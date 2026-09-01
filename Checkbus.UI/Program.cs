@@ -1,3 +1,4 @@
+using Checkbus.BLL.DependencyInjection;
 using Checkbus.UI.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+var connectionString = builder.Configuration.GetConnectionString("CheckbusDb")
+    ?? throw new InvalidOperationException("Connection string 'CheckbusDb' is not configured.");
+
+builder.Services.AddCheckbusApplication(connectionString);
 
 var app = builder.Build();
 

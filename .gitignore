@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Documentación de negocio confidencial (requisitos, decisiones, planificación)
+Data/

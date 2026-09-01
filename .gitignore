@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # Documentación de negocio confidencial (requisitos, decisiones, planificación)
 Data/
+
+# Indice local de CodeGraph (cache regenerable, no se comparte)
+.codegraph/

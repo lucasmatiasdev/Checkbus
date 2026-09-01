@@ -11,4 +11,11 @@
     <ProjectReference Include="..\Checkbus.DAL\Checkbus.DAL.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Needed for IHttpContextAccessor (HttpContextTenantProvider) and the
+         non-EF Microsoft.AspNetCore.Identity password hashing primitives
+         (PasswordHasher<TUser>) used by AuthService/CompanyRegistrationService. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 </Project>

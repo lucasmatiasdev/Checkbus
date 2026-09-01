@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Checkbus.BEL\Checkbus.BEL.csproj" />
+    <ProjectReference Include="..\Checkbus.DAL\Checkbus.DAL.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Checkbus.BEL/Checkbus.BEL.csproj" Id="57def8f9-a844-4799-a58b-f3e67a1e1697" />
+  <Project Path="Checkbus.BLL/Checkbus.BLL.csproj" Id="38f1442a-776b-48f1-b5c3-7d16bfaaef15" />
+  <Project Path="Checkbus.DAL/Checkbus.DAL.csproj" Id="6d5a5d9c-9455-42aa-bbb0-04d091165654" />
+  <Project Path="Checkbus.Tests/Checkbus.Tests.csproj" Id="94928e99-6d03-43e4-bfa5-486e0b1705ff" />
+  <Project Path="Checkbus.UI/Checkbus.UI.csproj" Id="e279c113-61e0-4c89-9cd3-14d9fb623db2" />
+</Solution>

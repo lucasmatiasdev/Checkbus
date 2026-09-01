@@ -6,6 +6,7 @@ using Checkbus.BLL.Organization;
 using Checkbus.UI.Components;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddMudServices();
 
 var connectionString = builder.Configuration.GetConnectionString("CheckbusDb")
     ?? throw new InvalidOperationException("Connection string 'CheckbusDb' is not configured.");

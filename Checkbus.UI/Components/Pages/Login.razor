@@ -4,7 +4,7 @@
 
 <h1>Iniciar sesión</h1>
 
-@if (HttpContext.Request.Query.ContainsKey("error"))
+@if (_hasError)
 {
     <p class="text-danger">Correo electrónico o contraseña incorrectos.</p>
 }
@@ -27,6 +27,14 @@
 </p>
 
 @code {
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private bool _hasError;
+
+    protected override void OnInitialized()
+    {
+        var query = QueryHelpers.ParseQuery(new Uri(NavigationManager.Uri).Query);
+        _hasError = query.ContainsKey("error");
+    }
 }

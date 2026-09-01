@@ -1,3 +1,4 @@
+using Checkbus.BLL.Auth;
 using Checkbus.DAL.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +14,12 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddCheckbusApplication(this IServiceCollection services, string connectionString)
     {
         services.AddCheckbusPersistence(connectionString);
+
+        services.AddScoped<IEntitlementService, EntitlementService>();
+        services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<IAuthorizationGuard, AuthorizationGuard>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<IUserService, UserService>();
 
         return services;
     }

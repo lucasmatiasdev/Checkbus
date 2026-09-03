@@ -1,0 +1,16 @@
+@inherits LayoutComponentBase
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h6">CheckBus</MudText>
+        <MudSpacer />
+        <MudButton Href="/#inicio" Variant="Variant.Text" Color="Color.Inherit">Inicio</MudButton>
+        <MudButton Href="/#nosotros" Variant="Variant.Text" Color="Color.Inherit">Nosotros</MudButton>
+        <MudButton Href="/#servicios" Variant="Variant.Text" Color="Color.Inherit">Servicios</MudButton>
+        <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" Class="ml-4">Iniciar sesión</MudButton>
+    </MudAppBar>
+
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>

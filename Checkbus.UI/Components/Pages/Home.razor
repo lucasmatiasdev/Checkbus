@@ -1,38 +1,46 @@
 @page "/"
-@using Checkbus.BEL.Auth
-@using Microsoft.AspNetCore.Components.Authorization
+@layout Layout.MarketingLayout
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Checkbus</PageTitle>
 
-@if (currentUser?.Identity?.IsAuthenticated == true)
-{
-    <h1>Hola, @currentUser.Identity!.Name</h1>
-    <p>Organización actual: @currentUser.FindFirst(CheckbusClaimTypes.OrganizationId)?.Value</p>
-    <form method="post" action="/account/logout">
-        <button type="submit" class="btn btn-secondary">Cerrar sesión</button>
-    </form>
-}
-else
-{
-    <h1>Checkbus</h1>
-    <p>
-        <a href="/login">Iniciar sesión</a> o
-        <a href="/empresas/nueva">dar de alta una empresa</a>.
-    </p>
-}
+<section id="inicio" style="min-height: 80vh; display: flex; align-items: center;">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-16">
+        <MudText Typo="Typo.h2" Class="mb-4">Checkbus</MudText>
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
+            Gestión integral de flota, rutas y viajes para empresas de transporte.
+        </MudText>
+        <MudButton Href="/company-registration" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large">
+            Dar de alta una empresa
+        </MudButton>
+    </MudContainer>
+</section>
 
-@code {
-    [CascadingParameter]
-    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+<section id="nosotros" style="min-height: 60vh; display: flex; align-items: center;">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-16">
+        <MudText Typo="Typo.h3" Class="mb-4">Nosotros</MudText>
+        <MudText Typo="Typo.body1">
+            Checkbus nace para que las empresas de transporte de pasajeros administren su operación completa
+            desde un solo lugar: flota, choferes, rutas, viajes, reservas y pagos.
+        </MudText>
+    </MudContainer>
+</section>
 
-    private System.Security.Claims.ClaimsPrincipal? currentUser;
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (AuthenticationStateTask is not null)
-        {
-            var state = await AuthenticationStateTask;
-            currentUser = state.User;
-        }
-    }
-}
+<section id="servicios" style="min-height: 60vh; display: flex; align-items: center;">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-16">
+        <MudText Typo="Typo.h3" Class="mb-6">Servicios</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.h6" Class="mb-2">Flota y choferes</MudText>
+                <MudText Typo="Typo.body2">Documentación, mantenimiento y diagnóstico de vehículos y choferes.</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.h6" Class="mb-2">Rutas y viajes</MudText>
+                <MudText Typo="Typo.body2">Planificación de rutas, paradas y publicación de viajes.</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.h6" Class="mb-2">Reservas y pagos</MudText>
+                <MudText Typo="Typo.body2">Compra online de pasajes con confirmación de pago integrada.</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</section>

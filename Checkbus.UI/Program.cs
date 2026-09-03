@@ -70,7 +70,7 @@ app.MapPost("/account/login", async (HttpContext http, IAuthService authService)
 
     await SignInAsync(http, authenticated.UserId, authenticated.Email, authenticated.FullName,
         authenticated.OrganizationId, authenticated.RoleId, authenticated.RoleName);
-    return Results.Redirect("/");
+    return Results.Redirect("/app");
 });
 
 app.MapPost("/account/register-company", async (HttpContext http, ICompanyRegistrationService registrationService) =>
@@ -89,18 +89,18 @@ app.MapPost("/account/register-company", async (HttpContext http, ICompanyRegist
 
         await SignInAsync(http, registered.AdminUserId, adminEmail, adminFullName,
             registered.OrganizationId, registered.AdminRoleId, registered.AdminRoleName);
-        return Results.Redirect("/");
+        return Results.Redirect("/app");
     }
     catch (InvalidOperationException)
     {
-        return Results.Redirect("/empresas/nueva?error=1");
+        return Results.Redirect("/company-registration?error=1");
     }
 });
 
 app.MapPost("/account/logout", async (HttpContext http) =>
 {
     await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    return Results.Redirect("/login");
+    return Results.Redirect("/");
 });
 
 app.Run();

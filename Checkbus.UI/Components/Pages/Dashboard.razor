@@ -1,0 +1,29 @@
+@page "/app"
+@using Checkbus.BEL.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
+
+<PageTitle>Checkbus</PageTitle>
+
+<h1>Hola, @currentUser?.Identity?.Name</h1>
+<p>Organización actual: @currentUser?.FindFirst(CheckbusClaimTypes.OrganizationId)?.Value</p>
+<form method="post" action="/account/logout">
+    <button type="submit" class="btn btn-secondary">Cerrar sesión</button>
+</form>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private System.Security.Claims.ClaimsPrincipal? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is not null)
+        {
+            var state = await AuthenticationStateTask;
+            currentUser = state.User;
+        }
+    }
+}

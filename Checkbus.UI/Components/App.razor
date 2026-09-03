@@ -17,9 +17,32 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="RenderModeForPage" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 
 </html>
+
+@code {
+    // /, /login y /company-registration usan forms POST planos (login, alta de
+    // empresa) protegidos con <AntiforgeryToken />: deben quedar en Static SSR
+    // (render mode null hereda el estático de App.razor) para que el token no
+    // se genere dos veces (prerender + hidratación del circuito), lo cual
+    // desincroniza el campo oculto de la cookie antiforgery y rompe el primer
+    // submit. /app necesita interactividad (drawer de MainLayout, futuras
+    // pantallas) pero también tiene un form con AntiforgeryToken (logout), así
+    // que va con prerender deshabilitado en vez de estático.
+    private static readonly string[] StaticSsrPaths = ["/", "/login", "/company-registration"];
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IComponentRenderMode? RenderModeForPage =>
+        HttpContext.Request.Path.Value switch
+        {
+            var path when StaticSsrPaths.Contains(path) => null,
+            "/app" => new InteractiveServerRenderMode(prerender: false),
+            _ => RenderMode.InteractiveServer,
+        };
+}

@@ -9,6 +9,7 @@
 <h1>Hola, @currentUser?.Identity?.Name</h1>
 <p>Organización actual: @currentUser?.FindFirst(CheckbusClaimTypes.OrganizationId)?.Value</p>
 <form method="post" action="/account/logout">
+    <AntiforgeryToken />
     <button type="submit" class="btn btn-secondary">Cerrar sesión</button>
 </form>
 

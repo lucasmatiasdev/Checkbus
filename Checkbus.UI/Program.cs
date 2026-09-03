@@ -4,6 +4,7 @@ using Checkbus.BLL.Auth;
 using Checkbus.BLL.DependencyInjection;
 using Checkbus.BLL.Organization;
 using Checkbus.UI.Components;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using MudBlazor.Services;
@@ -31,6 +32,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.AccessDeniedPath = "/login";
     });
 builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery();
 
 var app = builder.Build();
 
@@ -71,7 +73,7 @@ app.MapPost("/account/login", async (HttpContext http, IAuthService authService)
     await SignInAsync(http, authenticated.UserId, authenticated.Email, authenticated.FullName,
         authenticated.OrganizationId, authenticated.RoleId, authenticated.RoleName);
     return Results.Redirect("/app");
-});
+}).ValidateAntiforgery();
 
 app.MapPost("/account/register-company", async (HttpContext http, ICompanyRegistrationService registrationService) =>
 {
@@ -95,13 +97,13 @@ app.MapPost("/account/register-company", async (HttpContext http, ICompanyRegist
     {
         return Results.Redirect("/company-registration?error=1");
     }
-});
+}).ValidateAntiforgery();
 
 app.MapPost("/account/logout", async (HttpContext http) =>
 {
     await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/");
-});
+}).ValidateAntiforgery();
 
 app.Run();
 
@@ -119,4 +121,24 @@ static async Task SignInAsync(
     };
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+}
+
+internal static class AntiforgeryExtensions
+{
+    public static TBuilder ValidateAntiforgery<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder
+    {
+        return builder.AddEndpointFilter(async (context, next) =>
+        {
+            var antiforgery = context.HttpContext.RequestServices.GetRequiredService<IAntiforgery>();
+            try
+            {
+                await antiforgery.ValidateRequestAsync(context.HttpContext);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest("Antiforgery token validation failed.");
+            }
+            return await next(context);
+        });
+    }
 }

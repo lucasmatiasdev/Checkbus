@@ -1,0 +1,145 @@
+@page "/app/vehicles/new"
+@using Checkbus.BEL.Fleet.Enums
+@using Checkbus.BLL.Fleet
+@using Checkbus.BLL.Tenancy
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IFleetService FleetService
+@inject CircuitTenantState CircuitTenantState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Nuevo vehículo</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Nuevo vehículo</MudText>
+
+<MudCard Class="pa-4" Style="max-width: 640px;">
+    <MudCardContent>
+        <MudForm @ref="_form" Model="_model">
+            <MudText Typo="Typo.h6" Class="mb-2">Datos del vehículo</MudText>
+            <MudTextField T="string" Label="Patente" @bind-Value="_model.Plate"
+                          Required="true" RequiredError="Campo obligatorio" Class="mb-3" />
+            <MudNumericField T="int" Label="Capacidad" @bind-Value="_model.Capacity" Min="1" Class="mb-4" />
+
+            <MudText Typo="Typo.h6" Class="mb-2">Documentación</MudText>
+            <MudSelect T="VehicleDocumentationType" Label="Tipo de documento" @bind-Value="_model.DocumentationType" Class="mb-3">
+                @foreach (var type in Enum.GetValues<VehicleDocumentationType>())
+                {
+                    <MudSelectItem T="VehicleDocumentationType" Value="type">@type</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="Número de documento" @bind-Value="_model.DocumentNumber"
+                          Required="true" RequiredError="Campo obligatorio" Class="mb-3" />
+            <MudSelect T="VehicleDocumentationState" Label="Estado" @bind-Value="_model.DocumentationState" Class="mb-3">
+                @foreach (var state in Enum.GetValues<VehicleDocumentationState>())
+                {
+                    <MudSelectItem T="VehicleDocumentationState" Value="state">@state</MudSelectItem>
+                }
+            </MudSelect>
+            <InputFile OnChange="OnDocumentationFileSelected" />
+            @if (_documentationFileName is not null)
+            {
+                <MudText Typo="Typo.body2" Class="mt-1 mb-4">Archivo seleccionado: @_documentationFileName</MudText>
+            }
+
+            <MudText Typo="Typo.h6" Class="my-2">Diagnóstico inicial</MudText>
+            <MudNumericField T="int" Label="Kilometraje" @bind-Value="_model.Mileage" Min="0" Class="mb-3" />
+            @foreach (var component in Enum.GetValues<VehicleComponent>())
+            {
+                <MudSelect T="ComponentRating" Label="@component.ToString()" Value="_ratings[component]"
+                          ValueChanged="@(r => _ratings[component] = r)" Class="mb-3">
+                    @foreach (var rating in Enum.GetValues<ComponentRating>())
+                    {
+                        <MudSelectItem T="ComponentRating" Value="rating">@rating</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </MudForm>
+
+        @if (_errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_errorMessage</MudAlert>
+        }
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">Guardar</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private const long MaxUploadBytes = 10 * 1024 * 1024;
+
+    private MudForm _form = null!;
+    private readonly VehicleFormModel _model = new();
+    private readonly Dictionary<VehicleComponent, ComponentRating> _ratings =
+        Enum.GetValues<VehicleComponent>().ToDictionary(c => c, _ => ComponentRating.Optimo);
+    private IBrowserFile? _documentationFile;
+    private string? _documentationFileName;
+    private bool _saving;
+    private string? _errorMessage;
+
+    private void OnDocumentationFileSelected(InputFileChangeEventArgs e)
+    {
+        _documentationFile = e.File;
+        _documentationFileName = e.File.Name;
+    }
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        var organizationId = CircuitTenantState.OrganizationId;
+        if (organizationId is null)
+        {
+            _errorMessage = "No se pudo determinar la organización actual.";
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+        try
+        {
+            FileUpload? documentationAttachment = null;
+            if (_documentationFile is not null)
+            {
+                var stream = _documentationFile.OpenReadStream(MaxUploadBytes);
+                var format = Path.GetExtension(_documentationFile.Name).TrimStart('.');
+                documentationAttachment = new FileUpload(_documentationFile.Name, format, stream);
+            }
+
+            var componentRatings = _ratings
+                .Select(kvp => new ComponentRatingInput(kvp.Key, kvp.Value))
+                .ToList();
+
+            await FleetService.CreateVehicleAsync(
+                organizationId.Value, _model.Plate, _model.Capacity,
+                _model.DocumentationType, _model.DocumentNumber, _model.DocumentationState,
+                documentationAttachment, _model.Mileage, componentRatings);
+
+            Snackbar.Add("Vehículo creado correctamente.", Severity.Success);
+            NavigationManager.NavigateTo("/app");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "No se pudo crear el vehículo: " + ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class VehicleFormModel
+    {
+        public string Plate { get; set; } = string.Empty;
+        public int Capacity { get; set; } = 1;
+        public VehicleDocumentationType DocumentationType { get; set; } = VehicleDocumentationType.Vtv;
+        public string DocumentNumber { get; set; } = string.Empty;
+        public VehicleDocumentationState DocumentationState { get; set; } = VehicleDocumentationState.Pendiente;
+        public int Mileage { get; set; }
+    }
+}

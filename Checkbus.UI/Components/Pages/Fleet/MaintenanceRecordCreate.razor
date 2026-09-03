@@ -1,0 +1,120 @@
+@page "/app/maintenance/new"
+@using Checkbus.BEL.Fleet.Enums
+@using Checkbus.BLL.Fleet
+@using Checkbus.BLL.Tenancy
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IFleetService FleetService
+@inject CircuitTenantState CircuitTenantState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Nuevo mantenimiento</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Registrar mantenimiento</MudText>
+
+<MudCard Class="pa-4" Style="max-width: 560px;">
+    <MudCardContent>
+        @if (_vehicles is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_vehicles.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No hay vehículos cargados todavía. Creá un vehículo primero.</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form" Model="_model">
+                <MudSelect T="int" Label="Vehículo" @bind-Value="_model.VehicleId" Required="true" Class="mb-3">
+                    @foreach (var vehicle in _vehicles)
+                    {
+                        <MudSelectItem T="int" Value="vehicle.Id">@vehicle.Plate</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudDatePicker Label="Fecha del evento" @bind-Date="_eventDate" Class="mb-3" />
+                <MudTextField T="string" Label="Descripción" @bind-Value="_model.Description" Lines="3"
+                              Required="true" RequiredError="Campo obligatorio" Class="mb-3" />
+                <MudTextField T="string" Label="Componente(s) afectado(s)" @bind-Value="_model.AffectedComponents"
+                              Required="true" RequiredError="Campo obligatorio" Class="mb-3" />
+                <MudSelect T="MaintenanceStatus" Label="Estado" @bind-Value="_model.Status" Class="mb-3">
+                    @foreach (var status in Enum.GetValues<MaintenanceStatus>())
+                    {
+                        <MudSelectItem T="MaintenanceStatus" Value="status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudForm>
+        }
+
+        @if (_errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_errorMessage</MudAlert>
+        }
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                  Disabled="@(_saving || _vehicles is null || _vehicles.Count == 0)">Guardar</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private MudForm _form = null!;
+    private readonly MaintenanceFormModel _model = new();
+    private DateTime? _eventDate = DateTime.UtcNow;
+    private IReadOnlyList<VehicleSummary>? _vehicles;
+    private bool _saving;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var organizationId = CircuitTenantState.OrganizationId;
+        if (organizationId is null)
+        {
+            _errorMessage = "No se pudo determinar la organización actual.";
+            _vehicles = Array.Empty<VehicleSummary>();
+            return;
+        }
+
+        _vehicles = await FleetService.GetVehiclesAsync(organizationId.Value);
+        if (_vehicles.Count > 0)
+        {
+            _model.VehicleId = _vehicles[0].Id;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+        try
+        {
+            await FleetService.CreateMaintenanceRecordAsync(
+                _model.VehicleId, _eventDate ?? DateTime.UtcNow, _model.Description, _model.AffectedComponents, _model.Status);
+
+            Snackbar.Add("Mantenimiento registrado correctamente.", Severity.Success);
+            NavigationManager.NavigateTo("/app");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "No se pudo registrar el mantenimiento: " + ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class MaintenanceFormModel
+    {
+        public int VehicleId { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string AffectedComponents { get; set; } = string.Empty;
+        public MaintenanceStatus Status { get; set; } = MaintenanceStatus.Programado;
+    }
+}

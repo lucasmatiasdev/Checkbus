@@ -16,10 +16,12 @@ namespace Checkbus.BLL.Tenancy;
 public class HttpContextTenantProvider : ITenantProvider
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly CircuitTenantState _circuitTenantState;
 
-    public HttpContextTenantProvider(IHttpContextAccessor httpContextAccessor)
+    public HttpContextTenantProvider(IHttpContextAccessor httpContextAccessor, CircuitTenantState circuitTenantState)
     {
         _httpContextAccessor = httpContextAccessor;
+        _circuitTenantState = circuitTenantState;
     }
 
     public int? CurrentOrganizationId
@@ -29,9 +31,15 @@ public class HttpContextTenantProvider : ITenantProvider
             var claimValue = _httpContextAccessor.HttpContext?.User?
                 .FindFirst(CheckbusClaimTypes.OrganizationId)?.Value;
 
-            return claimValue is not null && int.TryParse(claimValue, out var organizationId)
-                ? organizationId
-                : null;
+            if (claimValue is not null && int.TryParse(claimValue, out var organizationId))
+            {
+                return organizationId;
+            }
+
+            // HttpContext is unreliable deep inside an interactive Blazor
+            // Server circuit (past the initial render) — fall back to the
+            // value captured once at first render by CircuitTenantState.
+            return _circuitTenantState.OrganizationId;
         }
     }
 

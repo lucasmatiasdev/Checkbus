@@ -15,7 +15,16 @@ builder.Services.AddMudServices();
 var connectionString = builder.Configuration.GetConnectionString("CheckbusDb")
     ?? throw new InvalidOperationException("Connection string 'CheckbusDb' is not configured.");
 
-builder.Services.AddCheckbusApplication(connectionString);
+// Environment-configurable base path for IFileStorageService (decision #41):
+// a developer's own local disk by default, the VPS's local disk once
+// deployed via the FileStorage:BasePath configuration value — no code change
+// needed to move between environments.
+var configuredFileStorageBasePath = builder.Configuration["FileStorage:BasePath"];
+var fileStorageBasePath = string.IsNullOrWhiteSpace(configuredFileStorageBasePath)
+    ? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "file-storage")
+    : configuredFileStorageBasePath;
+
+builder.Services.AddCheckbusApplication(connectionString, fileStorageBasePath);
 
 // Minimal custom cookie authentication against Checkbus.BEL.Auth.User (CU-01):
 // deliberately not ASP.NET Core Identity's own user store, so CheckbusDbContext

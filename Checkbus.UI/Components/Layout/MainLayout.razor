@@ -1,4 +1,8 @@
 @inherits LayoutComponentBase
+@using Checkbus.BEL.Auth
+@using Checkbus.BLL.Tenancy
+@using Microsoft.AspNetCore.Components.Authorization
+@inject CircuitTenantState CircuitTenantState
 
 <MudLayout>
     <MudAppBar Elevation="1">
@@ -20,6 +24,26 @@
 
 @code {
     private bool _drawerOpen = true;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    // Populates the CircuitTenantState fallback once per circuit, from the
+    // cascading AuthenticationState (captured once at circuit start and
+    // reliable across later interactive renders, unlike IHttpContextAccessor
+    // — see CircuitTenantState/HttpContextTenantProvider). Any authenticated
+    // page under this layout that triggers a tenant-scoped BLL call from a
+    // component event (@onclick, EditForm OnValidSubmit, etc.) needs this.
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is not null)
+        {
+            var state = await AuthenticationStateTask;
+            var claimValue = state.User?.FindFirst(CheckbusClaimTypes.OrganizationId)?.Value;
+            var organizationId = claimValue is not null && int.TryParse(claimValue, out var parsed) ? parsed : (int?)null;
+            CircuitTenantState.Capture(organizationId);
+        }
+    }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 }

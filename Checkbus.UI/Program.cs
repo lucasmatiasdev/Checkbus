@@ -61,3 +61,12 @@ app.MapRazorComponents<App>()
 app.MapAccountEndpoints();
 
 app.Run();
+
+/// <summary>
+/// Standard .NET 8 marker for top-level-statement <c>Program.cs</c>: makes the
+/// otherwise-internal, compiler-generated <c>Program</c> class visible outside
+/// this assembly so <c>WebApplicationFactory&lt;Program&gt;</c> can host this
+/// exact application in-process for integration/end-to-end tests
+/// (Checkbus.Tests.EndToEnd).
+/// </summary>
+public partial class Program;

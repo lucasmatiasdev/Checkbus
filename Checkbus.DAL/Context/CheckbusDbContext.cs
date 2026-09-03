@@ -1,4 +1,5 @@
 using Checkbus.BEL.Auth;
+using Checkbus.BEL.Fleet;
 using Checkbus.DAL.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Organization = Checkbus.BEL.Organization.Organization;
@@ -58,6 +59,22 @@ public class CheckbusDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<Driver> Drivers => Set<Driver>();
+
+    public DbSet<License> Licenses => Set<License>();
+
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+
+    public DbSet<VehicleDocumentation> VehicleDocumentations => Set<VehicleDocumentation>();
+
+    public DbSet<VehicleDiagnostic> VehicleDiagnostics => Set<VehicleDiagnostic>();
+
+    public DbSet<ComponentDiagnostic> ComponentDiagnostics => Set<ComponentDiagnostic>();
+
+    public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
+
+    public DbSet<Attachment> Attachments => Set<Attachment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -67,6 +84,14 @@ public class CheckbusDbContext : DbContext
         modelBuilder.ApplyConfiguration(new RoleConfiguration(this));
         modelBuilder.ApplyConfiguration(new PermissionConfiguration());
         modelBuilder.ApplyConfiguration(new RolePermissionConfiguration(this));
+        modelBuilder.ApplyConfiguration(new DriverConfiguration(this));
+        modelBuilder.ApplyConfiguration(new LicenseConfiguration());
+        modelBuilder.ApplyConfiguration(new VehicleConfiguration(this));
+        modelBuilder.ApplyConfiguration(new VehicleDocumentationConfiguration());
+        modelBuilder.ApplyConfiguration(new VehicleDiagnosticConfiguration());
+        modelBuilder.ApplyConfiguration(new ComponentDiagnosticConfiguration());
+        modelBuilder.ApplyConfiguration(new MaintenanceRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AttachmentConfiguration(this));
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

@@ -1,4 +1,7 @@
+using Checkbus.Application.Abstractions;
 using Checkbus.Infrastructure.Context;
+using Checkbus.Infrastructure.Repositories;
+using Checkbus.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +24,10 @@ namespace Checkbus.Infrastructure
 
             services.AddScoped(provider =>
                 provider.GetRequiredService<IDbContextFactory<CheckbusDbContext>>().CreateDbContext());
+
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
 
             return services;
         }

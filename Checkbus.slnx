@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Checkbus.Application/Checkbus.Application.csproj" />
+  <Project Path="Checkbus.Domain/Checkbus.Domain.csproj" />
+  <Project Path="Checkbus.Infrastructure/Checkbus.Infrastructure.csproj" />
+  <Project Path="Checkbus.Presentation/Checkbus.Presentation.csproj" />
+  <Project Path="Checkbus.UnitTests/Checkbus.UnitTests.csproj" />
+</Solution>

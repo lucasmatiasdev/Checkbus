@@ -1,14 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>0097e834-dadb-4e32-8128-246114c42f80</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Checkbus.Application\Checkbus.Application.csproj" />
     <ProjectReference Include="..\Checkbus.Domain\Checkbus.Domain.csproj" />
+    <ProjectReference Include="..\Checkbus.Infrastructure\Checkbus.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

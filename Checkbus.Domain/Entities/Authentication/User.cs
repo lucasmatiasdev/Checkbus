@@ -1,5 +1,6 @@
 ﻿using Checkbus.Domain.Entities.Authentication.Authorization;
 using Checkbus.Domain.Entities.Tenancy;
+using Checkbus.Domain.Enums;
 using Checkbus.Domain.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -17,5 +18,12 @@ namespace Checkbus.Domain.Entities.Authentication
         public required string PasswordHash { get; set; }
         public required Organization Organization { get; set; }
         public required Profile Profile { get; set; }
+        public DocumentType DocumentType { get; set; } = DocumentType.DNI;
+        public required string DocumentNumber { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTimeOffset? LockedUntil { get; set; }
     }
 }

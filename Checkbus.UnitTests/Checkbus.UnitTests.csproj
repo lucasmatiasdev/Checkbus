@@ -12,8 +12,16 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Checkbus.Application\Checkbus.Application.csproj" />
+    <ProjectReference Include="..\Checkbus.Domain\Checkbus.Domain.csproj" />
+    <ProjectReference Include="..\Checkbus.Infrastructure\Checkbus.Infrastructure.csproj" />
+    <ProjectReference Include="..\Checkbus.Presentation\Checkbus.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,6 @@
 using Checkbus.Application.Abstractions;
 
-namespace Checkbus.Application.UseCases.Authentication
+namespace Checkbus.Application.UseCases.Authentication.Login
 {
     public sealed class LoginUseCase
     {
@@ -64,7 +64,7 @@ namespace Checkbus.Application.UseCases.Authentication
             user.UpdatedAt = now.UtcDateTime;
             await _userRepository.SaveChangesAsync(ct);
 
-            return LoginResult.Succeeded(user.Id, user.Email, user.OrganizationId);
+            return LoginResult.Succeeded(user.Id, user.Email, user.OrganizationId, user.MustChangePassword);
         }
     }
 }

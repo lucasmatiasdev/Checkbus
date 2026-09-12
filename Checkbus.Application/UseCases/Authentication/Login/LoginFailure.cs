@@ -1,4 +1,4 @@
-namespace Checkbus.Application.UseCases.Authentication
+namespace Checkbus.Application.UseCases.Authentication.Login
 {
     public enum LoginFailure
     {

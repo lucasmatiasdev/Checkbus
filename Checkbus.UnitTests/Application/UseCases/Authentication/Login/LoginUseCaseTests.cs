@@ -1,12 +1,12 @@
 using Checkbus.Application.Abstractions;
-using Checkbus.Application.UseCases.Authentication;
+using Checkbus.Application.UseCases.Authentication.Login;
 using Checkbus.Domain.Entities.Authentication;
 using Checkbus.Domain.Entities.Authentication.Authorization;
 using Checkbus.Domain.Entities.Tenancy;
 using Checkbus.UnitTests.TestDoubles;
 using NSubstitute;
 
-namespace Checkbus.UnitTests.Application.UseCases.Authentication
+namespace Checkbus.UnitTests.Application.UseCases.Authentication.Login
 {
     public class LoginUseCaseTests
     {
@@ -26,7 +26,8 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication
             bool isActive = true,
             DateTimeOffset? lockedUntil = null,
             int failedLoginAttempts = 0,
-            int organizationId = 1)
+            int organizationId = 1,
+            bool mustChangePassword = false)
         {
             return new User
             {
@@ -41,7 +42,8 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication
                 DocumentNumber = "12345678",
                 IsActive = isActive,
                 LockedUntil = lockedUntil,
-                FailedLoginAttempts = failedLoginAttempts
+                FailedLoginAttempts = failedLoginAttempts,
+                MustChangePassword = mustChangePassword
             };
         }
 
@@ -126,6 +128,21 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication
             Assert.Equal(0, user.FailedLoginAttempts);
             Assert.Null(user.LockedUntil);
             await _userRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_ValidCredentialsWithMustChangePassword_ReturnsMustChangePasswordTrue()
+        {
+            var user = CreateUser(mustChangePassword: true);
+            _userRepository.FindByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+            _passwordHasher.Verify(StoredHash, ValidPassword).Returns(true);
+
+            var sut = CreateSut();
+
+            var result = await sut.ExecuteAsync(new LoginRequest(user.Email, ValidPassword));
+
+            Assert.True(result.Success);
+            Assert.True(result.MustChangePassword);
         }
 
         [Fact]

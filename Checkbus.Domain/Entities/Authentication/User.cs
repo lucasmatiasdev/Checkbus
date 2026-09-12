@@ -27,5 +27,6 @@ namespace Checkbus.Domain.Entities.Authentication
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public int FailedLoginAttempts { get; set; } = 0;
         public DateTimeOffset? LockedUntil { get; set; }
+        public bool MustChangePassword { get; set; } = true;
     }
 }

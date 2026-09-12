@@ -1,4 +1,4 @@
-namespace Checkbus.Application.UseCases.Authentication
+namespace Checkbus.Application.UseCases.Authentication.Login
 {
     public sealed record LoginResult
     {
@@ -7,14 +7,16 @@ namespace Checkbus.Application.UseCases.Authentication
         public int UserId { get; init; }
         public string? Email { get; init; }
         public int OrganizationId { get; init; }
+        public bool MustChangePassword { get; init; }
 
-        public static LoginResult Succeeded(int userId, string email, int organizationId) =>
+        public static LoginResult Succeeded(int userId, string email, int organizationId, bool mustChangePassword) =>
             new()
             {
                 Success = true,
                 UserId = userId,
                 Email = email,
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
+                MustChangePassword = mustChangePassword
             };
 
         public static LoginResult Failed(LoginFailure reason) =>

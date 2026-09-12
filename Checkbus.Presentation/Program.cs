@@ -1,11 +1,36 @@
+using Checkbus.Application.Abstractions;
 using Checkbus.Infrastructure;
+using Checkbus.Presentation.Authentication;
 using Checkbus.Presentation.Components;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// D1: CircuitCurrentTenant is registered as its concrete type (Scoped) so MainLayout can call
+// its PrimeAsync() priming method directly, and ICurrentTenant resolves to that same scoped
+// instance so CheckbusDbContext's query filter and the concrete type observe one cached value.
+// Registered before AddInfrastructure because AddInfrastructure's scoped DbContext delegate
+// resolves ICurrentTenant to bind it.
+builder.Services.AddScoped<CircuitCurrentTenant>();
+builder.Services.AddScoped<ICurrentTenant>(provider => provider.GetRequiredService<CircuitCurrentTenant>());
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "checkbus.auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/login";
+    });
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -22,6 +47,10 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

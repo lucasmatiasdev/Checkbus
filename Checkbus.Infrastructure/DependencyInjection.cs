@@ -27,7 +27,10 @@ namespace Checkbus.Infrastructure
 
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+            services.AddScoped<IProfileRepository, ProfileRepository>();
             services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
+            services.AddSingleton<IPasswordGenerator, CryptoPasswordGenerator>();
 
             return services;
         }

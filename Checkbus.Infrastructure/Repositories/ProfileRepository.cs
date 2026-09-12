@@ -14,11 +14,8 @@ namespace Checkbus.Infrastructure.Repositories
             _context = context;
         }
 
-        // MUST Include(Organization) — Profile's organization FK is a shadow property (D5);
-        // RegisterUseCase's tenancy check relies on the navigation being loaded.
         public Task<Profile?> FindByIdAsync(int id, CancellationToken ct = default) =>
             _context.Profiles
-                .Include(p => p.Organization)
                 .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 }

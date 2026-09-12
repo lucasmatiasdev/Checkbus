@@ -34,7 +34,7 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication.Register
             new() { Id = id, Name = name, CUIT = "20-12345678-9" };
 
         private static Profile CreateProfile(int id = DefaultProfileId, Organization? organization = null) =>
-            new() { Id = id, Name = "Default", Organization = organization };
+            new() { Id = id, Name = "Default", Organization = organization, OrganizationId = organization?.Id };
 
         private void SetupDefaultOrganizationAndProfile()
         {

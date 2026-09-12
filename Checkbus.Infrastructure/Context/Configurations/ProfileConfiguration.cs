@@ -16,7 +16,7 @@ namespace Checkbus.Infrastructure.Context.Configurations
 
             builder.HasOne(p => p.Organization)
                 .WithMany()
-                .HasForeignKey("OrganizationId")
+                .HasForeignKey(p => p.OrganizationId)
                 .IsRequired(false);
 
             // A6: explicit Profile<->Role many-to-many, unidirectional (no reverse nav on Role).

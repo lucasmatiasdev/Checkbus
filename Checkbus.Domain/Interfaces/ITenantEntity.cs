@@ -9,6 +9,7 @@ namespace Checkbus.Domain.Interfaces
 {
     public interface ITenantEntity
     {
+        public int OrganizationId { get; set; }
         public Organization Organization { get; set; }
     }
 }

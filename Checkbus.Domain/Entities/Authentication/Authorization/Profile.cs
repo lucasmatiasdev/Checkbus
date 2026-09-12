@@ -14,5 +14,6 @@ namespace Checkbus.Domain.Entities.Authentication.Authorization
         public required string Name { get; set; }
         public ICollection<Role> Roles { get; set; } = new List<Role>();
         public Organization? Organization { get; set; }
+        public int? OrganizationId { get; set; }
     }
 }

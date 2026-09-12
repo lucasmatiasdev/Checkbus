@@ -37,7 +37,7 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication.Login
                 PasswordHash = passwordHash,
                 Organization = new Organization { Id = organizationId, Name = "Org", CUIT = "20-12345678-9" },
                 OrganizationId = organizationId,
-                Profile = new Profile { Id = DefaultProfileId, Name = "Default" },
+                Profile = new Profile { Id = DefaultProfileId, Name = "Default", OrganizationId = organizationId },
                 ProfileId = DefaultProfileId,
                 DocumentNumber = "12345678",
                 IsActive = isActive,

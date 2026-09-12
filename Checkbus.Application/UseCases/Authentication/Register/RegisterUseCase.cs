@@ -58,7 +58,7 @@ namespace Checkbus.Application.UseCases.Authentication.Register
                 return RegisterResult.Failed(RegisterFailure.ProfileNotFound);
             }
 
-            if (profile.Organization is not null && profile.Organization.Id != request.OrganizationId)
+            if (profile.OrganizationId is not null && profile.OrganizationId != request.OrganizationId)
             {
                 // Deliberately indistinguishable from "profile does not exist" (design D5/spec cross-tenant scenario).
                 return RegisterResult.Failed(RegisterFailure.ProfileNotFound);

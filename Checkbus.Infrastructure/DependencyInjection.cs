@@ -1,4 +1,6 @@
 using Checkbus.Application.Abstractions;
+using Checkbus.Application.UseCases.Authentication.Login;
+using Checkbus.Application.UseCases.Authentication.Register;
 using Checkbus.Infrastructure.Context;
 using Checkbus.Infrastructure.Repositories;
 using Checkbus.Infrastructure.Security;
@@ -22,8 +24,14 @@ namespace Checkbus.Infrastructure
             services.AddDbContextFactory<CheckbusDbContext>(options =>
                 options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
 
+            // D4: bind the tenant after construction (never via the constructor) so
+            // AddDbContextFactory's options-only activation short-circuit stays intact.
             services.AddScoped(provider =>
-                provider.GetRequiredService<IDbContextFactory<CheckbusDbContext>>().CreateDbContext());
+            {
+                var context = provider.GetRequiredService<IDbContextFactory<CheckbusDbContext>>().CreateDbContext();
+                context.BindTenant(provider.GetRequiredService<ICurrentTenant>());
+                return context;
+            });
 
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<IUserRepository, UserRepository>();
@@ -31,6 +39,10 @@ namespace Checkbus.Infrastructure
             services.AddScoped<IProfileRepository, ProfileRepository>();
             services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
             services.AddSingleton<IPasswordGenerator, CryptoPasswordGenerator>();
+
+            // D8: scoped to match their scoped repository dependencies.
+            services.AddScoped<LoginUseCase>();
+            services.AddScoped<RegisterUseCase>();
 
             return services;
         }

@@ -17,8 +17,11 @@ namespace Checkbus.Infrastructure.Repositories
             _context = context;
         }
 
+        // D7: email is the global login identifier (unique by construction + 23505) and login
+        // runs before any tenant is bound, so this MUST bypass the D6 tenant filter.
         public Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken ct = default) =>
             _context.Users
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail, ct);
 
         public Task SaveChangesAsync(CancellationToken ct = default) =>
@@ -42,8 +45,12 @@ namespace Checkbus.Infrastructure.Repositories
             }
         }
 
+        // D7: already scoped by the explicit organizationId parameter; IgnoreQueryFilters avoids
+        // silently changing tested behavior for callers that pass an organization the caller's
+        // own tenant may not match (e.g. registration checks before a tenant is bound).
         public async Task<IReadOnlyList<string>> FindEmailsByPrefixAsync(int organizationId, string localPartPrefix, CancellationToken ct = default) =>
             await _context.Users
+                .IgnoreQueryFilters()
                 .Where(u => u.OrganizationId == organizationId && u.Email.StartsWith(localPartPrefix))
                 .Select(u => u.Email)
                 .ToListAsync(ct);

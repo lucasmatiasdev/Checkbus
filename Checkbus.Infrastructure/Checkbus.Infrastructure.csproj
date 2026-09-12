@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Lets integration tests bind a fixed tenant via the internal CheckbusDbContext.BindTenant
+         (D4/D9) without widening it to a public API. -->
+    <InternalsVisibleTo Include="Checkbus.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Checkbus.Application\Checkbus.Application.csproj" />
     <ProjectReference Include="..\Checkbus.Domain\Checkbus.Domain.csproj" />
   </ItemGroup>

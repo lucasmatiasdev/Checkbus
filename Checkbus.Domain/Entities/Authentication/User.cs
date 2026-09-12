@@ -17,7 +17,9 @@ namespace Checkbus.Domain.Entities.Authentication
         public required string Email { get; set; }
         public required string PasswordHash { get; set; }
         public required Organization Organization { get; set; }
+        public int OrganizationId { get; set; }
         public required Profile Profile { get; set; }
+        public int ProfileId { get; set; }
         public DocumentType DocumentType { get; set; } = DocumentType.DNI;
         public required string DocumentNumber { get; set; }
         public bool IsActive { get; set; } = true;

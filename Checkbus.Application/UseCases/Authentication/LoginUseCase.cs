@@ -64,7 +64,7 @@ namespace Checkbus.Application.UseCases.Authentication
             user.UpdatedAt = now.UtcDateTime;
             await _userRepository.SaveChangesAsync(ct);
 
-            return LoginResult.Succeeded(user.Id, user.Email, user.Organization.Id);
+            return LoginResult.Succeeded(user.Id, user.Email, user.OrganizationId);
         }
     }
 }

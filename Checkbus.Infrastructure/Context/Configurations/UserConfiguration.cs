@@ -31,12 +31,12 @@ namespace Checkbus.Infrastructure.Context.Configurations
 
             builder.HasOne(u => u.Organization)
                 .WithMany()
-                .HasForeignKey("OrganizationId")
+                .HasForeignKey(u => u.OrganizationId)
                 .IsRequired();
 
             builder.HasOne(u => u.Profile)
                 .WithMany()
-                .HasForeignKey("ProfileId")
+                .HasForeignKey(u => u.ProfileId)
                 .IsRequired();
         }
     }

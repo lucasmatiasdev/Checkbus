@@ -16,7 +16,6 @@ namespace Checkbus.Infrastructure.Repositories
 
         public Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken ct = default) =>
             _context.Users
-                .Include(u => u.Organization)
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail, ct);
 
         public Task SaveChangesAsync(CancellationToken ct = default) =>

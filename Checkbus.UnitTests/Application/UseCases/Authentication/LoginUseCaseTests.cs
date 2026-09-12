@@ -12,6 +12,7 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication
     {
         private const string ValidPassword = "correct-password";
         private const string StoredHash = "stored-hash";
+        private const int DefaultProfileId = 7;
 
         private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
         private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
@@ -34,7 +35,9 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication
                 Email = email,
                 PasswordHash = passwordHash,
                 Organization = new Organization { Id = organizationId, Name = "Org", CUIT = "20-12345678-9" },
-                Profile = new Profile { Name = "Default" },
+                OrganizationId = organizationId,
+                Profile = new Profile { Id = DefaultProfileId, Name = "Default" },
+                ProfileId = DefaultProfileId,
                 DocumentNumber = "12345678",
                 IsActive = isActive,
                 LockedUntil = lockedUntil,

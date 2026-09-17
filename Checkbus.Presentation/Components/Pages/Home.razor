@@ -1,7 +1,25 @@
-﻿@page "/"
+@page "/"
+@layout EmptyLayout
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Checkbus</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudThemeProvider Theme="CheckbusTheme.Default" IsDarkMode="true" />
 
-Welcome to your new app.
+<SiteNav />
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-16">
+    <section id="hero" class="py-16">
+        <MudText Typo="Typo.h2" HtmlTag="h1" GutterBottom="true">Checkbus</MudText>
+        <MudText Typo="Typo.subtitle1">Placeholder: propuesta de valor en una línea.</MudText>
+    </section>
+
+    <section id="about" class="py-16">
+        <MudText Typo="Typo.h3" GutterBottom="true">Sobre Nosotros</MudText>
+        <MudText Typo="Typo.body1">Placeholder: párrafo breve sobre la empresa.</MudText>
+    </section>
+
+    <section id="contact" class="py-16">
+        <MudText Typo="Typo.h3" GutterBottom="true">Contacto</MudText>
+        <MudText Typo="Typo.body1">Placeholder: datos de contacto. Sin formulario (fuera de alcance).</MudText>
+    </section>
+</MudContainer>

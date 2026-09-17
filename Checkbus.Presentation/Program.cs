@@ -1,8 +1,11 @@
 using Checkbus.Application.Abstractions;
 using Checkbus.Infrastructure;
+using Checkbus.Infrastructure.Context;
+using Checkbus.Infrastructure.Seeding;
 using Checkbus.Presentation.Authentication;
 using Checkbus.Presentation.Components;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +38,21 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+// Development-only: apply pending EF Core migrations and seed Development-only data. Staging and
+// Production schema changes stay a deliberate, separate `dotnet ef database update` operation, and
+// seeding never runs anywhere else (spec "Automatic Migration at Startup (Development Only)",
+// "No Migration Outside Development", "Development-Only Gating").
+if (app.Environment.IsDevelopment())
+{
+    var contextFactory = app.Services.GetRequiredService<IDbContextFactory<CheckbusDbContext>>();
+    await using var migrationContext = await contextFactory.CreateDbContextAsync();
+    await migrationContext.Database.MigrateAsync();
+
+    using var seedScope = app.Services.CreateScope();
+    var seeder = seedScope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
+    await seeder.SeedAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

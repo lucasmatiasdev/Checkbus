@@ -4,6 +4,7 @@ using Checkbus.Application.UseCases.Authentication.Register;
 using Checkbus.Infrastructure.Context;
 using Checkbus.Infrastructure.Repositories;
 using Checkbus.Infrastructure.Security;
+using Checkbus.Infrastructure.Seeding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,12 @@ namespace Checkbus.Infrastructure
             // D8: scoped to match their scoped repository dependencies.
             services.AddScoped<LoginUseCase>();
             services.AddScoped<RegisterUseCase>();
+
+            // Registered unconditionally; the only Development gate is the Program.cs call site
+            // (design "single Development gate") — a registered-but-never-invoked service is not
+            // a reachable path.
+            services.AddScoped<ISeedDataStore, DbContextSeedDataStore>();
+            services.AddScoped<DevelopmentDataSeeder>();
 
             return services;
         }

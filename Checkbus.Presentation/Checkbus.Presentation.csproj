@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Lets Checkbus.UnitTests reference the compiler-generated internal Program class via
+         WebApplicationFactory<Program> for the Development-gate integration test. -->
+    <InternalsVisibleTo Include="Checkbus.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Checkbus.Application\Checkbus.Application.csproj" />
     <ProjectReference Include="..\Checkbus.Domain\Checkbus.Domain.csproj" />
     <ProjectReference Include="..\Checkbus.Infrastructure\Checkbus.Infrastructure.csproj" />

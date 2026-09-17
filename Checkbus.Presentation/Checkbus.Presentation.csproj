@@ -19,4 +19,9 @@
     <ProjectReference Include="..\Checkbus.Infrastructure\Checkbus.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="4.1.0" />
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+  </ItemGroup>
+
 </Project>

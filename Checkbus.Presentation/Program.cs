@@ -6,6 +6,7 @@ using Checkbus.Presentation.Authentication;
 using Checkbus.Presentation.Components;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddMudServices();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 

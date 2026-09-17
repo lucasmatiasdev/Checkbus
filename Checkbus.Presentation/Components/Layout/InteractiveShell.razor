@@ -1,0 +1,16 @@
+@rendermode InteractiveServer
+@inject Checkbus.Presentation.Authentication.CircuitCurrentTenant CircuitCurrentTenant
+
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // The circuit is a different DI scope than the static SSR request that rendered
+        // MainLayout (design D-F2). Priming here as well keeps ICurrentTenant.OrganizationId
+        // populated for every ITenantEntity query made from inside this interactive island.
+        await CircuitCurrentTenant.PrimeAsync();
+    }
+}

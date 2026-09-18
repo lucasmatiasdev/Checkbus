@@ -2,6 +2,7 @@ using System.Reflection;
 using Checkbus.Presentation.Components.Layout;
 using Checkbus.Presentation.Components.Pages;
 using Checkbus.Presentation.Components.Shared;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -13,6 +14,9 @@ namespace Checkbus.UnitTests.Presentation
     /// under a content-free <see cref="EmptyLayout"/> so neither opens a circuit; the still-static
     /// <see cref="MainLayout"/> hosts the interactive island (<see cref="InteractiveShell"/>) as a
     /// sibling of <c>@Body</c>, never as an ancestor that would force a circuit onto every routed page.
+    /// Dashboard is the first page routed through <see cref="MainLayout"/> (no page-level
+    /// <c>@layout</c> override), so it is the first to inherit interactivity via
+    /// <see cref="InteractiveShell"/> rather than staying static under <see cref="EmptyLayout"/>.
     /// </summary>
     public class RenderModeBoundaryTests
     {
@@ -100,6 +104,30 @@ namespace Checkbus.UnitTests.Presentation
             var layoutAttribute = typeof(SiteNav).GetCustomAttribute<LayoutAttribute>();
 
             Assert.Null(layoutAttribute);
+        }
+
+        [Fact]
+        public void Dashboard_HasNoRenderModeAttribute()
+        {
+            var renderModeAttributes = typeof(Dashboard).GetCustomAttributes(inherit: false)
+                .OfType<RenderModeAttribute>()
+                .ToList();
+
+            Assert.Empty(renderModeAttributes);
+        }
+
+        [Fact]
+        public void Dashboard_HasNoLayoutAttribute()
+        {
+            var layoutAttribute = typeof(Dashboard).GetCustomAttribute<LayoutAttribute>();
+
+            Assert.Null(layoutAttribute);
+        }
+
+        [Fact]
+        public void Dashboard_HasAuthorizeAttribute()
+        {
+            Assert.NotNull(typeof(Dashboard).GetCustomAttribute<AuthorizeAttribute>());
         }
     }
 }

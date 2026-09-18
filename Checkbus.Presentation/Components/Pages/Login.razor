@@ -57,7 +57,7 @@
 
         var principal = LoginPrincipalFactory.Create(result);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
-        NavigationManager.NavigateTo("/", forceLoad: true);
+        NavigationManager.NavigateTo("/dashboard", forceLoad: true);
     }
 
     private sealed class InputModel

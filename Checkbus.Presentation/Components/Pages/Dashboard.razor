@@ -1,10 +1,34 @@
 @page "/dashboard"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
+@inject NavigationManager NavigationManager
 
 <PageTitle>Dashboard — Checkbus</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large">
     <MudText Typo="Typo.h2" HtmlTag="h1" GutterBottom="true">Dashboard</MudText>
     <MudText Typo="Typo.subtitle1">Placeholder: contenido del panel pendiente.</MudText>
+
+    @* TEMPORARY placeholder control — delete once the authenticated nav component
+       owns sign-out. Static SSR has no @onclick, so this is a form POST (see D-DL1). *@
+    <EditForm Model="logoutFormModel" FormName="logout" Method="post" OnSubmit="LogoutUser" class="mt-6">
+        <MudStaticButton Variant="Variant.Outlined" Color="Color.Secondary" ButtonType="@ButtonType.Submit">Cerrar sesión</MudStaticButton>
+    </EditForm>
 </MudContainer>
+
+@code {
+    // TEMPORARY (see markup comment). EditForm mandates a non-null Model even with
+    // no fields to bind; this inert object satisfies that contract — D-DL2.
+    private readonly object logoutFormModel = new();
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private async Task LogoutUser()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+}

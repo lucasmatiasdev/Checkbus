@@ -31,11 +31,15 @@ namespace Checkbus.UnitTests.Presentation.Authentication
             }
         }
 
-        private static ClaimsPrincipal AuthenticatedPrincipal(int organizationId)
+        private static ClaimsPrincipal AuthenticatedPrincipal(int organizationId, string? organizationName = null)
         {
-            var identity = new ClaimsIdentity(
-                new[] { new Claim(CheckbusClaims.OrganizationId, organizationId.ToString()) },
-                authenticationType: "TestAuth");
+            var claims = new List<Claim> { new(CheckbusClaims.OrganizationId, organizationId.ToString()) };
+            if (organizationName is not null)
+            {
+                claims.Add(new Claim(CheckbusClaims.OrganizationName, organizationName));
+            }
+
+            var identity = new ClaimsIdentity(claims, authenticationType: "TestAuth");
             return new ClaimsPrincipal(identity);
         }
 
@@ -55,6 +59,17 @@ namespace Checkbus.UnitTests.Presentation.Authentication
         }
 
         [Fact]
+        public async Task PrimeAsync_AuthenticatedPrincipal_CachesOrganizationName()
+        {
+            var provider = new FakeAuthenticationStateProvider(AuthenticatedPrincipal(9, "Checkbus Norte"));
+            var sut = new CircuitCurrentTenant(provider);
+
+            await sut.PrimeAsync();
+
+            Assert.Equal("Checkbus Norte", sut.OrganizationName);
+        }
+
+        [Fact]
         public async Task PrimeAsync_AnonymousPrincipal_ReturnsNullOrganizationId()
         {
             var provider = new FakeAuthenticationStateProvider(AnonymousPrincipal());
@@ -63,6 +78,17 @@ namespace Checkbus.UnitTests.Presentation.Authentication
             await sut.PrimeAsync();
 
             Assert.Null(sut.OrganizationId);
+        }
+
+        [Fact]
+        public async Task PrimeAsync_AnonymousPrincipal_ReturnsNullOrganizationName()
+        {
+            var provider = new FakeAuthenticationStateProvider(AnonymousPrincipal());
+            var sut = new CircuitCurrentTenant(provider);
+
+            await sut.PrimeAsync();
+
+            Assert.Null(sut.OrganizationName);
         }
     }
 }

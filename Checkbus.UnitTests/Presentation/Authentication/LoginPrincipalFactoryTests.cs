@@ -9,7 +9,7 @@ namespace Checkbus.UnitTests.Presentation.Authentication
         [Fact]
         public void Create_SuccessfulLoginResult_MapsAllClaimsCorrectly()
         {
-            var result = LoginResult.Succeeded(userId: 42, email: "user@example.com", organizationId: 7, mustChangePassword: true);
+            var result = LoginResult.Succeeded(userId: 42, email: "user@example.com", organizationId: 7, organizationName: "Acme Transit", mustChangePassword: true);
 
             var principal = LoginPrincipalFactory.Create(result);
 
@@ -18,6 +18,7 @@ namespace Checkbus.UnitTests.Presentation.Authentication
             Assert.Equal("user@example.com", principal.FindFirst(ClaimTypes.Email)?.Value);
             Assert.Equal("user@example.com", principal.FindFirst(ClaimTypes.Name)?.Value);
             Assert.Equal("7", principal.FindFirst(CheckbusClaims.OrganizationId)?.Value);
+            Assert.Equal("Acme Transit", principal.FindFirst(CheckbusClaims.OrganizationName)?.Value);
             Assert.Equal("True", principal.FindFirst(CheckbusClaims.MustChangePassword)?.Value);
         }
 

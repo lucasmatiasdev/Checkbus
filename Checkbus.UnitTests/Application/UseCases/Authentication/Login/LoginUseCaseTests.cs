@@ -35,7 +35,7 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication.Login
                 FullName = "Test User",
                 Email = email,
                 PasswordHash = passwordHash,
-                Organization = new Organization { Id = organizationId, Name = "Org", CUIT = "20-12345678-9" },
+                Organization = new Organization { Id = organizationId, Name = "Acme Transit", CUIT = "20-12345678-9" },
                 OrganizationId = organizationId,
                 Profile = new Profile { Id = DefaultProfileId, Name = "Default", OrganizationId = organizationId },
                 ProfileId = DefaultProfileId,
@@ -125,6 +125,7 @@ namespace Checkbus.UnitTests.Application.UseCases.Authentication.Login
             Assert.Equal(user.Id, result.UserId);
             Assert.Equal(user.Email, result.Email);
             Assert.Equal(user.Organization.Id, result.OrganizationId);
+            Assert.Equal(user.Organization.Name, result.OrganizationName);
             Assert.Equal(0, user.FailedLoginAttempts);
             Assert.Null(user.LockedUntil);
             await _userRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());

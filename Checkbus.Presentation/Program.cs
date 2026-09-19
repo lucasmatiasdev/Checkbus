@@ -4,6 +4,7 @@ using Checkbus.Infrastructure.Context;
 using Checkbus.Infrastructure.Seeding;
 using Checkbus.Presentation.Authentication;
 using Checkbus.Presentation.Components;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -73,6 +74,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseAntiforgery();
+
+// D-SN4: sign-out cannot run inside the interactive Sidebar island (no cascading
+// HttpContext — dashboard-logout D-DL5). Sidebar navigates here with forceLoad: true.
+app.MapGet("/Account/Logout", async (HttpContext httpContext) =>
+{
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/");
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

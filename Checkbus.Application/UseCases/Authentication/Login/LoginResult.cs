@@ -7,15 +7,17 @@ namespace Checkbus.Application.UseCases.Authentication.Login
         public int UserId { get; init; }
         public string? Email { get; init; }
         public int OrganizationId { get; init; }
+        public string? OrganizationName { get; init; }
         public bool MustChangePassword { get; init; }
 
-        public static LoginResult Succeeded(int userId, string email, int organizationId, bool mustChangePassword) =>
+        public static LoginResult Succeeded(int userId, string email, int organizationId, string organizationName, bool mustChangePassword) =>
             new()
             {
                 Success = true,
                 UserId = userId,
                 Email = email,
                 OrganizationId = organizationId,
+                OrganizationName = organizationName,
                 MustChangePassword = mustChangePassword
             };
 

@@ -24,6 +24,7 @@ namespace Checkbus.Presentation.Authentication
                 new(ClaimTypes.Email, result.Email ?? string.Empty),
                 new(ClaimTypes.Name, result.Email ?? string.Empty),
                 new(CheckbusClaims.OrganizationId, result.OrganizationId.ToString(CultureInfo.InvariantCulture)),
+                new(CheckbusClaims.OrganizationName, result.OrganizationName ?? string.Empty),
                 new(CheckbusClaims.MustChangePassword, result.MustChangePassword.ToString(CultureInfo.InvariantCulture))
             };
 

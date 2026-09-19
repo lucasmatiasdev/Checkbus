@@ -29,6 +29,6 @@
     private async Task LogoutUser()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        NavigationManager.NavigateTo("/login", forceLoad: true);
+        NavigationManager.NavigateTo("/", forceLoad: true);
     }
 }

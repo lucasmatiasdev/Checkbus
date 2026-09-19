@@ -8,5 +8,11 @@ namespace Checkbus.Application.Abstractions
     public interface ICurrentTenant
     {
         int? OrganizationId { get; }
+
+        /// <summary>
+        /// The current tenant's organization name. `null` is the explicit "no tenant" state,
+        /// same contract as <see cref="OrganizationId"/> — never an exception.
+        /// </summary>
+        string? OrganizationName { get; }
     }
 }

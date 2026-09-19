@@ -18,5 +18,7 @@ namespace Checkbus.Infrastructure.Context
         }
 
         public int? OrganizationId => null;
+
+        public string? OrganizationName => null;
     }
 }

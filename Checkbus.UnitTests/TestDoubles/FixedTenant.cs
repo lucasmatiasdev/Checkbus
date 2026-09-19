@@ -5,11 +5,14 @@ namespace Checkbus.UnitTests.TestDoubles
     /// <summary>Test double for <see cref="ICurrentTenant"/> that always resolves to the same tenant.</summary>
     public sealed class FixedTenant : ICurrentTenant
     {
-        public FixedTenant(int? organizationId)
+        public FixedTenant(int? organizationId, string? organizationName = null)
         {
             OrganizationId = organizationId;
+            OrganizationName = organizationName;
         }
 
         public int? OrganizationId { get; }
+
+        public string? OrganizationName { get; }
     }
 }

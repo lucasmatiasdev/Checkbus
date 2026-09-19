@@ -18,6 +18,7 @@ namespace Checkbus.Presentation.Authentication
     {
         private readonly AuthenticationStateProvider _authenticationStateProvider;
         private int? _organizationId;
+        private string? _organizationName;
 
         public CircuitCurrentTenant(AuthenticationStateProvider authenticationStateProvider)
         {
@@ -26,6 +27,8 @@ namespace Checkbus.Presentation.Authentication
         }
 
         public int? OrganizationId => _organizationId;
+
+        public string? OrganizationName => _organizationName;
 
         public async Task PrimeAsync()
         {
@@ -50,6 +53,9 @@ namespace Checkbus.Presentation.Authentication
             _organizationId = claim is not null && int.TryParse(claim.Value, out var organizationId)
                 ? organizationId
                 : null;
+
+            var organizationNameClaim = state.User.FindFirst(CheckbusClaims.OrganizationName);
+            _organizationName = organizationNameClaim?.Value;
         }
 
         public void Dispose()

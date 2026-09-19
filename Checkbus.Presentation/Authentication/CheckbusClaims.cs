@@ -7,6 +7,7 @@ namespace Checkbus.Presentation.Authentication
     public static class CheckbusClaims
     {
         public const string OrganizationId = "checkbus:organization_id";
+        public const string OrganizationName = "checkbus:organization_name";
         public const string MustChangePassword = "checkbus:must_change_password";
     }
 }

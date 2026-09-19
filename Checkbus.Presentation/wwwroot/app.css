@@ -49,3 +49,19 @@ html {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+/* D-SN8: Sidebar footer pinning and main-content drawer offset (MudDrawer 8.x has no footer
+   slot; a rendered-as-an-island MudDrawer cannot register with a MudDrawerContainer). */
+.checkbus-sidebar__stack {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.checkbus-sidebar__footer {
+    margin-top: auto;
+}
+
+.checkbus-main {
+    padding-left: var(--mud-drawer-width-left, 240px);
+}

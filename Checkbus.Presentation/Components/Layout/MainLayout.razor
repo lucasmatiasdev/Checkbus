@@ -1,9 +1,18 @@
 ﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 @inject Checkbus.Presentation.Authentication.CircuitCurrentTenant CircuitCurrentTenant
 
 <MudThemeProvider Theme="CheckbusTheme.Default" IsDarkMode="true" />
 
-@Body
+<AuthorizeView>
+    <Authorized>
+        <Sidebar />
+    </Authorized>
+</AuthorizeView>
+
+<div class="checkbus-main">
+    @Body
+</div>
 
 <InteractiveShell />
 

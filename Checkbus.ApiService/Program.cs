@@ -2,6 +2,7 @@ using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Persistence;
@@ -32,6 +33,7 @@ builder.Services.AddControllers();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<AuthExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

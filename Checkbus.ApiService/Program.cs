@@ -1,9 +1,11 @@
 using Checkbus.ApiService.Application.Auth.Commands;
+using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Persistence;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,7 +24,9 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<LoginCommand>();
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
+builder.Services.AddValidatorsFromAssemblyContaining<LoginCommand>();
 
 builder.Services.AddControllers();
 

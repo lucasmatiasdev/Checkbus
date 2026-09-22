@@ -14,12 +14,12 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             _context = context;
         }
 
-        public Task<User?> FindByEmailAsync(string email)
+        public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
         {
             return _context.Users
                 .Include(u => u.Role)
                 .Include(u => u.Organization)
-                .FirstOrDefaultAsync(u => u.Email == email);
+                .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
         }
     }
 }

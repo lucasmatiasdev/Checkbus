@@ -1,5 +1,4 @@
 using Checkbus.ApiService.Application.Auth.Commands;
-using Checkbus.ApiService.Application.Common;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
@@ -20,7 +19,10 @@ builder.Services.AddSingleton(jwtOptions);
 builder.Services.AddScoped<IPasswordHasher, IdentityPasswordHasher>();
 builder.Services.AddScoped<IJwtGenerator, JwtGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<ICommandHandler<LoginCommand, LoginCommandResult>, LoginCommandHandler>();
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblyContaining<LoginCommand>();
+});
 
 builder.Services.AddControllers();
 

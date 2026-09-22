@@ -4,6 +4,6 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
 {
     public interface IUserRepository
     {
-        Task<User?> FindByEmailAsync(string email);
+        Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken);
     }
 }

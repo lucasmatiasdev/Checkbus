@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" Version="13.5.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="xunit.v3" Version="3.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Checkbus.ApiService.Application\Checkbus.ApiService.Application.csproj" />
+    <ProjectReference Include="..\Checkbus.ApiService.Domain\Checkbus.ApiService.Domain.csproj" />
+    <ProjectReference Include="..\Checkbus.ApiService.Infrastructure\Checkbus.ApiService.Infrastructure.csproj" />
+    <ProjectReference Include="..\Checkbus.ApiService\Checkbus.ApiService.csproj" />
+    <ProjectReference Include="..\Checkbus.AppHost\Checkbus.AppHost.csproj" />
+    <ProjectReference Include="..\Checkbus.Web\Checkbus.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Aspire.Hosting.ApplicationModel" />
+    <Using Include="Aspire.Hosting.Testing" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="Checkbus.ApiService.Application/Checkbus.ApiService.Application.csproj" />
+  <Project Path="Checkbus.ApiService.Domain/Checkbus.ApiService.Domain.csproj" />
+  <Project Path="Checkbus.ApiService.Infrastructure/Checkbus.ApiService.Infrastructure.csproj" />
+  <Project Path="Checkbus.ApiService/Checkbus.ApiService.csproj" />
+  <Project Path="Checkbus.AppHost/Checkbus.AppHost.csproj" />
+  <Project Path="Checkbus.ServiceDefaults/Checkbus.ServiceDefaults.csproj" />
+  <Project Path="Checkbus.Tests/Checkbus.Tests.csproj" />
+  <Project Path="Checkbus.Web/Checkbus.Web.csproj" />
+</Solution>

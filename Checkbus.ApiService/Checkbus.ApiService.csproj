@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>47ce6e3d-4a3e-4a12-bd50-ee6d4ceaa98c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Checkbus.ApiService.Application\Checkbus.ApiService.Application.csproj" />
+    <ProjectReference Include="..\Checkbus.ApiService.Domain\Checkbus.ApiService.Domain.csproj" />
+    <ProjectReference Include="..\Checkbus.ApiService.Infrastructure\Checkbus.ApiService.Infrastructure.csproj" />
+    <ProjectReference Include="..\Checkbus.ServiceDefaults\Checkbus.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.2" />
+  </ItemGroup>
+
+</Project>

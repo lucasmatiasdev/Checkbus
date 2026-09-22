@@ -1,0 +1,18 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Visual Studio
+.vs/
+
+## Rider / JetBrains
+.idea/
+
+## Aspire
+.aspire/
+
+## OS
+.DS_Store
+Thumbs.db

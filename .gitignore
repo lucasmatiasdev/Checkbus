@@ -13,6 +13,9 @@ obj/
 ## Aspire
 .aspire/
 
+## Local file storage
+Checkbus.ApiService/App_Data/
+
 ## OS
 .DS_Store
 Thumbs.db

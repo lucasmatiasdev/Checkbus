@@ -17,8 +17,15 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Authentication
 
         public bool Verify(string hash, string password)
         {
-            var result = _hasher.VerifyHashedPassword(null!, hash, password);
-            return result == PasswordVerificationResult.Success || result == PasswordVerificationResult.SuccessRehashNeeded;
+            try
+            {
+                var result = _hasher.VerifyHashedPassword(null!, hash, password);
+                return result == PasswordVerificationResult.Success || result == PasswordVerificationResult.SuccessRehashNeeded;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
     }
 }

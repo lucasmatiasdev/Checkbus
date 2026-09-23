@@ -15,9 +15,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
     {
         public static void Seed(DbContext context, bool isPopulated)
         {
-            if (isPopulated) return;
-
             var db = (CheckbusDbContext)context;
+
+            if (isPopulated || db.Users.Any(u => u.Email == "admin@checkbus.dev")) return;
 
             var organization = new Organization { Id = Guid.NewGuid(), CUIT = "20-12345678-9", Name = "Checkbus Demo", Slug = "checkbus-demo", LogoUrl = "", IsActive = true };
             var role = new Role { Id = Guid.NewGuid(), Name = "Admin" };
@@ -45,10 +45,10 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         }
 
         public static Task SeedAsync(DbContext context, bool isPopulated, CancellationToken cancellationToken)
-        {
-            if (isPopulated) return Task.CompletedTask;
-
+        {        
             var db = (CheckbusDbContext)context;
+
+            if (isPopulated || db.Users.Any(u => u.Email == "admin@checkbus.dev")) return Task.CompletedTask;
 
             var organization = new Organization { Id = Guid.NewGuid(), CUIT = "20-12345678-9", Name = "Checkbus Demo", Slug = "checkbus-demo", LogoUrl = "", IsActive = true };
             var role = new Role { Id = Guid.NewGuid(), Name = "Admin" };

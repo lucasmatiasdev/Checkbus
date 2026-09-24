@@ -1,0 +1,18 @@
+<MudPaper Outlined="true" Class="d-flex flex-column align-center pa-6 h-100">
+    <MudImage Src="@Src" Alt="@Alt" Height="28" ObjectFit="ObjectFit.Contain" />
+    <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-3">@Caption</MudText>
+</MudPaper>
+
+@code {
+    /// <summary>Path to the official, unmodified brand logo SVG (e.g. <c>@@Assets["img/brand/github-mark.svg"]</c>).</summary>
+    [Parameter]
+    public required string Src { get; set; }
+
+    /// <summary>Accessible alt text for the logo image.</summary>
+    [Parameter]
+    public required string Alt { get; set; }
+
+    /// <summary>Attribution/caption text shown under the logo (e.g. trademark notice).</summary>
+    [Parameter]
+    public required string Caption { get; set; }
+}

@@ -1,0 +1,14 @@
+<MudCard Class="d-flex flex-column h-100" Elevation="0" Outlined="true">
+    <MudCardContent Class="d-flex flex-column flex-grow-1">
+        <MudIcon Icon="@Item.Icon" Color="Color.Primary" Size="Size.Large" Class="mb-3" />
+        <MudText Typo="Typo.h6" Class="mb-2">@Item.Title</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@Item.Description</MudText>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    /// <summary>The solution content this card renders. Provided whole so the future content
+    /// swap only touches <see cref="LandingContent"/>, never this markup.</summary>
+    [Parameter]
+    public required SolutionItem Item { get; set; }
+}

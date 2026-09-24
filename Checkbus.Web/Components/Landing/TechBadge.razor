@@ -1,0 +1,14 @@
+<MudStack Row="false" AlignItems="AlignItems.Center" Class="px-4">
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="font-weight-medium">@Label</MudText>
+</MudStack>
+
+@code {
+    /// <summary>
+    /// The wordmark text to render. This is the ONLY parameter this component exposes — there is
+    /// intentionally no icon/image parameter, so the Microsoft/Visual Studio/C#/.NET trademark
+    /// constraint (text-only, no logo asset) cannot be violated by a data edit. See
+    /// <see cref="BrandLogoCard"/> for the component used for GitHub/PostgreSQL logos instead.
+    /// </summary>
+    [Parameter]
+    public required string Label { get; set; }
+}

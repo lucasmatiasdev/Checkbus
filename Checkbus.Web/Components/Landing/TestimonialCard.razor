@@ -1,0 +1,21 @@
+<MudCard Class="d-flex flex-column h-100" Elevation="0" Outlined="true">
+    <MudCardContent Class="d-flex flex-column flex-grow-1">
+        <MudRating SelectedValue="5" ReadOnly="true" Class="mb-2" />
+        <MudText Typo="Typo.body1" Class="flex-grow-1 font-italic">"@Testimonial.Quote"</MudText>
+        <MudStack Row="true" Spacing="3" Class="mt-4" AlignItems="AlignItems.Center">
+            <MudAvatar Color="Color.Primary">@Testimonial.Initials</MudAvatar>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">@Testimonial.Author</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Testimonial.Role, @Testimonial.Company</MudText>
+            </MudStack>
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    /// <summary>The testimonial this card renders. The star rating is a fixed 5-star display —
+    /// <see cref="Testimonial"/> intentionally carries no numeric rating field, since every
+    /// placeholder testimonial in this static content set is a 5-star quote.</summary>
+    [Parameter]
+    public required Testimonial Testimonial { get; set; }
+}

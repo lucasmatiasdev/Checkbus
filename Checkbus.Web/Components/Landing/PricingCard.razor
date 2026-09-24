@@ -1,0 +1,36 @@
+<MudCard Class="d-flex flex-column h-100" Elevation="@(Plan.Highlighted ? 4 : 0)" Outlined="@Plan.Highlighted">
+    <MudCardContent Class="d-flex flex-column flex-grow-1">
+        <MudText Typo="Typo.h5" Class="mb-1">@Plan.Name</MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Baseline" Spacing="1" Class="mb-2">
+            <MudText Typo="Typo.h3">@Plan.Price</MudText>
+            @if (!string.IsNullOrEmpty(Plan.Period))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@Plan.Period</MudText>
+            }
+        </MudStack>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@Plan.Description</MudText>
+        <MudList T="string" Dense="true" Class="flex-grow-1">
+            @foreach (var feature in Plan.Features)
+            {
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Primary">
+                    @feature
+                </MudListItem>
+            }
+        </MudList>
+    </MudCardContent>
+    <MudCardActions Class="pa-4 pt-0">
+        <MudButton FullWidth="true"
+                   Variant="Variant.Filled"
+                   Color="@(Plan.Highlighted ? Color.Primary : Color.Default)"
+                   DropShadow="false">
+            @Plan.CtaLabel
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    /// <summary>The pricing tier this card renders. <see cref="PricingPlan.Highlighted"/> switches
+    /// this card to an outlined, elevated presentation with a primary-colored CTA.</summary>
+    [Parameter]
+    public required PricingPlan Plan { get; set; }
+}

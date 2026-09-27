@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Checkbus.ApiService.Domain.Interfaces
 {
-    internal interface ITenantEntity
+    public interface ITenantEntity
     {
         public Guid OrganizationId { get; set; }
         public Organization Organization { get; set; }

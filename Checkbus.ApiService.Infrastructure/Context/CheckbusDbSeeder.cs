@@ -11,11 +11,11 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
     /// <c>DbContextOptionsBuilder.UseSeeding</c>/<c>UseAsyncSeeding</c>.
     /// Ensures the demo organization and the seeded admin user exist on every
     /// startup — idempotent and convergent regardless of the database's
-    /// previous state. Roles are a fixed set of string values (see
-    /// <see cref="Roles"/>), not a database table, so there is nothing else to
-    /// seed. The <c>isPopulated</c> parameter required by the EF Core seeding
-    /// delegate signatures is intentionally ignored: only the database's
-    /// actual contents decide what, if anything, still needs staging.
+    /// previous state. Roles are a fixed <see cref="Role"/> enum, not a
+    /// database table, so there is nothing else to seed. The
+    /// <c>isPopulated</c> parameter required by the EF Core seeding delegate
+    /// signatures is intentionally ignored: only the database's actual
+    /// contents decide what, if anything, still needs staging.
     /// </summary>
     public static class CheckbusDbSeeder
     {
@@ -79,7 +79,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                     Email = SeededAdminEmail,
                     PasswordHash = string.Empty,
                     DocumentNumber = "12345678",
-                    Role = Roles.Administrador,
+                    Role = Role.Administrador,
                     OrganizationId = organization.Id,
                     Organization = organization,
                     IsActive = true
@@ -88,15 +88,13 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
 
                 db.Users.Add(user);
             }
-            else if (string.IsNullOrWhiteSpace(adminUser.Role))
-            {
-                // Only repair a genuinely invalid/empty stored value (e.g. left
-                // over from a bug or a botched manual edit). Never overwrite a
-                // valid, different role: that could be a deliberate operator
-                // decision (e.g. demoting this well-known seeded account), and
-                // seeding must not silently reverse it.
-                adminUser.Role = Roles.Administrador;
-            }
+            // If the admin user already exists, its Role is left untouched
+            // entirely: Role is now an enum, so it cannot hold an
+            // empty/invalid value through normal construction, and there is
+            // nothing left to repair. This also means seeding can never
+            // silently revert a deliberate operator reassignment to a
+            // different valid role (e.g. demoting this well-known seeded
+            // account) — there is no conditional branch that could do so.
 
             return db.ChangeTracker.HasChanges();
         }

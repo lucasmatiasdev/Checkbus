@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 
@@ -10,7 +11,7 @@ namespace Checkbus.Tests.Infrastructure;
 /// </summary>
 public static class TestUserFactory
 {
-    public static User CreateUser(string role) => new()
+    public static User CreateUser(Role role) => new()
     {
         Id = Guid.NewGuid(),
         Username = "jdoe",

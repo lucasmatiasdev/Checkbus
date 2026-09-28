@@ -48,7 +48,7 @@ public class CheckbusDbSeederTests
 
         var organization = db.Organizations.Single(o => o.Slug == DemoOrganizationSlug);
         var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        Assert.Equal(Roles.Administrador, adminUser.Role);
+        Assert.Equal(Role.Administrador, adminUser.Role);
         Assert.Equal(organization.Id, adminUser.OrganizationId);
     }
 
@@ -108,45 +108,28 @@ public class CheckbusDbSeederTests
     }
 
     [Fact]
-    public void Seed_AdminUserRoleEmpty_RepairsToAdministrador()
-    {
-        using var connection = CreateOpenConnection();
-        using var db = CreateContext(connection);
-        db.Database.EnsureCreated();
-        CheckbusDbSeeder.Seed(db, isPopulated: false);
-
-        // Simulate a genuinely invalid stored value (e.g. left over from a bug
-        // or a botched manual edit) — not a deliberate operator reassignment.
-        var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        adminUser.Role = string.Empty;
-        db.SaveChanges();
-
-        CheckbusDbSeeder.Seed(db, isPopulated: false);
-
-        var reloadedUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        Assert.Equal(Roles.Administrador, reloadedUser.Role);
-    }
-
-    [Fact]
     public void Seed_AdminUserReassignedToRealRole_DoesNotRevertReassignment()
     {
         // Anti-regression for a corrected security finding: seeding must never
         // silently undo a deliberate operator action (e.g. demoting this
         // well-known seeded account) just because it no longer matches
-        // Administrador. Only a genuinely empty/invalid Role gets repaired.
+        // Administrador. There is no repair branch at all any more — an enum
+        // cannot hold an "empty"/invalid value through normal construction, so
+        // this is now true by construction, but the regression test stays to
+        // guard against a future re-introduction of repair logic.
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
         db.Database.EnsureCreated();
         CheckbusDbSeeder.Seed(db, isPopulated: false);
 
         var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        adminUser.Role = Roles.Chofer;
+        adminUser.Role = Role.Chofer;
         db.SaveChanges();
 
         CheckbusDbSeeder.Seed(db, isPopulated: false);
 
         var reloadedUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        Assert.Equal(Roles.Chofer, reloadedUser.Role);
+        Assert.Equal(Role.Chofer, reloadedUser.Role);
     }
 
     [Fact]
@@ -167,6 +150,6 @@ public class CheckbusDbSeederTests
         var syncAdminRole = syncDb.Users.Single(u => u.Email == SeededAdminEmail).Role;
         var asyncAdminRole = asyncDb.Users.Single(u => u.Email == SeededAdminEmail).Role;
         Assert.Equal(syncAdminRole, asyncAdminRole);
-        Assert.Equal(Roles.Administrador, syncAdminRole);
+        Assert.Equal(Role.Administrador, syncAdminRole);
     }
 }

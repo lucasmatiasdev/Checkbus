@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
@@ -11,7 +12,7 @@ namespace Checkbus.Tests.Auth;
 
 public class LoginCommandHandlerTests
 {
-    private static User CreateUser(bool isActive = true, string role = "Admin") => new()
+    private static User CreateUser(bool isActive = true, Role role = Role.Administrador) => new()
     {
         Id = Guid.NewGuid(),
         Username = "jdoe",
@@ -118,7 +119,7 @@ public class LoginCommandHandlerTests
     [Fact]
     public async Task Handle_ValidCredentials_GeneratesTokenAndReturnsResult()
     {
-        var user = CreateUser(role: "Driver");
+        var user = CreateUser(role: Role.Chofer);
         var jwtGenerator = new FakeJwtGenerator();
         var handler = new LoginCommandHandler(
             new FakeUserRepository(user),
@@ -134,14 +135,14 @@ public class LoginCommandHandlerTests
         Assert.Equal("fake-jwt-token", result.Token);
         Assert.Equal(user.Id, result.UserId);
         Assert.Equal(user.OrganizationId, result.OrganizationId);
-        Assert.Equal("Driver", result.Role);
+        Assert.Equal("Chofer", result.Role);
         Assert.Equal(user.Username, result.Username);
     }
 
     [Fact]
     public async Task Handle_ValidCredentials_LogsLoginSucceededWithIdentityFields()
     {
-        var user = CreateUser(role: "Driver");
+        var user = CreateUser(role: Role.Chofer);
         var jwtGenerator = new FakeJwtGenerator();
         var logger = new FakeLogger<LoginCommandHandler>();
         var handler = new LoginCommandHandler(
@@ -157,7 +158,7 @@ public class LoginCommandHandlerTests
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.Equal(user.Id, entry.Fields["UserId"]);
         Assert.Equal(user.OrganizationId, entry.Fields["OrganizationId"]);
-        Assert.Equal("Driver", entry.Fields["Role"]);
+        Assert.Equal("Chofer", entry.Fields["Role"]);
     }
 
     [Fact]

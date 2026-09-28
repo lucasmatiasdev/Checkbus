@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
@@ -16,7 +17,7 @@ public class JwtGeneratorTests
         ExpirationMinutes = 60
     };
 
-    private static User CreateUser(string role) => new()
+    private static User CreateUser(Role role) => new()
     {
         Id = Guid.NewGuid(),
         Username = "jdoe",
@@ -38,38 +39,38 @@ public class JwtGeneratorTests
     };
 
     [Fact]
-    public void GenerateToken_AdminUser_ContainsSingleRoleClaimWithAdminValue()
+    public void GenerateToken_AdministradorUser_ContainsSingleRoleClaimWithAdministradorValue()
     {
         var generator = new JwtGenerator(Options);
-        var user = CreateUser("Admin");
+        var user = CreateUser(Role.Administrador);
 
         var token = generator.GenerateToken(user);
         var jwt = new JsonWebTokenHandler().ReadJsonWebToken(token);
 
         var roleClaims = jwt.Claims.Where(c => c.Type == ClaimTypes.Role).ToList();
         Assert.Single(roleClaims);
-        Assert.Equal("Admin", roleClaims[0].Value);
+        Assert.Equal("Administrador", roleClaims[0].Value);
     }
 
     [Fact]
-    public void GenerateToken_DriverUser_ContainsSingleRoleClaimWithDriverValue()
+    public void GenerateToken_ChoferUser_ContainsSingleRoleClaimWithChoferValue()
     {
         var generator = new JwtGenerator(Options);
-        var user = CreateUser("Driver");
+        var user = CreateUser(Role.Chofer);
 
         var token = generator.GenerateToken(user);
         var jwt = new JsonWebTokenHandler().ReadJsonWebToken(token);
 
         var roleClaims = jwt.Claims.Where(c => c.Type == ClaimTypes.Role).ToList();
         Assert.Single(roleClaims);
-        Assert.Equal("Driver", roleClaims[0].Value);
+        Assert.Equal("Chofer", roleClaims[0].Value);
     }
 
     [Fact]
     public void GenerateToken_IncludesIdentityAndOrganizationClaims()
     {
         var generator = new JwtGenerator(Options);
-        var user = CreateUser("Admin");
+        var user = CreateUser(Role.Administrador);
 
         var token = generator.GenerateToken(user);
         var jwt = new JsonWebTokenHandler().ReadJsonWebToken(token);
@@ -83,7 +84,7 @@ public class JwtGeneratorTests
     public void GenerateToken_HonoursIssuerAudienceAndExpiry()
     {
         var generator = new JwtGenerator(Options);
-        var user = CreateUser("Admin");
+        var user = CreateUser(Role.Administrador);
         var beforeGeneration = DateTime.UtcNow;
 
         var token = generator.GenerateToken(user);

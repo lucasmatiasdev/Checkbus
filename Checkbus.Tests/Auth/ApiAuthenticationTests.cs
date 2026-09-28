@@ -18,11 +18,11 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         _factory = factory;
     }
 
-    private static string CreateToken(JwtOptions options, string role) =>
+    private static string CreateToken(JwtOptions options, Role role) =>
         new JwtGenerator(options).GenerateToken(TestUserFactory.CreateUser(role));
 
     private static string CreateValidAdministradorToken() =>
-        CreateToken(CheckbusApiFactory.CreateTestJwtOptions(), Roles.Administrador);
+        CreateToken(CheckbusApiFactory.CreateTestJwtOptions(), Role.Administrador);
 
     [Fact]
     public async Task RoleProbe_MissingToken_Returns401()
@@ -45,7 +45,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
             Audience = CheckbusApiFactory.TestAudience,
             ExpirationMinutes = -10
         };
-        var token = CreateToken(expiredOptions, Roles.Administrador);
+        var token = CreateToken(expiredOptions, Role.Administrador);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);
@@ -64,7 +64,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
             Audience = CheckbusApiFactory.TestAudience,
             ExpirationMinutes = CheckbusApiFactory.TestExpirationMinutes
         };
-        var token = CreateToken(wrongIssuerOptions, Roles.Administrador);
+        var token = CreateToken(wrongIssuerOptions, Role.Administrador);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);
@@ -83,7 +83,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
             Audience = "some-other-audience",
             ExpirationMinutes = CheckbusApiFactory.TestExpirationMinutes
         };
-        var token = CreateToken(wrongAudienceOptions, Roles.Administrador);
+        var token = CreateToken(wrongAudienceOptions, Role.Administrador);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);
@@ -102,7 +102,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
             Audience = CheckbusApiFactory.TestAudience,
             ExpirationMinutes = CheckbusApiFactory.TestExpirationMinutes
         };
-        var token = CreateToken(wrongSigningKeyOptions, Roles.Administrador);
+        var token = CreateToken(wrongSigningKeyOptions, Role.Administrador);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);
@@ -149,7 +149,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
     public async Task Me_ValidToken_Returns200WithCallersOwnIdentity()
     {
         var client = _factory.CreateClient();
-        var user = TestUserFactory.CreateUser(Roles.Administrador);
+        var user = TestUserFactory.CreateUser(Role.Administrador);
         var token = new JwtGenerator(CheckbusApiFactory.CreateTestJwtOptions()).GenerateToken(user);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -163,7 +163,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         // never anything else (no client-supplied override is possible here).
         Assert.Equal(user.Id, body!.UserId);
         Assert.Equal(user.OrganizationId, body.OrganizationId);
-        Assert.Equal(user.Role, body.Role);
+        Assert.Equal(user.Role.ToString(), body.Role);
         Assert.Equal(user.Username, body.Username);
     }
 }

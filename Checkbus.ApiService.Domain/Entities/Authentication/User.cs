@@ -1,4 +1,5 @@
-﻿using Checkbus.ApiService.Domain.Entities.Tenancy;
+﻿using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace Checkbus.ApiService.Domain.Entities.Authentication
         public required string PasswordHash { get; set; }
         public DocumentType DocumentType { get; set; } = DocumentType.DNI;
         public required string DocumentNumber { get; set; }
-        public required string Role { get; set; }
+        public required Role Role { get; set; }
         public Guid OrganizationId { get; set; }
         public required Organization Organization { get; set; }
         public bool IsActive { get; set; } = true;

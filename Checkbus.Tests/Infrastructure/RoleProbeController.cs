@@ -16,6 +16,6 @@ namespace Checkbus.Tests.Infrastructure;
 public sealed class RoleProbeController : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = Roles.Administrador)]
+    [Authorize(Roles = nameof(Role.Administrador))]
     public IActionResult Get() => Ok();
 }

@@ -16,14 +16,14 @@ public class ApiAuthorizationTests : IClassFixture<CheckbusApiFactory>
         _factory = factory;
     }
 
-    private static string CreateToken(string role) =>
+    private static string CreateToken(Role role) =>
         new JwtGenerator(CheckbusApiFactory.CreateTestJwtOptions()).GenerateToken(TestUserFactory.CreateUser(role));
 
     [Fact]
     public async Task RoleProbe_CorrectRole_Returns200()
     {
         var client = _factory.CreateClient();
-        var token = CreateToken(Roles.Administrador);
+        var token = CreateToken(Role.Administrador);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);
@@ -35,7 +35,7 @@ public class ApiAuthorizationTests : IClassFixture<CheckbusApiFactory>
     public async Task RoleProbe_WrongRole_Returns403NotUnauthorized()
     {
         var client = _factory.CreateClient();
-        var token = CreateToken(Roles.Chofer);
+        var token = CreateToken(Role.Chofer);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync(RoleProbePath, TestContext.Current.CancellationToken);

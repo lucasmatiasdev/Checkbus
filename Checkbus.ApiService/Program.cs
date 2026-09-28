@@ -8,6 +8,7 @@ using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
 using Checkbus.ApiService.Infrastructure.Persistence;
+using Checkbus.ApiService.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -66,6 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 builder.Services.AddControllers(options => options.Filters.Add(new AuthorizeFilter()));
 

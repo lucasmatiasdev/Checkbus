@@ -1,4 +1,6 @@
 ﻿using Checkbus.ApiService.Application.Auth.Commands;
+using Checkbus.ApiService.Application.Interfaces.Authentication;
+using Checkbus.ApiService.Contracts;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -22,6 +24,18 @@ namespace Checkbus.ApiService.Controllers
         {
             var result = await _mediator.Send(command, cancellationToken);
             return Ok(result);
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult Me([FromServices] ICurrentUserService currentUser)
+        {
+            var response = new CurrentUserResponse(
+                currentUser.UserId,
+                currentUser.OrganizationId,
+                currentUser.Role,
+                currentUser.Username);
+            return Ok(response);
         }
     }
 }

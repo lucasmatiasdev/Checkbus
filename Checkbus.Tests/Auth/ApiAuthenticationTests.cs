@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Checkbus.ApiService.Contracts;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.Tests.Infrastructure;
@@ -132,5 +133,37 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_ValidToken_Returns200WithCallersOwnIdentity()
+    {
+        var client = _factory.CreateClient();
+        var user = TestUserFactory.CreateUser(Roles.Administrador);
+        var token = new JwtGenerator(CheckbusApiFactory.CreateTestJwtOptions()).GenerateToken(user);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CurrentUserResponse>(
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotNull(body);
+        // Anti-IDOR proof: the response must reflect exactly the token's own claims,
+        // never anything else (no client-supplied override is possible here).
+        Assert.Equal(user.Id, body!.UserId);
+        Assert.Equal(user.OrganizationId, body.OrganizationId);
+        Assert.Equal(user.Role.Name, body.Role);
+        Assert.Equal(user.Username, body.Username);
     }
 }

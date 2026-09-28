@@ -2,7 +2,6 @@ using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Authentication.Authorization;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging;
@@ -19,8 +18,7 @@ public class LoginCommandHandlerTests
         Email = "jdoe@example.com",
         PasswordHash = "hashed-password",
         DocumentNumber = "12345678",
-        RoleId = Guid.NewGuid(),
-        Role = new Role { Id = Guid.NewGuid(), Name = role },
+        Role = role,
         OrganizationId = Guid.NewGuid(),
         Organization = new Organization
         {

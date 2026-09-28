@@ -54,14 +54,14 @@ namespace Checkbus.ApiService.Application.Auth.Commands
 
             _logger.LogInformation(
                 "LoginSucceeded for UserId {UserId} in OrganizationId {OrganizationId} with Role {Role}",
-                user.Id, user.OrganizationId, user.Role.Name);
+                user.Id, user.OrganizationId, user.Role);
 
             return new LoginCommandResult
             {
                 Token = token,
                 UserId = user.Id,
                 OrganizationId = user.OrganizationId,
-                Role = user.Role.Name,
+                Role = user.Role,
                 Username = user.Username
             };
         }

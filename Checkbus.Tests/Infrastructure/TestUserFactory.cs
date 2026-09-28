@@ -1,13 +1,12 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Authentication.Authorization;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 
 namespace Checkbus.Tests.Infrastructure;
 
 /// <summary>
 /// Shared <see cref="User"/> fixture builder for auth tests that only need a
-/// user with a given role to mint a JWT — the Organization/Role details are
-/// fixed dummies, not under test.
+/// user with a given role to mint a JWT — the Organization details are fixed
+/// dummies, not under test.
 /// </summary>
 public static class TestUserFactory
 {
@@ -18,8 +17,7 @@ public static class TestUserFactory
         Email = "jdoe@example.com",
         PasswordHash = "hashed-password",
         DocumentNumber = "12345678",
-        RoleId = Guid.NewGuid(),
-        Role = new Role { Id = Guid.NewGuid(), Name = role },
+        Role = role,
         OrganizationId = Guid.NewGuid(),
         Organization = new Organization
         {

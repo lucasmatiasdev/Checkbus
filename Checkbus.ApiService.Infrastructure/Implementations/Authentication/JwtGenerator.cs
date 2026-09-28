@@ -29,7 +29,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Authentication
                 new Claim("OrganizationId", user.OrganizationId.ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.Name)
+                new Claim(ClaimTypes.Role, user.Role)
             };
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

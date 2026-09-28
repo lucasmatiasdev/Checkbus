@@ -163,7 +163,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         // never anything else (no client-supplied override is possible here).
         Assert.Equal(user.Id, body!.UserId);
         Assert.Equal(user.OrganizationId, body.OrganizationId);
-        Assert.Equal(user.Role.Name, body.Role);
+        Assert.Equal(user.Role, body.Role);
         Assert.Equal(user.Username, body.Username);
     }
 }

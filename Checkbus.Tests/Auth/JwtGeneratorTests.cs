@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Authentication.Authorization;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -24,8 +23,7 @@ public class JwtGeneratorTests
         Email = "jdoe@example.com",
         PasswordHash = "hashed-password",
         DocumentNumber = "12345678",
-        RoleId = Guid.NewGuid(),
-        Role = new Role { Id = Guid.NewGuid(), Name = role },
+        Role = role,
         OrganizationId = Guid.NewGuid(),
         Organization = new Organization
         {

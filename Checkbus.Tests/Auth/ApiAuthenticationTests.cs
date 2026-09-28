@@ -1,9 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Checkbus.ApiService.Domain.Authorization;
-using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Authentication.Authorization;
-using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.Tests.Infrastructure;
 
@@ -20,30 +17,8 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         _factory = factory;
     }
 
-    private static User CreateUser(string role) => new()
-    {
-        Id = Guid.NewGuid(),
-        Username = "jdoe",
-        Email = "jdoe@example.com",
-        PasswordHash = "hashed-password",
-        DocumentNumber = "12345678",
-        RoleId = Guid.NewGuid(),
-        Role = new Role { Id = Guid.NewGuid(), Name = role },
-        OrganizationId = Guid.NewGuid(),
-        Organization = new Organization
-        {
-            Id = Guid.NewGuid(),
-            CUIT = "20-12345678-9",
-            Name = "Acme",
-            Slug = "acme",
-            LogoUrl = "https://example.com/logo.png",
-            IsActive = true
-        },
-        IsActive = true
-    };
-
     private static string CreateToken(JwtOptions options, string role) =>
-        new JwtGenerator(options).GenerateToken(CreateUser(role));
+        new JwtGenerator(options).GenerateToken(TestUserFactory.CreateUser(role));
 
     private static string CreateValidAdministradorToken() =>
         CreateToken(CheckbusApiFactory.CreateTestJwtOptions(), Roles.Administrador);

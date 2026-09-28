@@ -20,7 +20,7 @@ public class CurrentUserServiceTests
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim("OrganizationId", organizationId.ToString()),
+            new Claim(CurrentUserService.OrganizationIdClaimType,organizationId.ToString()),
             new Claim(ClaimTypes.Role, "Administrador"),
             new Claim(ClaimTypes.Name, "jdoe")
         };
@@ -43,7 +43,7 @@ public class CurrentUserServiceTests
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim("OrganizationId", Guid.NewGuid().ToString()),
+            new Claim(CurrentUserService.OrganizationIdClaimType,Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Role, "Administrador"),
             new Claim(ClaimTypes.Name, "jdoe")
         };
@@ -63,7 +63,7 @@ public class CurrentUserServiceTests
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, "not-a-guid"),
-            new Claim("OrganizationId", "also-not-a-guid"),
+            new Claim(CurrentUserService.OrganizationIdClaimType,"also-not-a-guid"),
             new Claim(ClaimTypes.Role, "Administrador"),
             new Claim(ClaimTypes.Name, "jdoe")
         };

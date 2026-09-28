@@ -8,10 +8,14 @@ namespace Checkbus.ApiService.Services
     /// Reads the authenticated caller's identity exclusively from the validated
     /// <see cref="ClaimsPrincipal"/> attached to the current request. Never derives
     /// identity from the request body, query string, or route values (anti-IDOR).
-    /// Registered Scoped — see design decision 8 for why Singleton must never be used.
+    /// Registered Scoped: <see cref="IHttpContextAccessor"/> exposes per-request state,
+    /// so a Singleton registration would cache one request's identity and leak it into
+    /// every later request served by the same instance.
     /// </summary>
     public sealed class CurrentUserService : ICurrentUserService
     {
+        internal const string OrganizationIdClaimType = "OrganizationId";
+
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public CurrentUserService(IHttpContextAccessor httpContextAccessor)
@@ -23,13 +27,16 @@ namespace Checkbus.ApiService.Services
 
         public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated == true;
 
-        public Guid? UserId => IsAuthenticated ? ParseGuid(Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value) : null;
+        public Guid? UserId => ParseGuid(ClaimIfAuthenticated(ClaimTypes.NameIdentifier));
 
-        public Guid? OrganizationId => IsAuthenticated ? ParseGuid(Principal?.FindFirst("OrganizationId")?.Value) : null;
+        public Guid? OrganizationId => ParseGuid(ClaimIfAuthenticated(OrganizationIdClaimType));
 
-        public string? Role => IsAuthenticated ? Principal?.FindFirst(ClaimTypes.Role)?.Value : null;
+        public string? Role => ClaimIfAuthenticated(ClaimTypes.Role);
 
-        public string? Username => IsAuthenticated ? Principal?.FindFirst(ClaimTypes.Name)?.Value : null;
+        public string? Username => ClaimIfAuthenticated(ClaimTypes.Name);
+
+        private string? ClaimIfAuthenticated(string claimType) =>
+            IsAuthenticated ? Principal?.FindFirst(claimType)?.Value : null;
 
         private static Guid? ParseGuid(string? value) =>
             Guid.TryParse(value, out var guid) ? guid : null;

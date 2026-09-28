@@ -31,7 +31,18 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
 
             if (!StageSeed(db)) return;
 
-            db.SaveChanges();
+            try
+            {
+                db.SaveChanges();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // The legacy-role migration branch deletes a row that a concurrently
+                // starting replica may have already deleted (rolling/horizontally
+                // scaled deployments). EF reports that as a concurrency conflict, not
+                // a real error — the database has already converged, so let this
+                // instance continue starting up instead of crashing on the race.
+            }
         }
 
         public static async Task SeedAsync(DbContext context, bool isPopulated, CancellationToken cancellationToken)
@@ -40,7 +51,15 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
 
             if (!StageSeed(db)) return;
 
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // See Seed(...) above: another instance's concurrent seeding pass
+                // already converged the same legacy-role migration.
+            }
         }
 
         /// <summary>
@@ -85,6 +104,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
 
                 var newRole = new Role { Id = Guid.NewGuid(), Name = roleName };
                 db.Roles.Add(newRole);
+                roles.Add(newRole);
                 existingRoleNames.Add(roleName);
 
                 if (roleName == Roles.Administrador)
@@ -134,8 +154,13 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
 
                 db.Users.Add(user);
             }
-            else if (adminUser.RoleId != administradorRoleId)
+            else if (adminUser.RoleId != administradorRoleId && roles.TrueForAll(r => r.Id != adminUser.RoleId))
             {
+                // Only repair an orphaned reference (a RoleId matching no existing
+                // row — e.g. left over from a bug or a botched manual edit). Never
+                // overwrite a RoleId that already points at a real, different role:
+                // that could be a deliberate operator decision (e.g. demoting this
+                // well-known seeded account), and seeding must not silently reverse it.
                 adminUser.RoleId = administradorRoleId;
             }
 

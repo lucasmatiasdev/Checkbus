@@ -190,8 +190,37 @@ public class CheckbusDbSeederTests
     }
 
     [Fact]
-    public void Seed_AdminUserPointedAtWrongRole_RepairsRoleId()
+    public void Seed_AdminUserRoleIdOrphaned_RepairsToAdministrador()
     {
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+        CheckbusDbSeeder.Seed(db, isPopulated: false);
+
+        // Simulate data corruption: RoleId references no row at all (not a
+        // deliberate reassignment to a real role — see the sibling test below).
+        // FKs are enforced, so this can only happen via a bypass, exactly like
+        // real-world corruption from raw SQL or a pre-FK-enforcement bug would.
+        var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
+        adminUser.RoleId = Guid.NewGuid();
+        db.Database.ExecuteSqlRaw("PRAGMA foreign_keys=OFF");
+        db.SaveChanges();
+        db.Database.ExecuteSqlRaw("PRAGMA foreign_keys=ON");
+
+        CheckbusDbSeeder.Seed(db, isPopulated: false);
+
+        var administradorRole = db.Roles.Single(r => r.Name == Roles.Administrador);
+        var reloadedUser = db.Users.Single(u => u.Email == SeededAdminEmail);
+        Assert.Equal(administradorRole.Id, reloadedUser.RoleId);
+    }
+
+    [Fact]
+    public void Seed_AdminUserReassignedToRealRole_DoesNotRevertReassignment()
+    {
+        // Anti-regression for a corrected security finding: seeding must never
+        // silently undo a deliberate operator action (e.g. demoting this
+        // well-known seeded account) just because it no longer matches
+        // Administrador. Only a truly orphaned RoleId gets repaired.
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
         db.Database.EnsureCreated();
@@ -204,9 +233,8 @@ public class CheckbusDbSeederTests
 
         CheckbusDbSeeder.Seed(db, isPopulated: false);
 
-        var administradorRole = db.Roles.Single(r => r.Name == Roles.Administrador);
         var reloadedUser = db.Users.Single(u => u.Email == SeededAdminEmail);
-        Assert.Equal(administradorRole.Id, reloadedUser.RoleId);
+        Assert.Equal(choferRole.Id, reloadedUser.RoleId);
     }
 
     [Fact]

@@ -109,7 +109,7 @@ public class AuthLoginEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("token").GetString()));
         Assert.True(root.TryGetProperty("userId", out _));
         Assert.True(root.TryGetProperty("organizationId", out _));
-        Assert.Equal("Admin", root.GetProperty("role").GetString());
+        Assert.Equal("Administrador", root.GetProperty("role").GetString());
         Assert.Equal("admin", root.GetProperty("username").GetString());
     }
 }

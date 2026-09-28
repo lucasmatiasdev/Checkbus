@@ -1,0 +1,36 @@
+﻿@page "/dashboard"
+@attribute [Authorize]
+@using Checkbus.Web.Contracts
+
+<h3>Dashboard</h3>
+
+@if (currentUser is not null)
+{
+    <MudText Typo="Typo.body1">Usuario: @currentUser.Username</MudText>
+    <MudText Typo="Typo.body1">Rol: @currentUser.Role</MudText>
+    <MudText Typo="Typo.body1">Organización: @currentUser.OrganizationId</MudText>
+}
+
+<form method="post" action="/logout" data-enhance="false">
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
+        Cerrar sesión
+    </MudButton>
+</form>
+
+@code {
+    // Resolved via IServiceProvider.GetRequiredKeyedService, not IHttpClientFactory.CreateClient:
+    // the Application Scope Handler pattern (Phase 5) only attaches the bearer token when the
+    // HttpClient is obtained through the keyed-scoped registration created by
+    // AddApplicationScopeHandler(), so the request carries the circuit's IServiceProvider for
+    // AuthenticationStateHandler to read the "access_token" claim from.
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = default!;
+
+    private CurrentUserResponse? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
+        currentUser = await httpClient.GetFromJsonAsync<CurrentUserResponse>("auth/me");
+    }
+}

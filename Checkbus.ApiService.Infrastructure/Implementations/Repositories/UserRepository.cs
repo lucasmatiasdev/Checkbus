@@ -21,6 +21,17 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
         }
 
+        public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _context.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        }
+
+        public async Task UpdateAsync(User user, CancellationToken cancellationToken)
+        {
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task AddAsync(User user, CancellationToken cancellationToken)
         {
             // Raw DbUpdateException propagates on either unique-index violation

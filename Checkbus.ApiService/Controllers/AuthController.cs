@@ -27,6 +27,14 @@ namespace Checkbus.ApiService.Controllers
         }
 
         [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordCommand command, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(command, cancellationToken);
+            return NoContent();
+        }
+
+        [Authorize]
         [HttpGet("me")]
         public IActionResult Me([FromServices] ICurrentUserService currentUser)
         {

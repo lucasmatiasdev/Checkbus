@@ -52,8 +52,29 @@ public class AuthLoginEndpointTests
     }
 
     [Fact]
-    public async Task Login_TooShortPassword_Returns400WithFieldError()
+    public async Task Login_EmptyPassword_Returns400WithFieldError()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var httpClient = await CreateApiClientAsync(cancellationToken);
+
+        var response = await httpClient.PostAsJsonAsync(
+            "/api/auth/login",
+            new { Email = "admin@checkbus.dev", Password = "" },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        Assert.True(doc.RootElement.GetProperty("errors").TryGetProperty("Password", out _));
+    }
+
+    [Fact]
+    public async Task Login_ShortNonEmptyPassword_Returns401NotValidationError()
+    {
+        // The login validator no longer enforces a minimum password length (a
+        // DNI-derived initial password may legitimately be 7 characters). A short
+        // password now reaches IPasswordHasher.Verify and fails authentication
+        // instead of being rejected by FluentValidation.
         var cancellationToken = TestContext.Current.CancellationToken;
         var httpClient = await CreateApiClientAsync(cancellationToken);
 
@@ -62,10 +83,7 @@ public class AuthLoginEndpointTests
             new { Email = "admin@checkbus.dev", Password = "short" },
             cancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(body);
-        Assert.True(doc.RootElement.GetProperty("errors").TryGetProperty("Password", out _));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -111,5 +129,6 @@ public class AuthLoginEndpointTests
         Assert.True(root.TryGetProperty("organizationId", out _));
         Assert.Equal("Administrador", root.GetProperty("role").GetString());
         Assert.Equal("admin@checkbus.dev", root.GetProperty("email").GetString());
+        Assert.False(root.GetProperty("mustChangePassword").GetBoolean());
     }
 }

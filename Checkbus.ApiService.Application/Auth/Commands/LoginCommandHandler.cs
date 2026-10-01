@@ -62,7 +62,8 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 UserId = user.Id,
                 OrganizationId = user.OrganizationId,
                 Role = user.Role.ToString(),
-                Email = user.Email
+                Email = user.Email,
+                MustChangePassword = user.MustChangePassword
             };
         }
     }

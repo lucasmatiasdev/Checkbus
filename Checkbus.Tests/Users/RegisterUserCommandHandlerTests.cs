@@ -32,6 +32,12 @@ public class RegisterUserCommandHandlerTests
         public Task<IReadOnlyList<string>> FindEmailsByLocalPartPrefixAsync(
             string localPartPrefix, string domain, CancellationToken cancellationToken)
             => Task.FromResult(TakenEmails);
+
+        public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task UpdateAsync(User user, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
     }
 
     private sealed class FakeOrganizationRepository(string? slug) : IOrganizationRepository

@@ -11,7 +11,7 @@ namespace Checkbus.Tests.Auth;
 
 public class LoginCommandHandlerTests
 {
-    private static User CreateUser(bool isActive = true, Role role = Role.Administrador) => new()
+    private static User CreateUser(bool isActive = true, Role role = Role.Administrador, bool mustChangePassword = false) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Jane",
@@ -21,7 +21,8 @@ public class LoginCommandHandlerTests
         DocumentNumber = "12345678",
         Role = role,
         OrganizationId = Guid.NewGuid(),
-        IsActive = isActive
+        IsActive = isActive,
+        MustChangePassword = mustChangePassword
     };
 
     private sealed class FakeUserRepository(User? user) : IUserRepository
@@ -36,6 +37,12 @@ public class LoginCommandHandlerTests
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
 
         public Task<IReadOnlyList<string>> FindEmailsByLocalPartPrefixAsync(string localPartPrefix, string domain, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task UpdateAsync(User user, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
     }
 
@@ -223,6 +230,24 @@ public class LoginCommandHandlerTests
         Assert.Equal("InvalidCredentials", entry.Fields["FailureReason"]);
         Assert.Equal(user.Id, entry.Fields["UserId"]);
         Assert.Equal(user.OrganizationId, entry.Fields["OrganizationId"]);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_ValidCredentials_ResultCarriesMustChangePasswordFlag(bool mustChangePassword)
+    {
+        var user = CreateUser(role: Role.Chofer, mustChangePassword: mustChangePassword);
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(mustChangePassword, result.MustChangePassword);
     }
 
     [Fact]

@@ -68,14 +68,17 @@ public class LoginCommandValidatorTests
     }
 
     [Fact]
-    public void Password_TooShort_IsRejected()
+    public void Password_SevenChars_IsAccepted()
     {
+        // The login password-length floor was removed: a newly-registered user's
+        // initial password is their DocumentNumber, which may legitimately be as
+        // short as 7 characters (Argentine DNIs). Only NotEmpty/MaximumLength remain.
         var command = ValidCommand();
         command.Password = "abcdefg"; // 7 chars
 
         var result = _validator.TestValidate(command);
 
-        result.ShouldHaveValidationErrorFor(c => c.Password);
+        result.ShouldNotHaveValidationErrorFor(c => c.Password);
     }
 
     [Fact]

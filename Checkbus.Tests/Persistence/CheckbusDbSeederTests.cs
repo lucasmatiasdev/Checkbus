@@ -50,6 +50,10 @@ public class CheckbusDbSeederTests
         var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
         Assert.Equal(Role.Administrador, adminUser.Role);
         Assert.Equal(organization.Id, adminUser.OrganizationId);
+        // Regression guard for the CLR default: MustChangePassword must be false
+        // for any user not created through the registration flow, including the
+        // seeded admin — no initializer on User.MustChangePassword relies on this.
+        Assert.False(adminUser.MustChangePassword);
     }
 
     [Fact]

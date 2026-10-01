@@ -28,6 +28,15 @@ public class LoginCommandHandlerTests
     {
         public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
             => Task.FromResult(user);
+
+        public Task AddAsync(User user, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task<bool> DocumentNumberExistsInOrganizationAsync(string documentNumber, Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task<IReadOnlyList<string>> FindEmailsByLocalPartPrefixAsync(string localPartPrefix, string domain, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
     }
 
     private sealed class FakePasswordHasher(bool verifyResult) : IPasswordHasher

@@ -17,6 +17,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(u => u.Id);
                 entity.HasIndex(u => u.Email).IsUnique();
+                entity.HasIndex(u => new { u.OrganizationId, u.DocumentNumber }).IsUnique();
+                entity.Property(u => u.Name).HasMaxLength(100);
+                entity.Property(u => u.Surname).HasMaxLength(100);
                 entity.Property(u => u.Role).HasConversion<string>();
                 entity.HasOne(u => u.Organization)
                     .WithMany()

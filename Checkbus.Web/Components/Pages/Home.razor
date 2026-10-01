@@ -1,5 +1,6 @@
 @page "/"
 @layout LandingLayout
+@attribute [AllowAnonymous]
 
 <PageTitle>Checkbus</PageTitle>
 
@@ -28,19 +29,6 @@
         <TechBadge Label=".NET" />
     </MudStack>
     <MudDivider Class="my-8" />
-    <MudGrid Justify="Justify.Center" Spacing="8">
-        <MudItem xs="12" md="5">
-            <BrandLogoCard Src="@Assets["img/brand/github-mark.svg"]"
-                           Alt="GitHub"
-                           Caption="GitHub®. Marca registrada de GitHub, Inc." />
-        </MudItem>
-        <MudItem xs="0" md="2" Class="d-none d-md-block"></MudItem>
-        <MudItem xs="12" md="5">
-            <BrandLogoCard Src="@Assets["img/brand/postgresql-elephant.svg"]"
-                           Alt="PostgreSQL"
-                           Caption="PostgreSQL®. Marca registrada de la PostgreSQL Community Association of Canada." />
-        </MudItem>
-    </MudGrid>
 </MudContainer>
 
 <!-- Soluciones section: navbar's #soluciones link resolves here. -->

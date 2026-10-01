@@ -13,10 +13,10 @@
                 <MudText Typo="Typo.h6" Color="Color.Secondary" Class="font-weight-bold">Checkbus</MudText>
             </MudLink>
             <MudSpacer />
-            <MudLink Href="#producto" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Producto</MudLink>
-            <MudLink Href="#soluciones" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Soluciones</MudLink>
-            <MudLink Href="#precios" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Precios</MudLink>
-            <MudLink Href="#contacto" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Contacto</MudLink>
+            <MudLink Href="/#producto" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Producto</MudLink>
+            <MudLink Href="/#soluciones" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Soluciones</MudLink>
+            <MudLink Href="/#precios" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Precios</MudLink>
+            <MudLink Href="/#contacto" Color="Color.Secondary" Underline="Underline.None" Class="mx-3">Contacto</MudLink>
             <MudSpacer />
             <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Class="px-6">Iniciar sesión</MudButton>
         </MudHidden>
@@ -27,10 +27,10 @@
             </MudLink>
             <MudSpacer />
             <MudMenu Icon="@Icons.Material.Filled.Menu" AriaLabel="Abrir menú" Dense="true">
-                <MudMenuItem Icon="@Icons.Material.Filled.Inventory2" OnClick="@(() => Nav.NavigateTo("#producto"))">Producto</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.Lightbulb" OnClick="@(() => Nav.NavigateTo("#soluciones"))">Soluciones</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.LocalOffer" OnClick="@(() => Nav.NavigateTo("#precios"))">Precios</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.ContactMail" OnClick="@(() => Nav.NavigateTo("#contacto"))">Contacto</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Inventory2" OnClick="@(() => Nav.NavigateTo("/#producto"))">Producto</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Lightbulb" OnClick="@(() => Nav.NavigateTo("/#soluciones"))">Soluciones</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.LocalOffer" OnClick="@(() => Nav.NavigateTo("/#precios"))">Precios</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.ContactMail" OnClick="@(() => Nav.NavigateTo("/#contacto"))">Contacto</MudMenuItem>
                 <MudDivider />
                 <MudMenuItem Icon="@Icons.Material.Filled.Login" OnClick="@(() => Nav.NavigateTo("/login"))">Iniciar sesión</MudMenuItem>
             </MudMenu>

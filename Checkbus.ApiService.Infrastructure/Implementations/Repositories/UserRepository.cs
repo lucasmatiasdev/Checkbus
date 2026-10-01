@@ -17,7 +17,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
         {
             return _context.Users
-                .Include(u => u.Role)
                 .Include(u => u.Organization)
                 .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
         }

@@ -1,0 +1,74 @@
+@page "/login"
+@layout LandingLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Checkbus - Iniciar sesión</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-16 d-flex flex-column align-center">
+    <MudPaper Elevation="2" Class="pa-8" Style="width: 100%; max-width: 420px;">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2" Align="Align.Center">
+            Iniciar sesión
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6" Align="Align.Center">
+            Ingresá tus credenciales para acceder a tu cuenta.
+        </MudText>
+
+        @if (Error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">Email o contraseña incorrectos.</MudAlert>
+        }
+
+        <form method="post" action="/account/login" data-enhance="false">
+            <MudTextField T="string"
+                           @bind-Value="model.Email"
+                           Label="Email"
+                           Variant="Variant.Outlined"
+                           InputType="InputType.Email"
+                           UserAttributes="@(new Dictionary<string, object?> { ["name"] = "Email", ["required"] = true })"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Password"
+                           Label="Contraseña"
+                           Variant="Variant.Outlined"
+                           InputType="@passwordInputType"
+                           Adornment="Adornment.End"
+                           AdornmentIcon="@passwordAdornmentIcon"
+                           OnAdornmentClick="TogglePasswordVisibility"
+                           UserAttributes="@(new Dictionary<string, object?> { ["name"] = "Password", ["required"] = true })"
+                           Class="mb-2" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Class="mb-4">
+                Iniciar sesión
+            </MudButton>
+        </form>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private readonly LoginModel model = new();
+    private bool showPassword;
+
+    private InputType passwordInputType => showPassword ? InputType.Text : InputType.Password;
+    private string passwordAdornmentIcon => showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility;
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+
+    private sealed class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}

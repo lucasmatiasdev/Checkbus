@@ -158,4 +158,30 @@ public class UserRepositoryTests
 
         Assert.Equal(2, await db.Users.CountAsync(cancellationToken));
     }
+
+    [Fact]
+    public async Task AddAsync_DuplicateEmailAcrossDifferentOrganizations_IsRejectedByUniqueIndex()
+    {
+        // Regression proof for the spec's `user-identity` -> Email Global Uniqueness
+        // requirement (Phase 5, task 5.3 gap closure). The Email unique index itself
+        // pre-dates this change and is untouched by it, but no committed test previously
+        // proved it rejects a duplicate at the database level across two different
+        // organizations — distinct from DocumentNumber, which is scoped per organization.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organizationA = CreateOrganization("org-a");
+        var organizationB = CreateOrganization("org-b");
+        db.Organizations.AddRange(organizationA, organizationB);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new UserRepository(db);
+        await repository.AddAsync(
+            CreateUser(organizationA.Id, "30111222", "jose.diaz@checkbus-demo.com"), cancellationToken);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => repository.AddAsync(
+            CreateUser(organizationB.Id, "30111333", "jose.diaz@checkbus-demo.com"), cancellationToken));
+    }
 }

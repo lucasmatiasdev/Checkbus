@@ -67,6 +67,24 @@ public class UserEmailGeneratorTests
     }
 
     [Fact]
+    public void Generate_SameNormalizedName_DifferentOrganizationSlugs_ProducesDifferentDomains()
+    {
+        // Regression proof for the spec's `user-identity` -> Organization Slug Uniqueness
+        // scenario "Unique slugs prevent cross-tenant email collisions" (Phase 5, task 5.3
+        // gap closure): two organizations with distinct slugs registering identically
+        // normalizing names must never collide, because the domain is derived from the
+        // (uniquely-indexed) slug.
+        var resultA = UserEmailGenerator.Generate("Jose", "Diaz", "org-a", NoTakenEmails);
+        var resultB = UserEmailGenerator.Generate("Jose", "Diaz", "org-b", NoTakenEmails);
+
+        Assert.True(resultA.Succeeded);
+        Assert.True(resultB.Succeeded);
+        Assert.Equal("jose.diaz@org-a.com", resultA.Email);
+        Assert.Equal("jose.diaz@org-b.com", resultB.Email);
+        Assert.NotEqual(resultA.Email, resultB.Email);
+    }
+
+    [Fact]
     public void Generate_SlugNormalizesToEmpty_ReturnsEmptyDomain()
     {
         var result = UserEmailGenerator.Generate("Jose", "Diaz", "---", NoTakenEmails);

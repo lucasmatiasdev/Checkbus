@@ -33,7 +33,7 @@ namespace Checkbus.ApiService.Services
 
         public string? Role => ClaimIfAuthenticated(ClaimTypes.Role);
 
-        public string? Username => ClaimIfAuthenticated(ClaimTypes.Name);
+        public string? Email => ClaimIfAuthenticated(ClaimTypes.Name);
 
         private string? ClaimIfAuthenticated(string claimType) =>
             IsAuthenticated ? Principal?.FindFirst(claimType)?.Value : null;

@@ -164,6 +164,6 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         Assert.Equal(user.Id, body!.UserId);
         Assert.Equal(user.OrganizationId, body.OrganizationId);
         Assert.Equal(user.Role.ToString(), body.Role);
-        Assert.Equal(user.Username, body.Username);
+        Assert.Equal(user.Email, body.Email);
     }
 }

@@ -3,7 +3,6 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,21 +14,13 @@ public class LoginCommandHandlerTests
     private static User CreateUser(bool isActive = true, Role role = Role.Administrador) => new()
     {
         Id = Guid.NewGuid(),
-        Username = "jdoe",
+        Name = "Jane",
+        Surname = "Doe",
         Email = "jdoe@example.com",
         PasswordHash = "hashed-password",
         DocumentNumber = "12345678",
         Role = role,
         OrganizationId = Guid.NewGuid(),
-        Organization = new Organization
-        {
-            Id = Guid.NewGuid(),
-            CUIT = "20-12345678-9",
-            Name = "Acme",
-            Slug = "acme",
-            LogoUrl = "https://example.com/logo.png",
-            IsActive = true
-        },
         IsActive = isActive
     };
 
@@ -136,7 +127,7 @@ public class LoginCommandHandlerTests
         Assert.Equal(user.Id, result.UserId);
         Assert.Equal(user.OrganizationId, result.OrganizationId);
         Assert.Equal("Chofer", result.Role);
-        Assert.Equal(user.Username, result.Username);
+        Assert.Equal(user.Email, result.Email);
     }
 
     [Fact]

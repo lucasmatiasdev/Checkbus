@@ -28,7 +28,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Authentication
             {
                 new Claim("OrganizationId", user.OrganizationId.ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Name, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             };
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));

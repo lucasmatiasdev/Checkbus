@@ -8,6 +8,6 @@ namespace Checkbus.ApiService.Domain.Interfaces
     public interface ITenantEntity
     {
         public Guid OrganizationId { get; set; }
-        public Organization Organization { get; set; }
+        public Organization? Organization { get; set; }
     }
 }

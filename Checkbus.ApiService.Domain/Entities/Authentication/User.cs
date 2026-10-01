@@ -11,14 +11,15 @@ namespace Checkbus.ApiService.Domain.Entities.Authentication
     public class User : ITenantEntity
     {
         public Guid Id { get; set; }
-        public required string Username { get; set; }
+        public required string Name { get; set; }
+        public required string Surname { get; set; }
         public required string Email { get; set; }
         public required string PasswordHash { get; set; }
         public DocumentType DocumentType { get; set; } = DocumentType.DNI;
         public required string DocumentNumber { get; set; }
         public required Role Role { get; set; }
         public Guid OrganizationId { get; set; }
-        public required Organization Organization { get; set; }
+        public Organization? Organization { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

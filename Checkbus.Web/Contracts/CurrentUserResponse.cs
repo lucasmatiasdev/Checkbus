@@ -6,4 +6,4 @@ namespace Checkbus.Web.Contracts;
 /// shared — matching the existing <c>LoginApiResult</c> mirror-DTO convention already used in
 /// <c>Checkbus.Web/Program.cs</c>.
 /// </summary>
-public sealed record CurrentUserResponse(Guid? UserId, Guid? OrganizationId, string? Role, string? Username);
+public sealed record CurrentUserResponse(Guid? UserId, Guid? OrganizationId, string? Role, string? Email);

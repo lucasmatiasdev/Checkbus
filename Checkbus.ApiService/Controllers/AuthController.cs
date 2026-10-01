@@ -34,7 +34,7 @@ namespace Checkbus.ApiService.Controllers
                 currentUser.UserId,
                 currentUser.OrganizationId,
                 currentUser.Role,
-                currentUser.Username);
+                currentUser.Email);
             return Ok(response);
         }
     }

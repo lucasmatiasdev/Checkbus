@@ -20,7 +20,6 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
     public static class CheckbusDbSeeder
     {
         private const string SeededAdminEmail = "admin@checkbus.dev";
-        private const string SeededAdminUsername = "admin";
         private const string SeededAdminPassword = "Admin123!";
         private const string DemoOrganizationSlug = "checkbus-demo";
 
@@ -75,7 +74,8 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 var user = new User
                 {
                     Id = Guid.NewGuid(),
-                    Username = SeededAdminUsername,
+                    Name = "Admin",
+                    Surname = "Checkbus",
                     Email = SeededAdminEmail,
                     PasswordHash = string.Empty,
                     DocumentNumber = "12345678",

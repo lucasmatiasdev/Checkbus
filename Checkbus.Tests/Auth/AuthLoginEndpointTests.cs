@@ -110,6 +110,6 @@ public class AuthLoginEndpointTests
         Assert.True(root.TryGetProperty("userId", out _));
         Assert.True(root.TryGetProperty("organizationId", out _));
         Assert.Equal("Administrador", root.GetProperty("role").GetString());
-        Assert.Equal("admin", root.GetProperty("username").GetString());
+        Assert.Equal("admin@checkbus.dev", root.GetProperty("email").GetString());
     }
 }

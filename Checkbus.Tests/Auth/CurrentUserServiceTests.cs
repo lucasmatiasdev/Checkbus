@@ -31,7 +31,7 @@ public class CurrentUserServiceTests
         Assert.Equal(userId, service.UserId);
         Assert.Equal(organizationId, service.OrganizationId);
         Assert.Equal("Administrador", service.Role);
-        Assert.Equal("jdoe", service.Username);
+        Assert.Equal("jdoe", service.Email);
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class CurrentUserServiceTests
         Assert.Null(service.UserId);
         Assert.Null(service.OrganizationId);
         Assert.Null(service.Role);
-        Assert.Null(service.Username);
+        Assert.Null(service.Email);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class CurrentUserServiceTests
         Assert.Null(service.OrganizationId);
         // Unaffected claims still resolve normally — malformed handling is isolated per property.
         Assert.Equal("Administrador", service.Role);
-        Assert.Equal("jdoe", service.Username);
+        Assert.Equal("jdoe", service.Email);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class CurrentUserServiceTests
             _ = service.UserId;
             _ = service.OrganizationId;
             _ = service.Role;
-            _ = service.Username;
+            _ = service.Email;
         });
 
         Assert.Null(exception);
@@ -103,6 +103,6 @@ public class CurrentUserServiceTests
         Assert.Null(service.UserId);
         Assert.Null(service.OrganizationId);
         Assert.Null(service.Role);
-        Assert.Null(service.Username);
+        Assert.Null(service.Email);
     }
 }

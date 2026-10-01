@@ -78,7 +78,7 @@ app.MapPost("/account/login", async (HttpContext httpContext, IHttpClientFactory
     var claims = new List<Claim>
     {
         new(ClaimTypes.NameIdentifier, result!.UserId.ToString()),
-        new(ClaimTypes.Name, result.Username),
+        new(ClaimTypes.Name, result.Email),
         new(ClaimTypes.Role, result.Role),
         new("OrganizationId", result.OrganizationId.ToString()),
         new("access_token", result.Token)
@@ -107,4 +107,4 @@ app.MapDefaultEndpoints();
 
 app.Run();
 
-record LoginApiResult(string Token, Guid UserId, Guid OrganizationId, string Role, string Username);
+record LoginApiResult(string Token, Guid UserId, Guid OrganizationId, string Role, string Email);

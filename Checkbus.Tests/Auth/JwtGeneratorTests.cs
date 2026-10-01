@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
-using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Microsoft.IdentityModel.JsonWebTokens;
 
@@ -20,21 +19,13 @@ public class JwtGeneratorTests
     private static User CreateUser(Role role) => new()
     {
         Id = Guid.NewGuid(),
-        Username = "jdoe",
+        Name = "Jane",
+        Surname = "Doe",
         Email = "jdoe@example.com",
         PasswordHash = "hashed-password",
         DocumentNumber = "12345678",
         Role = role,
         OrganizationId = Guid.NewGuid(),
-        Organization = new Organization
-        {
-            Id = Guid.NewGuid(),
-            CUIT = "20-12345678-9",
-            Name = "Acme",
-            Slug = "acme",
-            LogoUrl = "https://example.com/logo.png",
-            IsActive = true
-        },
         IsActive = true
     };
 
@@ -76,7 +67,7 @@ public class JwtGeneratorTests
         var jwt = new JsonWebTokenHandler().ReadJsonWebToken(token);
 
         Assert.Equal(user.Id.ToString(), jwt.Claims.Single(c => c.Type == ClaimTypes.NameIdentifier).Value);
-        Assert.Equal(user.Username, jwt.Claims.Single(c => c.Type == ClaimTypes.Name).Value);
+        Assert.Equal(user.Email, jwt.Claims.Single(c => c.Type == ClaimTypes.Name).Value);
         Assert.Equal(user.OrganizationId.ToString(), jwt.Claims.Single(c => c.Type == "OrganizationId").Value);
     }
 

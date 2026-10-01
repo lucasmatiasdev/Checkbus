@@ -62,7 +62,7 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 UserId = user.Id,
                 OrganizationId = user.OrganizationId,
                 Role = user.Role.ToString(),
-                Username = user.Username
+                Email = user.Email
             };
         }
     }

@@ -8,6 +8,6 @@ namespace Checkbus.ApiService.Application.Interfaces.Authentication
         Guid? UserId { get; }
         Guid? OrganizationId { get; }
         string? Role { get; }
-        string? Username { get; }
+        string? Email { get; }
     }
 }

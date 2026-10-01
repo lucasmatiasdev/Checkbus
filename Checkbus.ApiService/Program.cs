@@ -38,6 +38,7 @@ builder.Services.AddSingleton(fileStorageOptions);
 builder.Services.AddScoped<IPasswordHasher, IdentityPasswordHasher>();
 builder.Services.AddScoped<IJwtGenerator, JwtGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {

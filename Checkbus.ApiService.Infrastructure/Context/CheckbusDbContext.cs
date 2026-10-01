@@ -26,6 +26,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             modelBuilder.Entity<Organization>(entity =>
             {
                 entity.HasKey(o => o.Id);
+                entity.HasIndex(o => o.Slug).IsUnique();
             });
         }
     }

@@ -1,0 +1,152 @@
+@page "/users/register"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Components.Dialogs
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Registrar usuario</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Registrar usuario
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Completá los datos para darle de alta a una persona nueva. La contraseña inicial va a ser su número de documento.
+        </MudText>
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Name"
+                           For="@(() => model.Name)"
+                           Label="Nombre"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Surname"
+                           For="@(() => model.Surname)"
+                           Label="Apellido"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudSelect T="WebDocumentType"
+                       @bind-Value="model.DocumentType"
+                       For="@(() => model.DocumentType)"
+                       Label="Tipo de documento"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.DNI">DNI</MudSelectItem>
+                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.Pasaporte">Pasaporte</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField T="string"
+                           @bind-Value="model.DocumentNumber"
+                           For="@(() => model.DocumentNumber)"
+                           Label="Número de documento"
+                           HelperText="También va a ser la contraseña inicial de la persona."
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudSelect T="WebRole?"
+                       @bind-Value="model.Role"
+                       For="@(() => model.Role)"
+                       Label="Rol"
+                       Placeholder="Elegí un rol"
+                       Variant="Variant.Outlined"
+                       Class="mb-6">
+                @foreach (var role in RegisterUserFormModel.AssignableRoles)
+                {
+                    <MudSelectItem T="WebRole?" Value="@((WebRole?)role)">@role</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Disabled="isSubmitting">
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Registrando...</span>
+                }
+                else
+                {
+                    <span>Registrar usuario</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private UserRegistrationClient RegistrationClient { get; set; } = default!;
+
+    [Inject]
+    private IDialogService DialogService { get; set; } = default!;
+
+    private RegisterUserFormModel model = new();
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        try
+        {
+            var outcome = await RegistrationClient.RegisterAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case UserRegistrationOutcome.Success success:
+                    errorMessage = null;
+
+                    var dialogParameters = new DialogParameters
+                    {
+                        ["Email"] = success.Result.Email,
+                        ["Name"] = success.Result.Name,
+                        ["Surname"] = success.Result.Surname,
+                        ["InitialPassword"] = model.DocumentNumber
+                    };
+                    await DialogService.ShowAsync<UserCreatedDialog>("Usuario creado", dialogParameters);
+
+                    // Only reset on success — the 4 failure branches below must preserve the
+                    // admin's typed data so they can fix and resubmit without retyping everything.
+                    model = new RegisterUserFormModel();
+                    break;
+
+                case UserRegistrationOutcome.ValidationFailed validationFailed:
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case UserRegistrationOutcome.Conflict conflict:
+                    errorMessage = conflict.Message;
+                    break;
+
+                case UserRegistrationOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para registrar usuarios. Iniciá sesión de nuevo con una cuenta de administrador.";
+                    break;
+
+                case UserRegistrationOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

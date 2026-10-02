@@ -37,7 +37,7 @@ public sealed class UserRegistrationClient([FromKeyedServices("apiservice")] Htt
         catch (Exception)
         {
             return new UserRegistrationOutcome.TransportError(
-                "Could not reach the server. Please try again.");
+                "No pudimos conectar con el servidor. Probá de nuevo.");
         }
 
         using (response)
@@ -60,7 +60,7 @@ public sealed class UserRegistrationClient([FromKeyedServices("apiservice")] Htt
 
                     case HttpStatusCode.Conflict:
                         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
-                        return new UserRegistrationOutcome.Conflict(problem?.Detail ?? "A conflict occurred.");
+                        return new UserRegistrationOutcome.Conflict(problem?.Detail ?? "Ocurrió un conflicto. Probá de nuevo.");
 
                     case HttpStatusCode.Unauthorized:
                     case HttpStatusCode.Forbidden:
@@ -68,7 +68,7 @@ public sealed class UserRegistrationClient([FromKeyedServices("apiservice")] Htt
 
                     default:
                         return new UserRegistrationOutcome.TransportError(
-                            "An unexpected error occurred. Please try again.");
+                            "Ocurrió un error inesperado. Probá de nuevo.");
                 }
             }
             catch (Exception)

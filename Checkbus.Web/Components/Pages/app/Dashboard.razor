@@ -1,21 +1,52 @@
-﻿@page "/dashboard"
+@page "/dashboard"
 @attribute [Authorize]
 @using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
 
-<h3>Dashboard</h3>
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <h3>Dashboard</h3>
 
-@if (currentUser is not null)
-{
-    <MudText Typo="Typo.body1">Usuario: @currentUser.Email</MudText>
-    <MudText Typo="Typo.body1">Rol: @currentUser.Role</MudText>
-    <MudText Typo="Typo.body1">Organización: @currentUser.OrganizationId</MudText>
-}
+    @if (currentUser is not null)
+    {
+        <MudText Typo="Typo.body1">Usuario: @currentUser.Email</MudText>
+        <MudText Typo="Typo.body1">Rol: @currentUser.Role</MudText>
+        <MudText Typo="Typo.body1">Organización: @currentUser.OrganizationId</MudText>
+    }
 
-<form method="post" action="/logout" data-enhance="false">
-    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
-        Cerrar sesión
-    </MudButton>
-</form>
+    @if (isAdministrador)
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="3">
+                <MudPaper Elevation="2"
+                          Class="pa-4"
+                          Style="cursor: pointer;"
+                          @onclick="@(() => NavigationManager.NavigateTo("/users"))">
+                    @if (isLoadingExpiringCount)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (expiringCount is not null)
+                    {
+                        <MudText Typo="Typo.h4">@expiringCount</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">—</MudText>
+                    }
+                    <MudText Typo="Typo.body2">
+                        @(expiringCount is null && !isLoadingExpiringCount ? "No disponible" : "Documentos por vencer")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <form method="post" action="/logout" data-enhance="false">
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
+            Cerrar sesión
+        </MudButton>
+    </form>
+</MudContainer>
 
 @code {
     // Resolved via IServiceProvider.GetRequiredKeyedService, not IHttpClientFactory.CreateClient:
@@ -26,11 +57,43 @@
     [Inject]
     private IServiceProvider ServiceProvider { get; set; } = default!;
 
+    [Inject]
+    private DriverRequirementsClient DriverRequirementsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
     private CurrentUserResponse? currentUser;
+    private bool isAdministrador;
+    private int? expiringCount;
+    private bool isLoadingExpiringCount;
 
     protected override async Task OnInitializedAsync()
     {
         var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
         currentUser = await httpClient.GetFromJsonAsync<CurrentUserResponse>("auth/me");
+        isAdministrador = currentUser?.Role == "Administrador";
+
+        if (isAdministrador)
+        {
+            isLoadingExpiringCount = true;
+            // OnInitializedAsync only re-renders once, after the whole method completes — without
+            // this explicit StateHasChanged, isAdministrador becoming true and the spinner turning
+            // on would never reach the DOM before the count fetch below also finishes.
+            StateHasChanged();
+            try
+            {
+                var outcome = await DriverRequirementsClient.GetExpiringCountAsync();
+                expiringCount = outcome switch
+                {
+                    DriverRequirementCountOutcome.Success success => success.Count,
+                    _ => null
+                };
+            }
+            finally
+            {
+                isLoadingExpiringCount = false;
+            }
+        }
     }
 }

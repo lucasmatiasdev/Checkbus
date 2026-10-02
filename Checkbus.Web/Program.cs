@@ -31,6 +31,7 @@ builder.Services.AddHttpClient("apiservice", client =>
     .AddHttpMessageHandler<AuthenticationStateHandler>();
 
 builder.Services.AddScoped<UserRegistrationClient>();
+builder.Services.AddScoped<UsersClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

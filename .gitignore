@@ -19,6 +19,12 @@ Checkbus.ApiService/App_Data/
 ## ODD task tracking (local only, mirrored to Engram)
 odd/
 
+## Local AI-tooling metadata (skill registry index)
+.atl/
+
+## Local reference material (not part of the app)
+notes/
+
 ## OS
 .DS_Store
 Thumbs.db

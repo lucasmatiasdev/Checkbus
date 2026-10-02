@@ -6,7 +6,8 @@ namespace Checkbus.Tests.Users;
 
 /// <summary>
 /// Drift-detection coverage for the Checkbus.Web BFF mirror enums (<see cref="WebRole"/>,
-/// <see cref="WebDocumentType"/>). Checkbus.Web never references the API projects, so these
+/// <see cref="WebDocumentType"/>, <see cref="WebDriverRequirementType"/>,
+/// <see cref="WebDriverRequirementStatus"/>). Checkbus.Web never references the API projects, so these
 /// enums are hand-duplicated; this test walks the real domain enums via reflection and asserts
 /// every member has a same-named counterpart with an identical underlying numeric value on the
 /// web side, catching future additions, removals, or renumbering on either side.
@@ -23,6 +24,18 @@ public class WebContractEnumParityTests
     public void WebDocumentType_StaysNumericallyInSyncWith_RealDocumentType()
     {
         AssertEnumParity<DocumentType, WebDocumentType>();
+    }
+
+    [Fact]
+    public void WebDriverRequirementType_StaysNumericallyInSyncWith_RealDriverRequirementType()
+    {
+        AssertEnumParity<DriverRequirementType, WebDriverRequirementType>();
+    }
+
+    [Fact]
+    public void WebDriverRequirementStatus_StaysNumericallyInSyncWith_RealDriverRequirementStatus()
+    {
+        AssertEnumParity<DriverRequirementStatus, WebDriverRequirementStatus>();
     }
 
     private static void AssertEnumParity<TReal, TWeb>()

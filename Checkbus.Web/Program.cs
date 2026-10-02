@@ -32,6 +32,7 @@ builder.Services.AddHttpClient("apiservice", client =>
 
 builder.Services.AddScoped<UserRegistrationClient>();
 builder.Services.AddScoped<UsersClient>();
+builder.Services.AddScoped<DriverRequirementsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -103,6 +104,28 @@ app.MapPost("/logout", async (HttpContext httpContext) =>
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");
 });
+
+// The browser can't directly hit the API's file-download endpoint — the bearer token is only
+// attached server-side (inside Checkbus.Web) via AuthenticationStateHandler on the keyed
+// "apiservice" HttpClient, not by a raw <img src>/<a href> request from the browser. This
+// endpoint runs inside Checkbus.Web's own authenticated (cookie) session, then internally makes
+// the authenticated server-to-server call to apiservice and streams the bytes straight through,
+// never buffering the whole file in memory.
+app.MapGet("/driver-documents/{userId:guid}/{type}", async (
+    Guid userId,
+    string type,
+    [FromKeyedServices("apiservice")] HttpClient httpClient,
+    CancellationToken cancellationToken) =>
+{
+    var response = await httpClient.GetAsync($"DriverRequirements/{userId}/{type}/document", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+        return Results.StatusCode((int)response.StatusCode);
+
+    var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+    return Results.Stream(stream, contentType);
+})
+.RequireAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

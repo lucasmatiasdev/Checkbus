@@ -1,0 +1,44 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Usuario creado</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Compartí estas credenciales con <strong>@Name @Surname</strong> para que pueda iniciar sesión.
+        </MudText>
+
+        <MudStack Spacing="2" Class="mb-4">
+            <MudTextField T="string" Label="Email" Value="@Email" ReadOnly="true" Variant="Variant.Outlined" />
+            <MudTextField T="string" Label="Contraseña inicial" Value="@InitialPassword" ReadOnly="true" Variant="Variant.Outlined" />
+        </MudStack>
+
+        <MudAlert Severity="Severity.Warning">
+            Es obligatorio que la persona cambie esta contraseña la primera vez que inicie sesión.
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Cerrar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public required string Email { get; set; }
+
+    [Parameter]
+    public required string Name { get; set; }
+
+    [Parameter]
+    public required string Surname { get; set; }
+
+    [Parameter]
+    public required string InitialPassword { get; set; }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

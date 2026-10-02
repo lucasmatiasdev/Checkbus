@@ -1,0 +1,13 @@
+@page "/access-denied"
+@attribute [AllowAnonymous]
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-16 d-flex flex-column align-center text-center">
+    <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" Size="Size.Large" Class="mb-4" />
+    <MudText Typo="Typo.h5" Class="mb-2">No tenés permiso para acceder a esta página</MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+        Tu cuenta no tiene el rol necesario para esta sección. Si creés que es un error, consultá con un administrador.
+    </MudText>
+    <MudButton Href="/dashboard" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" DropShadow="false">
+        Volver al inicio
+    </MudButton>
+</MudContainer>

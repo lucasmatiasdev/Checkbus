@@ -24,6 +24,12 @@
                     Usuarios
                 </MudNavLink>
             </AuthorizeView>
+            <AuthorizeView Roles="Chofer">
+                <MudNavLink Href="/my-documents" Match="NavLinkMatch.All">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderShared" />
+                    Mis Documentos
+                </MudNavLink>
+            </AuthorizeView>
         </MudNavMenu>
     </MudDrawer>
     <MudMainContent>

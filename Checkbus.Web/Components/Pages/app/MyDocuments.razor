@@ -1,0 +1,274 @@
+@page "/my-documents"
+@attribute [Authorize(Roles = "Chofer")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Checkbus - Mis Documentos</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Mis Documentos
+    </MudText>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else
+    {
+        @foreach (var type in RequirementTypes)
+        {
+            var requirement = requirements.FirstOrDefault(r => r.Type == type);
+            var vigencia = DriverRequirementVigencia.Compute(requirement?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
+
+            <MudPaper Elevation="2" Class="pa-6 mb-6">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+                    <MudText Typo="Typo.h6">@GetTypeLabel(type)</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudChip T="string" Color="@GetStatusColor(requirement?.Status)" Size="Size.Small">
+                            @GetStatusLabel(requirement?.Status)
+                        </MudChip>
+                        <MudChip T="string" Color="@DriverRequirementVigencia.GetColor(vigencia)" Size="Size.Small">
+                            @DriverRequirementVigencia.GetLabel(vigencia)
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+
+                <MudText Typo="Typo.body2" Class="mb-4">
+                    @if (requirement?.ExpirationDate is not null)
+                    {
+                        @($"Vence: {requirement.ExpirationDate.Value:dd/MM/yyyy}")
+                    }
+                    else
+                    {
+                        @("Todavía no subiste un documento para este requisito.")
+                    }
+                </MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <InputFile OnChange="@(e => OnFileSelected(type, e))" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker Label="Fecha de vencimiento"
+                                       @bind-Date="expirationDates[type]" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker Label="Fecha de emisión (opcional)"
+                                       @bind-Date="issueDates[type]" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (uploadErrors.TryGetValue(type, out var uploadError) && uploadError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4">@uploadError</MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Class="mt-4"
+                           Disabled="@uploadingTypes.Contains(type)"
+                           OnClick="@(() => HandleUpload(type))">
+                    @if (uploadingTypes.Contains(type))
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Subiendo...</span>
+                    }
+                    else
+                    {
+                        <span>Subir documento</span>
+                    }
+                </MudButton>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
+    // OpenReadStream buffer and matching the backend's 5MB cap (T2 FluentValidation).
+    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+
+    private static readonly WebDriverRequirementType[] RequirementTypes =
+        Enum.GetValues<WebDriverRequirementType>();
+
+    // Resolved via IServiceProvider.GetRequiredKeyedService, not IHttpClientFactory.CreateClient —
+    // same "apiservice" keyed-client pattern used by Dashboard.razor to reach auth/me.
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = default!;
+
+    [Inject]
+    private DriverRequirementsClient RequirementsClient { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private Guid? currentUserId;
+    private IReadOnlyList<DriverRequirementResponse> requirements = [];
+    private readonly Dictionary<WebDriverRequirementType, DateTime?> expirationDates = new();
+    private readonly Dictionary<WebDriverRequirementType, DateTime?> issueDates = new();
+    private readonly Dictionary<WebDriverRequirementType, IBrowserFile?> selectedFiles = new();
+    private readonly Dictionary<WebDriverRequirementType, string?> uploadErrors = new();
+    private readonly HashSet<WebDriverRequirementType> uploadingTypes = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var type in RequirementTypes)
+        {
+            expirationDates[type] = null;
+            issueDates[type] = null;
+            selectedFiles[type] = null;
+            uploadErrors[type] = null;
+        }
+
+        try
+        {
+            var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
+            var currentUser = await httpClient.GetFromJsonAsync<CurrentUserResponse>("auth/me");
+            currentUserId = currentUser?.UserId;
+
+            if (currentUserId is null)
+            {
+                errorMessage = "No pudimos cargar tus documentos.";
+                return;
+            }
+
+            await LoadRequirementsAsync(currentUserId.Value);
+        }
+        catch (Exception)
+        {
+            errorMessage = "No pudimos cargar tus documentos.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadRequirementsAsync(Guid userId)
+    {
+        var outcome = await RequirementsClient.GetRequirementsAsync(userId);
+
+        switch (outcome)
+        {
+            case DriverRequirementsListOutcome.Success success:
+                requirements = success.Requirements;
+                errorMessage = null;
+                break;
+
+            case DriverRequirementsListOutcome.Forbidden:
+            case DriverRequirementsListOutcome.NotFound:
+            case DriverRequirementsListOutcome.TransportError:
+                errorMessage = "No pudimos cargar tus documentos.";
+                break;
+        }
+    }
+
+    private void OnFileSelected(WebDriverRequirementType type, InputFileChangeEventArgs e)
+    {
+        selectedFiles[type] = e.File;
+        uploadErrors[type] = null;
+    }
+
+    private async Task HandleUpload(WebDriverRequirementType type)
+    {
+        uploadErrors[type] = null;
+
+        var file = selectedFiles.GetValueOrDefault(type);
+        if (file is null)
+        {
+            uploadErrors[type] = "Elegí un archivo para subir.";
+            return;
+        }
+
+        var expirationDate = expirationDates.GetValueOrDefault(type);
+        if (expirationDate is null)
+        {
+            uploadErrors[type] = "Ingresá la fecha de vencimiento.";
+            return;
+        }
+
+        if (currentUserId is null)
+        {
+            uploadErrors[type] = "No pudimos identificar tu usuario.";
+            return;
+        }
+
+        uploadingTypes.Add(type);
+        try
+        {
+            var issueDate = issueDates.GetValueOrDefault(type);
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: MaxUploadSizeBytes);
+            var outcome = await RequirementsClient.UploadDocumentAsync(
+                currentUserId.Value,
+                type,
+                stream,
+                file.Name,
+                file.ContentType,
+                DateOnly.FromDateTime(expirationDate.Value),
+                issueDate is null ? null : DateOnly.FromDateTime(issueDate.Value));
+
+            switch (outcome)
+            {
+                case DriverRequirementActionOutcome.Success:
+                    selectedFiles[type] = null;
+                    expirationDates[type] = null;
+                    issueDates[type] = null;
+                    Snackbar.Add("Documento subido correctamente. Queda pendiente de revisión.", Severity.Success);
+                    await LoadRequirementsAsync(currentUserId.Value);
+                    break;
+
+                case DriverRequirementActionOutcome.ValidationFailed validationFailed:
+                    uploadErrors[type] = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case DriverRequirementActionOutcome.Forbidden:
+                case DriverRequirementActionOutcome.NotFound:
+                    uploadErrors[type] = "No tenés permiso para subir este documento.";
+                    break;
+
+                case DriverRequirementActionOutcome.TransportError transportError:
+                    uploadErrors[type] = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            uploadingTypes.Remove(type);
+        }
+    }
+
+    /// <summary>Spanish display label for a requirement type, same inline-mapping style as
+    /// <c>Usuarios.razor</c>'s <c>GetRoleLabel</c>.</summary>
+    private static string GetTypeLabel(WebDriverRequirementType type) => type switch
+    {
+        WebDriverRequirementType.LicenciaConducir => "Licencia de Conducir",
+        WebDriverRequirementType.CapacitacionProfesional => "Capacitación Profesional",
+        _ => type.ToString()
+    };
+
+    private static string GetStatusLabel(WebDriverRequirementStatus? status) => status switch
+    {
+        WebDriverRequirementStatus.Apto => "Apto",
+        WebDriverRequirementStatus.NoApto => "No apto",
+        WebDriverRequirementStatus.Pendiente => "Pendiente",
+        _ => "Pendiente"
+    };
+
+    private static Color GetStatusColor(WebDriverRequirementStatus? status) => status switch
+    {
+        WebDriverRequirementStatus.Apto => Color.Success,
+        WebDriverRequirementStatus.NoApto => Color.Error,
+        _ => Color.Default
+    };
+}

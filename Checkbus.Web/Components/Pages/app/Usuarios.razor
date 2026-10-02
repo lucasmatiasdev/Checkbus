@@ -1,0 +1,166 @@
+@page "/users"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Usuarios</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Usuarios
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="@(() => NavigationManager.NavigateTo("/users/register"))">
+            Nuevo usuario
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        <MudStack Row="true" Spacing="4" Class="mb-4">
+            <MudSelect T="WebRole?"
+                       Value="selectedRole"
+                       ValueChanged="OnRoleChanged"
+                       Label="Rol"
+                       Variant="Variant.Outlined"
+                       Class="flex-grow-0"
+                       Style="min-width: 220px;">
+                <MudSelectItem T="WebRole?" Value="@((WebRole?)null)">Todos</MudSelectItem>
+                @foreach (var role in Enum.GetValues<WebRole>())
+                {
+                    <MudSelectItem T="WebRole?" Value="@((WebRole?)role)">@GetRoleLabel(role)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                           Value="searchText"
+                           ValueChanged="OnSearchTextChanged"
+                           Immediate="true"
+                           Label="Buscar por nombre o apellido"
+                           Variant="Variant.Outlined"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.Search"
+                           Class="flex-grow-1" />
+        </MudStack>
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="UserListItemResponse" Items="@filteredUsers">
+                <Columns>
+                    <TemplateColumn Title="" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" />
+                            </MudAvatar>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Name" Title="Nombre" />
+                    <PropertyColumn Property="x => x.Surname" Title="Apellido" />
+                    <PropertyColumn Property="x => x.Email" Title="Email" />
+                    <TemplateColumn Title="Rol">
+                        <CellTemplate>
+                            @GetRoleLabel(context.Item.Role)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Disabled="true"
+                                       Class="mr-2">
+                                Editar
+                            </MudButton>
+                            @if (context.Item.Role == WebRole.Chofer)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Size="Size.Small"
+                                           Disabled="true">
+                                    Documentos
+                                </MudButton>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<UserListItemResponse> allUsers = [];
+    private IReadOnlyList<UserListItemResponse> filteredUsers = [];
+    private WebRole? selectedRole;
+    private string? searchText;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var outcome = await UsersClient.GetUsersAsync();
+
+            switch (outcome)
+            {
+                case UsersListOutcome.Success success:
+                    allUsers = success.Users;
+                    filteredUsers = UserListFilter.Apply(allUsers, selectedRole, searchText);
+                    errorMessage = null;
+                    break;
+
+                case UsersListOutcome.Forbidden:
+                case UsersListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar la lista de usuarios.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnRoleChanged(WebRole? role)
+    {
+        selectedRole = role;
+        filteredUsers = UserListFilter.Apply(allUsers, selectedRole, searchText);
+    }
+
+    private void OnSearchTextChanged(string? text)
+    {
+        searchText = text;
+        filteredUsers = UserListFilter.Apply(allUsers, selectedRole, searchText);
+    }
+
+    /// <summary>
+    /// Spanish display label for a role, used both in the role filter dropdown and the grid's
+    /// "Rol" column. Not a 1:1 <c>ToString()</c> because <see cref="WebRole.Mecanico"/>'s Spanish
+    /// word carries an accent ("Mecánico") that the enum member name (ASCII-only) cannot.
+    /// </summary>
+    private static string GetRoleLabel(WebRole role) => role switch
+    {
+        WebRole.Administrador => "Administrador",
+        WebRole.Chofer => "Chofer",
+        WebRole.Planificador => "Planificador",
+        WebRole.Mecanico => "Mecánico",
+        _ => role.ToString()
+    };
+}

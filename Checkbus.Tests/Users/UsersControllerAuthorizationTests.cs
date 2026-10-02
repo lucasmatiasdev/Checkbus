@@ -18,6 +18,7 @@ namespace Checkbus.Tests.Users;
 public class UsersControllerAuthorizationTests : IClassFixture<CheckbusApiFactory>
 {
     private const string RegisterPath = "/api/users";
+    private const string ListPath = "/api/users";
 
     private readonly CheckbusApiFactory _factory;
 
@@ -133,5 +134,28 @@ public class UsersControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         var response = await client.PostAsJsonAsync(RegisterPath, body, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetUsers_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(ListPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Planificador)]
+    [InlineData(Role.Mecanico)]
+    public async Task GetUsers_NonAdminRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+
+        var response = await client.GetAsync(ListPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

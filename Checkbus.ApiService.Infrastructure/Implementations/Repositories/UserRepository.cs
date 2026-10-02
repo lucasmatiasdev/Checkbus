@@ -64,5 +64,12 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .Select(u => u.Email)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            return await _context.Users
+                .Where(u => u.OrganizationId == organizationId)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

@@ -184,4 +184,51 @@ public class UserRepositoryTests
         await Assert.ThrowsAsync<DbUpdateException>(() => repository.AddAsync(
             CreateUser(organizationB.Id, "30111333", "jose.diaz@checkbus-demo.com"), cancellationToken));
     }
+
+    [Fact]
+    public async Task GetAllByOrganizationAsync_ReturnsOnlyUsersFromThatOrganization()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organizationA = CreateOrganization("org-a");
+        var organizationB = CreateOrganization("org-b");
+        db.Organizations.AddRange(organizationA, organizationB);
+        db.Users.AddRange(
+            CreateUser(organizationA.Id, "30111222", "jose.diaz@org-a.com"),
+            CreateUser(organizationA.Id, "30111333", "maria.gomez@org-a.com"),
+            CreateUser(organizationB.Id, "30111222", "jose.diaz@org-b.com"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new UserRepository(db);
+
+        var users = await repository.GetAllByOrganizationAsync(organizationA.Id, cancellationToken);
+
+        Assert.Equal(2, users.Count);
+        Assert.All(users, u => Assert.Equal(organizationA.Id, u.OrganizationId));
+        Assert.Contains(users, u => u.Email == "jose.diaz@org-a.com");
+        Assert.Contains(users, u => u.Email == "maria.gomez@org-a.com");
+        Assert.DoesNotContain(users, u => u.Email == "jose.diaz@org-b.com");
+    }
+
+    [Fact]
+    public async Task GetAllByOrganizationAsync_NoUsersInOrganization_ReturnsEmpty()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new UserRepository(db);
+
+        var users = await repository.GetAllByOrganizationAsync(organization.Id, cancellationToken);
+
+        Assert.Empty(users);
+    }
 }

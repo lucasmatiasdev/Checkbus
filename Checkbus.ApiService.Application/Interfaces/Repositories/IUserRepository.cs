@@ -12,5 +12,6 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
             string documentNumber, Guid organizationId, CancellationToken cancellationToken);
         Task<IReadOnlyList<string>> FindEmailsByLocalPartPrefixAsync(
             string localPartPrefix, string domain, CancellationToken cancellationToken);
+        Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
     }
 }

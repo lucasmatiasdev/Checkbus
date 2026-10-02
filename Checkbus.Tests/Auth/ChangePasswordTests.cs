@@ -85,6 +85,9 @@ public class ChangePasswordCommandHandlerTests
             UpdatedUsers.Add(user);
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ChangePasswordCommandHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? userId) : ICurrentUserService

@@ -44,6 +44,9 @@ public class LoginCommandHandlerTests
 
         public Task UpdateAsync(User user, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
     }
 
     private sealed class FakePasswordHasher(bool verifyResult) : IPasswordHasher

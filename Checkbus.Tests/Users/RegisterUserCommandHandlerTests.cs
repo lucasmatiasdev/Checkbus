@@ -38,6 +38,9 @@ public class RegisterUserCommandHandlerTests
 
         public Task UpdateAsync(User user, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
     }
 
     private sealed class FakeOrganizationRepository(string? slug) : IOrganizationRepository

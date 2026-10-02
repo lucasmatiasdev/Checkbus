@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Users.Commands;
+using Checkbus.ApiService.Application.Users.Queries;
 using Checkbus.ApiService.Domain.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -23,6 +24,14 @@ namespace Checkbus.ApiService.Controllers
         {
             var result = await _mediator.Send(command, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
+        }
+
+        [Authorize(Roles = nameof(Role.Administrador))]
+        [HttpGet]
+        public async Task<IActionResult> GetUsers(CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetUsersQuery(), cancellationToken);
+            return Ok(result);
         }
     }
 }

@@ -77,6 +77,7 @@ builder.Services.AddControllers(options => options.Filters.Add(new AuthorizeFilt
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<AuthExceptionHandler>();
 builder.Services.AddExceptionHandler<UserConflictExceptionHandler>();
+builder.Services.AddExceptionHandler<DriverRequirementExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

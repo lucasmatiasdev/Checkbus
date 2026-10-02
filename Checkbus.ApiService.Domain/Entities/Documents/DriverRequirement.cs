@@ -17,6 +17,10 @@ namespace Checkbus.ApiService.Domain.Entities.Documents
         public DateOnly? ExpirationDate { get; set; }
         public bool DocumentPresent { get; set; }
         public string? FileKey { get; set; }
+
+        // Captured from the uploaded file's Content-Type at upload time so the download
+        // endpoint can serve the correct header without guessing from the file extension.
+        public string? FileContentType { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

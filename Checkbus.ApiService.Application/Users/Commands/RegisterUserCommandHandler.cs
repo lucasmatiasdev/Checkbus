@@ -1,6 +1,9 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.Documents;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using FluentValidation;
 using FluentValidation.Results;
@@ -12,17 +15,20 @@ namespace Checkbus.ApiService.Application.Users.Commands
     {
         private readonly IUserRepository _userRepository;
         private readonly IOrganizationRepository _organizationRepository;
+        private readonly IDriverRequirementRepository _driverRequirementRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IPasswordHasher _passwordHasher;
 
         public RegisterUserCommandHandler(
             IUserRepository userRepository,
             IOrganizationRepository organizationRepository,
+            IDriverRequirementRepository driverRequirementRepository,
             ICurrentUserService currentUser,
             IPasswordHasher passwordHasher)
         {
             _userRepository = userRepository;
             _organizationRepository = organizationRepository;
+            _driverRequirementRepository = driverRequirementRepository;
             _currentUser = currentUser;
             _passwordHasher = passwordHasher;
         }
@@ -88,6 +94,28 @@ namespace Checkbus.ApiService.Application.Users.Commands
             user.PasswordHash = _passwordHasher.Hash(user, request.DocumentNumber);
 
             await _userRepository.AddAsync(user, cancellationToken);
+
+            // Auto-create the 2 default driver-requirement rows (Pendiente, no dates) for
+            // every Chofer registration, in the same unit of work as the user insert.
+            // Exactly 2 DriverRequirementType values exist by deliberate scope decision
+            // (see odd/tasks/driver-documents.md) — this creates one row per value.
+            if (user.Role == Role.Chofer)
+            {
+                var requirementNow = DateTime.UtcNow;
+                var requirements = Enum.GetValues<DriverRequirementType>()
+                    .Select(type => new DriverRequirement
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        Type = type,
+                        Status = DriverRequirementStatus.Pendiente,
+                        DocumentPresent = false,
+                        CreatedAt = requirementNow,
+                        UpdatedAt = requirementNow
+                    });
+
+                await _driverRequirementRepository.AddRangeAsync(requirements, cancellationToken);
+            }
 
             return new RegisterUserCommandResult
             {

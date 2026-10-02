@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Users.Commands;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.Documents;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 
@@ -40,6 +41,27 @@ public class RegisterUserCommandHandlerTests
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
 
         public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+    }
+
+    private sealed class FakeDriverRequirementRepository : IDriverRequirementRepository
+    {
+        public List<DriverRequirement> AddedRequirements { get; } = [];
+
+        public Task AddRangeAsync(IEnumerable<DriverRequirement> requirements, CancellationToken cancellationToken)
+        {
+            AddedRequirements.AddRange(requirements);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<DriverRequirement>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task UpdateAsync(DriverRequirement requirement, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
+            Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
     }
 
@@ -89,6 +111,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId),
             new FakePasswordHasher());
 
@@ -103,6 +126,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -118,6 +142,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             userRepository,
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -139,6 +164,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             passwordHasher);
 
@@ -154,6 +180,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             userRepository,
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -169,6 +196,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId: null),
             new FakePasswordHasher());
 
@@ -182,6 +210,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository(slug: null),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -196,6 +225,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             userRepository,
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -215,6 +245,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             userRepository,
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
             new FakePasswordHasher());
 
@@ -230,6 +261,7 @@ public class RegisterUserCommandHandlerTests
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),
             new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId),
             new FakePasswordHasher());
         var command = CreateCommand();
@@ -239,5 +271,52 @@ public class RegisterUserCommandHandlerTests
 
         Assert.Equal("Administrador", result.Role);
         Assert.Equal(organizationId, result.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_ChoferRegistration_CreatesExactlyTwoDefaultDriverRequirements()
+    {
+        var driverRequirementRepository = new FakeDriverRequirementRepository();
+        var handler = new RegisterUserCommandHandler(
+            new FakeUserRepository(),
+            new FakeOrganizationRepository("checkbus-demo"),
+            driverRequirementRepository,
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakePasswordHasher());
+
+        var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, driverRequirementRepository.AddedRequirements.Count);
+        Assert.All(driverRequirementRepository.AddedRequirements, r =>
+        {
+            Assert.Equal(result.UserId, r.UserId);
+            Assert.Equal(DriverRequirementStatus.Pendiente, r.Status);
+            Assert.False(r.DocumentPresent);
+            Assert.Null(r.IssueDate);
+            Assert.Null(r.ExpirationDate);
+        });
+        Assert.Contains(driverRequirementRepository.AddedRequirements, r => r.Type == DriverRequirementType.LicenciaConducir);
+        Assert.Contains(driverRequirementRepository.AddedRequirements, r => r.Type == DriverRequirementType.CapacitacionProfesional);
+    }
+
+    [Theory]
+    [InlineData(Role.Administrador)]
+    [InlineData(Role.Planificador)]
+    [InlineData(Role.Mecanico)]
+    public async Task Handle_NonChoferRegistration_CreatesNoDriverRequirements(Role role)
+    {
+        var driverRequirementRepository = new FakeDriverRequirementRepository();
+        var handler = new RegisterUserCommandHandler(
+            new FakeUserRepository(),
+            new FakeOrganizationRepository("checkbus-demo"),
+            driverRequirementRepository,
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakePasswordHasher());
+        var command = CreateCommand();
+        command.Role = role;
+
+        await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Empty(driverRequirementRepository.AddedRequirements);
     }
 }

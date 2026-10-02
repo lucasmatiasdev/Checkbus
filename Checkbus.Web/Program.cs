@@ -3,6 +3,7 @@ using Checkbus.Web.Components;
 using Checkbus.Web.Extensions;
 using Checkbus.Web.Services;
 using MudBlazor.Services;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
@@ -105,19 +106,32 @@ app.MapPost("/logout", async (HttpContext httpContext) =>
     return Results.Redirect("/login");
 });
 
-// The browser can't directly hit the API's file-download endpoint — the bearer token is only
-// attached server-side (inside Checkbus.Web) via AuthenticationStateHandler on the keyed
-// "apiservice" HttpClient, not by a raw <img src>/<a href> request from the browser. This
-// endpoint runs inside Checkbus.Web's own authenticated (cookie) session, then internally makes
-// the authenticated server-to-server call to apiservice and streams the bytes straight through,
-// never buffering the whole file in memory.
+// The browser can't directly hit the API's file-download endpoint — the bearer token normally
+// gets attached via AuthenticationStateHandler on the keyed "apiservice" HttpClient, but that
+// mechanism reads AuthenticationStateProvider.GetAuthenticationStateAsync(), which
+// ServerAuthenticationStateProvider explicitly refuses to run outside a live Razor component's
+// circuit DI scope (throws InvalidOperationException — confirmed via manual smoke test, this is
+// not a theoretical concern). A minimal API endpoint's HTTP request scope is not that circuit, so
+// this handler resolves a plain (non-keyed) "apiservice" HttpClient via IHttpClientFactory — which
+// skips ApplicationScopeHandler entirely, so AuthenticationStateHandler's scope-option check never
+// fires — and attaches the bearer token itself by reading the same "access_token" claim directly
+// off the already-authenticated HttpContext.User, which IS valid in this request scope.
 app.MapGet("/driver-documents/{userId:guid}/{type}", async (
     Guid userId,
     string type,
-    [FromKeyedServices("apiservice")] HttpClient httpClient,
+    ClaimsPrincipal user,
+    IHttpClientFactory httpClientFactory,
     CancellationToken cancellationToken) =>
 {
-    var response = await httpClient.GetAsync($"DriverRequirements/{userId}/{type}/document", cancellationToken);
+    var token = user.FindFirst("access_token")?.Value;
+    if (string.IsNullOrEmpty(token))
+        return Results.Unauthorized();
+
+    var httpClient = httpClientFactory.CreateClient("apiservice");
+    using var request = new HttpRequestMessage(HttpMethod.Get, $"DriverRequirements/{userId}/{type}/document");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     if (!response.IsSuccessStatusCode)
         return Results.StatusCode((int)response.StatusCode);
 

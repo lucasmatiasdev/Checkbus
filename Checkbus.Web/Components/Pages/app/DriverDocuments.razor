@@ -1,0 +1,237 @@
+@page "/users/{UserId:guid}/documents"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Documentos</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Documentos de @headingName
+        </MudText>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => NavigationManager.NavigateTo("/users"))">
+            Volver
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (actionError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@actionError</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (errorMessage is null)
+    {
+        @foreach (var type in RequirementTypes)
+        {
+            var requirement = requirements.FirstOrDefault(r => r.Type == type);
+            var vigencia = DriverRequirementVigencia.Compute(requirement?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
+            var isActing = actingTypes.Contains(type);
+
+            <MudPaper Elevation="2" Class="pa-6 mb-6">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+                    <MudText Typo="Typo.h6">@GetTypeLabel(type)</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudChip T="string" Color="@GetStatusColor(requirement?.Status)" Size="Size.Small">
+                            @GetStatusLabel(requirement?.Status)
+                        </MudChip>
+                        <MudChip T="string" Color="@DriverRequirementVigencia.GetColor(vigencia)" Size="Size.Small">
+                            @DriverRequirementVigencia.GetLabel(vigencia)
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+
+                @if (requirement?.IssueDate is not null)
+                {
+                    <MudText Typo="Typo.body2">@($"Emitido: {requirement.IssueDate.Value:dd/MM/yyyy}")</MudText>
+                }
+
+                <MudText Typo="Typo.body2" Class="mb-4">
+                    @if (requirement?.ExpirationDate is not null)
+                    {
+                        @($"Vence: {requirement.ExpirationDate.Value:dd/MM/yyyy}")
+                    }
+                    else
+                    {
+                        @("Todavía no se subió un documento para este requisito.")
+                    }
+                </MudText>
+
+                @if (requirement?.DocumentPresent == true)
+                {
+                    <MudLink Href="@($"/driver-documents/{UserId}/{type}")" Target="_blank" Class="mb-4" Style="display:block;">
+                        Ver documento
+                    </MudLink>
+                }
+
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Disabled="@(isActing || requirement?.DocumentPresent != true)"
+                               OnClick="@(() => HandleValidate(type, approved: true))">
+                        Aprobar
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Error"
+                               Disabled="@isActing"
+                               OnClick="@(() => HandleValidate(type, approved: false))">
+                        Rechazar
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private static readonly WebDriverRequirementType[] RequirementTypes =
+        Enum.GetValues<WebDriverRequirementType>();
+
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    [Inject]
+    private DriverRequirementsClient RequirementsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private string headingName = string.Empty;
+    private IReadOnlyList<DriverRequirementResponse> requirements = [];
+    private readonly HashSet<WebDriverRequirementType> actingTypes = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? actionError;
+
+    // OnParametersSetAsync (not OnInitializedAsync) because UserId is a routed parameter that can
+    // change via client-side routing (e.g. navigating from one Chofer's documents to another's
+    // without a full page reload) — OnInitializedAsync would only run once for the component's
+    // lifetime and would miss that transition.
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        actionError = null;
+
+        await LoadDriverNameAsync();
+        await LoadRequirementsAsync();
+
+        isLoading = false;
+    }
+
+    private async Task LoadDriverNameAsync()
+    {
+        var outcome = await UsersClient.GetUsersAsync();
+
+        // GetUsersAsync has no single-user-by-id endpoint to call instead — it returns every user
+        // in the org, so the Chofer's name is resolved by filtering the full list client-side.
+        headingName = outcome switch
+        {
+            UsersListOutcome.Success success => BuildHeadingName(success.Users),
+            _ => UserId.ToString()
+        };
+    }
+
+    private string BuildHeadingName(IReadOnlyList<UserListItemResponse> users)
+    {
+        var user = users.FirstOrDefault(u => u.Id == UserId);
+        return user is null ? UserId.ToString() : $"{user.Name} {user.Surname}";
+    }
+
+    private async Task LoadRequirementsAsync()
+    {
+        var outcome = await RequirementsClient.GetRequirementsAsync(UserId);
+
+        switch (outcome)
+        {
+            case DriverRequirementsListOutcome.Success success:
+                requirements = success.Requirements;
+                errorMessage = null;
+                break;
+
+            case DriverRequirementsListOutcome.Forbidden:
+            case DriverRequirementsListOutcome.NotFound:
+            case DriverRequirementsListOutcome.TransportError:
+                errorMessage = "No pudimos cargar los documentos de este usuario.";
+                break;
+        }
+    }
+
+    private async Task HandleValidate(WebDriverRequirementType type, bool approved)
+    {
+        actionError = null;
+        actingTypes.Add(type);
+        try
+        {
+            var outcome = await RequirementsClient.ValidateAsync(UserId, type, approved);
+
+            switch (outcome)
+            {
+                case DriverRequirementActionOutcome.Success:
+                    Snackbar.Add(approved ? "Documento aprobado." : "Documento rechazado.", Severity.Success);
+                    await LoadRequirementsAsync();
+                    break;
+
+                case DriverRequirementActionOutcome.ValidationFailed validationFailed:
+                    actionError = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case DriverRequirementActionOutcome.Forbidden:
+                case DriverRequirementActionOutcome.NotFound:
+                    actionError = "No tenés permiso para realizar esta acción.";
+                    break;
+
+                case DriverRequirementActionOutcome.TransportError transportError:
+                    actionError = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            actingTypes.Remove(type);
+        }
+    }
+
+    /// <summary>Spanish display label for a requirement type, mirroring <c>MyDocuments.razor</c>'s
+    /// <c>GetTypeLabel</c> mapping.</summary>
+    private static string GetTypeLabel(WebDriverRequirementType type) => type switch
+    {
+        WebDriverRequirementType.LicenciaConducir => "Licencia de Conducir",
+        WebDriverRequirementType.CapacitacionProfesional => "Capacitación Profesional",
+        _ => type.ToString()
+    };
+
+    private static string GetStatusLabel(WebDriverRequirementStatus? status) => status switch
+    {
+        WebDriverRequirementStatus.Apto => "Apto",
+        WebDriverRequirementStatus.NoApto => "No apto",
+        WebDriverRequirementStatus.Pendiente => "Pendiente",
+        _ => "Pendiente"
+    };
+
+    private static Color GetStatusColor(WebDriverRequirementStatus? status) => status switch
+    {
+        WebDriverRequirementStatus.Apto => Color.Success,
+        WebDriverRequirementStatus.NoApto => Color.Error,
+        _ => Color.Default
+    };
+}

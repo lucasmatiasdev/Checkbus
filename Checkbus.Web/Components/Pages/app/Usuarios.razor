@@ -86,7 +86,7 @@
                             {
                                 <MudButton Variant="Variant.Outlined"
                                            Size="Size.Small"
-                                           Disabled="true">
+                                           OnClick="@(() => NavigationManager.NavigateTo($"/users/{context.Item.Id}/documents"))">
                                     Documentos
                                 </MudButton>
                             }

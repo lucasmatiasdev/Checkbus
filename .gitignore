@@ -16,6 +16,9 @@ obj/
 ## Local file storage
 Checkbus.ApiService/App_Data/
 
+## ODD task tracking (local only, mirrored to Engram)
+odd/
+
 ## OS
 .DS_Store
 Thumbs.db

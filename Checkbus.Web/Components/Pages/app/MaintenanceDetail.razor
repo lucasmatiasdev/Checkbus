@@ -1,0 +1,553 @@
+@page "/maintenance/{Id:guid}"
+@attribute [Authorize(Roles = "Mecanico,Administrador")]
+@using System.ComponentModel.DataAnnotations
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Detalle de mantenimiento</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Detalle de mantenimiento
+        </MudText>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => NavigationManager.NavigateTo("/maintenance"))">
+            Volver
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (record is not null)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mb-6">
+            <MudText Typo="Typo.h6" Class="mb-4">
+                @($"{record.VehiclePatent} ({record.VehicleBrand} {record.VehicleModel})")
+            </MudText>
+
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Tipo</MudText>
+                    <MudText Typo="Typo.body1">@GetTypeLabel(record.Type)</MudText>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Fecha programada</MudText>
+                    <MudText Typo="Typo.body1">@record.ScheduledDate.ToString("dd/MM/yyyy")</MudText>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Descripción</MudText>
+            <MudText Typo="Typo.body1" Class="mb-6">@record.Description</MudText>
+
+            @if (updateErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@updateErrorMessage</MudAlert>
+            }
+
+            <EditForm Model="editModel" OnValidSubmit="HandleUpdateSubmit">
+                <DataAnnotationsValidator />
+
+                <MudSelect T="WebMaintenanceStatus"
+                           @bind-Value="editModel.Status"
+                           For="@(() => editModel.Status)"
+                           Label="Estado"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var status in StatusValues)
+                    {
+                        <MudSelectItem T="WebMaintenanceStatus" Value="@status">@GetStatusLabel(status)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Fecha de inicio" @bind-Date="editModel.StartDate" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Fecha de finalización" @bind-Date="editModel.EndDate" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudTextField T="string"
+                               @bind-Value="editModel.MechanicNotes"
+                               Label="Notas del mecánico"
+                               Variant="Variant.Outlined"
+                               Lines="3"
+                               Class="mb-4" />
+
+                <MudNumericField T="decimal?"
+                                  @bind-Value="editModel.Cost"
+                                  Label="Costo"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-4" />
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="isSavingRecord">
+                    @if (isSavingRecord)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Guardando...</span>
+                    }
+                    else
+                    {
+                        <span>Guardar</span>
+                    }
+                </MudButton>
+            </EditForm>
+        </MudPaper>
+
+        <MudPaper Elevation="2" Class="pa-6 mb-6">
+            <MudText Typo="Typo.h5" Class="mb-4">Diagnósticos</MudText>
+
+            @if (diagnostics.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Todavía no hay diagnósticos registrados para este mantenimiento.
+                </MudText>
+            }
+            else
+            {
+                <MudExpansionPanels>
+                    @foreach (var diagnostic in diagnostics)
+                    {
+                        <MudExpansionPanel Text="@($"{diagnostic.DiagnosedAt:dd/MM/yyyy} - {diagnostic.Components.Count} componente(s)")">
+                            @if (!string.IsNullOrWhiteSpace(diagnostic.Notes))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">@diagnostic.Notes</MudText>
+                            }
+                            <MudList T="string" Dense="true">
+                                @foreach (var component in diagnostic.Components)
+                                {
+                                    <MudListItem>
+                                        <MudText Typo="Typo.body1">
+                                            @($"{GetComponentLabel(component.Component)} - {GetConditionLabel(component.Condition)}")
+                                        </MudText>
+                                        @if (!string.IsNullOrWhiteSpace(component.Notes))
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">@component.Notes</MudText>
+                                        }
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        </MudExpansionPanel>
+                    }
+                </MudExpansionPanels>
+            }
+        </MudPaper>
+
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h5" Class="mb-4">Agregar diagnóstico</MudText>
+
+            @if (diagnosticErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@diagnosticErrorMessage</MudAlert>
+            }
+
+            <MudDatePicker Label="Fecha del diagnóstico" @bind-Date="newDiagnosedAt" Class="mb-4" />
+            <MudTextField T="string"
+                          @bind-Value="newDiagnosticNotes"
+                          Label="Notas (opcional)"
+                          Variant="Variant.Outlined"
+                          Lines="2"
+                          Class="mb-4" />
+
+            @for (var i = 0; i < componentRows.Count; i++)
+            {
+                var row = componentRows[i];
+                var index = i;
+                <MudGrid Class="mb-2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="WebVehicleComponent?"
+                                   @bind-Value="row.Component"
+                                   Label="Componente"
+                                   Placeholder="Elegí un componente"
+                                   Variant="Variant.Outlined">
+                            @foreach (var componentValue in ComponentValues)
+                            {
+                                <MudSelectItem T="WebVehicleComponent?" Value="@((WebVehicleComponent?)componentValue)">
+                                    @GetComponentLabel(componentValue)
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="WebComponentCondition?"
+                                   @bind-Value="row.Condition"
+                                   Label="Condición"
+                                   Placeholder="Elegí una condición"
+                                   Variant="Variant.Outlined">
+                            @foreach (var conditionValue in ConditionValues)
+                            {
+                                <MudSelectItem T="WebComponentCondition?" Value="@((WebComponentCondition?)conditionValue)">
+                                    @GetConditionLabel(conditionValue)
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string" @bind-Value="row.Notes" Label="Notas (opcional)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Disabled="@(componentRows.Count == 1)"
+                                       OnClick="@(() => RemoveComponentRow(index))" />
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddComponentRow"
+                       Class="mb-4">
+                Agregar componente
+            </MudButton>
+
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="isSavingDiagnostic"
+                           OnClick="HandleAddDiagnosticSubmit">
+                    @if (isSavingDiagnostic)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Guardando...</span>
+                    }
+                    else
+                    {
+                        <span>Agregar diagnóstico</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private static readonly WebMaintenanceStatus[] StatusValues = Enum.GetValues<WebMaintenanceStatus>();
+    private static readonly WebVehicleComponent[] ComponentValues = Enum.GetValues<WebVehicleComponent>();
+    private static readonly WebComponentCondition[] ConditionValues = Enum.GetValues<WebComponentCondition>();
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Inject]
+    private MaintenanceRecordsClient MaintenanceRecordsClient { get; set; } = default!;
+
+    [Inject]
+    private VehicleDiagnosticsClient VehicleDiagnosticsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private MaintenanceRecordResponse? record;
+    private IReadOnlyList<VehicleDiagnosticResponse> diagnostics = [];
+    private RecordEditModel editModel = new();
+    private bool isLoading = true;
+    private bool isSavingRecord;
+    private bool isSavingDiagnostic;
+    private string? errorMessage;
+    private string? updateErrorMessage;
+    private string? diagnosticErrorMessage;
+
+    private DateTime? newDiagnosedAt;
+    private string? newDiagnosticNotes;
+    private List<ComponentRowModel> componentRows = [new()];
+
+    // OnParametersSetAsync (not OnInitializedAsync) because Id is a routed parameter that can
+    // change via client-side routing (e.g. navigating from one maintenance record's detail page
+    // to another's without a full page reload) — same reasoning as VehicleDocuments.razor's
+    // VehicleId handling.
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        // The record and its diagnostics are independent reads against two different endpoints —
+        // fetched in parallel rather than sequentially awaited.
+        var recordTask = LoadRecordAsync();
+        var diagnosticsTask = LoadDiagnosticsAsync();
+        await Task.WhenAll(recordTask, diagnosticsTask);
+
+        isLoading = false;
+    }
+
+    private async Task LoadRecordAsync()
+    {
+        var outcome = await MaintenanceRecordsClient.GetByIdAsync(Id);
+
+        switch (outcome)
+        {
+            case MaintenanceRecordOutcome.Success success:
+                record = success.Record;
+                editModel = RecordEditModel.FromResponse(success.Record);
+                errorMessage = null;
+                break;
+
+            case MaintenanceRecordOutcome.Forbidden:
+                errorMessage = "No tenés permiso para ver este mantenimiento.";
+                break;
+
+            case MaintenanceRecordOutcome.NotFound:
+                errorMessage = "El mantenimiento no existe o no pertenece a tu organización.";
+                break;
+
+            case MaintenanceRecordOutcome.TransportError transportError:
+                errorMessage = transportError.Message;
+                break;
+        }
+    }
+
+    private async Task LoadDiagnosticsAsync()
+    {
+        var outcome = await VehicleDiagnosticsClient.GetListAsync(Id);
+
+        switch (outcome)
+        {
+            case VehicleDiagnosticsListOutcome.Success success:
+                diagnostics = success.Diagnostics;
+                break;
+
+            case VehicleDiagnosticsListOutcome.Forbidden:
+            case VehicleDiagnosticsListOutcome.NotFound:
+            case VehicleDiagnosticsListOutcome.TransportError:
+                // LoadRecordAsync already surfaces the page-level error for a shared
+                // not-found/forbidden cause (both calls target the same record); degrade to an
+                // empty list here instead of a second competing error message.
+                diagnostics = [];
+                break;
+        }
+    }
+
+    private async Task HandleUpdateSubmit()
+    {
+        updateErrorMessage = null;
+        isSavingRecord = true;
+        try
+        {
+            var outcome = await MaintenanceRecordsClient.UpdateAsync(Id, editModel.ToRequest());
+
+            switch (outcome)
+            {
+                case MaintenanceRecordUpdateOutcome.Success:
+                    Snackbar.Add("Mantenimiento actualizado.", Severity.Success);
+                    await LoadRecordAsync();
+                    break;
+
+                case MaintenanceRecordUpdateOutcome.ValidationFailed validationFailed:
+                    updateErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case MaintenanceRecordUpdateOutcome.Forbidden:
+                    updateErrorMessage = "No tenés permiso para actualizar este mantenimiento.";
+                    break;
+
+                case MaintenanceRecordUpdateOutcome.NotFound:
+                    updateErrorMessage = "El mantenimiento no existe o no pertenece a tu organización.";
+                    break;
+
+                case MaintenanceRecordUpdateOutcome.TransportError transportError:
+                    updateErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSavingRecord = false;
+        }
+    }
+
+    private void AddComponentRow() => componentRows.Add(new ComponentRowModel());
+
+    private void RemoveComponentRow(int index)
+    {
+        // Mirrors the server-side validator's "component list must have at least 1 entry" rule
+        // (M3) — the UI never lets the list shrink below 1 row in the first place (the delete
+        // button for the last remaining row is disabled in the markup above), so this guard is a
+        // defensive no-op rather than the only line of defense.
+        if (componentRows.Count <= 1)
+            return;
+
+        componentRows.RemoveAt(index);
+    }
+
+    private async Task HandleAddDiagnosticSubmit()
+    {
+        diagnosticErrorMessage = null;
+
+        if (newDiagnosedAt is null)
+        {
+            diagnosticErrorMessage = "Ingresá la fecha del diagnóstico.";
+            return;
+        }
+
+        if (componentRows.Count == 0)
+        {
+            diagnosticErrorMessage = "Agregá al menos un componente.";
+            return;
+        }
+
+        if (componentRows.Any(row => row.Component is null || row.Condition is null))
+        {
+            diagnosticErrorMessage = "Completá el componente y la condición de cada fila.";
+            return;
+        }
+
+        var request = new CreateVehicleDiagnosticRequest
+        {
+            MaintenanceRecordId = Id,
+            DiagnosedAt = DateOnly.FromDateTime(newDiagnosedAt.Value),
+            Notes = string.IsNullOrWhiteSpace(newDiagnosticNotes) ? null : newDiagnosticNotes,
+            Components = componentRows.Select(row => new ComponentDiagnosticInputRequest
+            {
+                Component = row.Component!.Value,
+                Condition = row.Condition!.Value,
+                Notes = string.IsNullOrWhiteSpace(row.Notes) ? null : row.Notes
+            }).ToList()
+        };
+
+        isSavingDiagnostic = true;
+        try
+        {
+            var outcome = await VehicleDiagnosticsClient.CreateAsync(request);
+
+            switch (outcome)
+            {
+                case VehicleDiagnosticActionOutcome.Success:
+                    Snackbar.Add("Diagnóstico agregado.", Severity.Success);
+                    newDiagnosedAt = null;
+                    newDiagnosticNotes = null;
+                    componentRows = [new ComponentRowModel()];
+                    await LoadDiagnosticsAsync();
+                    break;
+
+                case VehicleDiagnosticActionOutcome.ValidationFailed validationFailed:
+                    diagnosticErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case VehicleDiagnosticActionOutcome.Forbidden:
+                    diagnosticErrorMessage = "No tenés permiso para agregar diagnósticos.";
+                    break;
+
+                case VehicleDiagnosticActionOutcome.NotFound:
+                    diagnosticErrorMessage = "El mantenimiento no existe o no pertenece a tu organización.";
+                    break;
+
+                case VehicleDiagnosticActionOutcome.TransportError transportError:
+                    diagnosticErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSavingDiagnostic = false;
+        }
+    }
+
+    private static string GetTypeLabel(WebMaintenanceType type) => type switch
+    {
+        WebMaintenanceType.Preventivo => "Preventivo",
+        WebMaintenanceType.Reactivo => "Reactivo",
+        _ => type.ToString()
+    };
+
+    private static string GetStatusLabel(WebMaintenanceStatus status) => status switch
+    {
+        WebMaintenanceStatus.Programado => "Programado",
+        WebMaintenanceStatus.EnProceso => "En proceso",
+        WebMaintenanceStatus.Completado => "Completado",
+        WebMaintenanceStatus.Cancelado => "Cancelado",
+        _ => status.ToString()
+    };
+
+    private static string GetComponentLabel(WebVehicleComponent component) => component switch
+    {
+        WebVehicleComponent.Motor => "Motor",
+        WebVehicleComponent.Frenos => "Frenos",
+        WebVehicleComponent.Suspension => "Suspensión",
+        WebVehicleComponent.Neumaticos => "Neumáticos",
+        WebVehicleComponent.Transmision => "Transmisión",
+        WebVehicleComponent.SistemaElectrico => "Sistema eléctrico",
+        WebVehicleComponent.Carroceria => "Carrocería",
+        WebVehicleComponent.LucesYSenales => "Luces y señales",
+        WebVehicleComponent.SistemaDeEscape => "Sistema de escape",
+        WebVehicleComponent.AireAcondicionado => "Aire acondicionado",
+        _ => component.ToString()
+    };
+
+    private static string GetConditionLabel(WebComponentCondition condition) => condition switch
+    {
+        WebComponentCondition.Bueno => "Bueno",
+        WebComponentCondition.Desgastado => "Desgastado",
+        WebComponentCondition.Fallado => "Fallado",
+        _ => condition.ToString()
+    };
+
+    /// <summary>
+    /// Local form-bound model for the lifecycle <see cref="EditForm"/>, re-created from the
+    /// loaded record on every (re)load via <see cref="FromResponse"/>. Unlike
+    /// <c>MaintenanceNew.razor</c>'s create-form fields, <see cref="Status"/> is non-nullable — the
+    /// record being edited always already has one, so there's no "unselected" state to guard
+    /// against with <c>[Required]</c> on a nullable backing field.
+    /// </summary>
+    private sealed class RecordEditModel
+    {
+        [Required]
+        public WebMaintenanceStatus Status { get; set; }
+
+        public DateTime? StartDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
+        public string? MechanicNotes { get; set; }
+
+        public decimal? Cost { get; set; }
+
+        public static RecordEditModel FromResponse(MaintenanceRecordResponse response) => new()
+        {
+            Status = response.Status,
+            StartDate = response.StartDate?.ToDateTime(TimeOnly.MinValue),
+            EndDate = response.EndDate?.ToDateTime(TimeOnly.MinValue),
+            MechanicNotes = response.MechanicNotes,
+            Cost = response.Cost
+        };
+
+        public UpdateMaintenanceRecordRequest ToRequest() => new()
+        {
+            Status = Status,
+            StartDate = StartDate is null ? null : DateOnly.FromDateTime(StartDate.Value),
+            EndDate = EndDate is null ? null : DateOnly.FromDateTime(EndDate.Value),
+            MechanicNotes = MechanicNotes,
+            Cost = Cost
+        };
+    }
+
+    /// <summary>
+    /// In-memory row for the "add diagnostic" form's dynamically-growable component list.
+    /// <see cref="Component"/>/<see cref="Condition"/> are nullable so an unselected row is
+    /// detectable and rejected by <c>HandleAddDiagnosticSubmit</c>'s client-side check before ever
+    /// reaching the server, mirroring the server-side validator's same per-entry requirement.
+    /// </summary>
+    private sealed class ComponentRowModel
+    {
+        public WebVehicleComponent? Component { get; set; }
+        public WebComponentCondition? Condition { get; set; }
+        public string? Notes { get; set; }
+    }
+}

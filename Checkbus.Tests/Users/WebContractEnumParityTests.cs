@@ -7,7 +7,9 @@ namespace Checkbus.Tests.Users;
 /// <summary>
 /// Drift-detection coverage for the Checkbus.Web BFF mirror enums (<see cref="WebRole"/>,
 /// <see cref="WebDocumentType"/>, <see cref="WebDriverRequirementType"/>,
-/// <see cref="WebDriverRequirementStatus"/>). Checkbus.Web never references the API projects, so these
+/// <see cref="WebDriverRequirementStatus"/>, <see cref="WebMaintenanceType"/>,
+/// <see cref="WebMaintenanceStatus"/>, <see cref="WebVehicleComponent"/>,
+/// <see cref="WebComponentCondition"/>). Checkbus.Web never references the API projects, so these
 /// enums are hand-duplicated; this test walks the real domain enums via reflection and asserts
 /// every member has a same-named counterpart with an identical underlying numeric value on the
 /// web side, catching future additions, removals, or renumbering on either side.
@@ -36,6 +38,30 @@ public class WebContractEnumParityTests
     public void WebDriverRequirementStatus_StaysNumericallyInSyncWith_RealDriverRequirementStatus()
     {
         AssertEnumParity<DriverRequirementStatus, WebDriverRequirementStatus>();
+    }
+
+    [Fact]
+    public void WebMaintenanceType_StaysNumericallyInSyncWith_RealMaintenanceType()
+    {
+        AssertEnumParity<MaintenanceType, WebMaintenanceType>();
+    }
+
+    [Fact]
+    public void WebMaintenanceStatus_StaysNumericallyInSyncWith_RealMaintenanceStatus()
+    {
+        AssertEnumParity<MaintenanceStatus, WebMaintenanceStatus>();
+    }
+
+    [Fact]
+    public void WebVehicleComponent_StaysNumericallyInSyncWith_RealVehicleComponent()
+    {
+        AssertEnumParity<VehicleComponent, WebVehicleComponent>();
+    }
+
+    [Fact]
+    public void WebComponentCondition_StaysNumericallyInSyncWith_RealComponentCondition()
+    {
+        AssertEnumParity<ComponentCondition, WebComponentCondition>();
     }
 
     private static void AssertEnumParity<TReal, TWeb>()

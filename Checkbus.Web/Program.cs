@@ -36,6 +36,8 @@ builder.Services.AddScoped<UsersClient>();
 builder.Services.AddScoped<DriverRequirementsClient>();
 builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
+builder.Services.AddScoped<MaintenanceRecordsClient>();
+builder.Services.AddScoped<VehicleDiagnosticsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

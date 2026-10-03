@@ -15,6 +15,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<DriverRequirement> DriverRequirements => Set<DriverRequirement>();
         public DbSet<Vehicle> Vehicles => Set<Vehicle>();
         public DbSet<VehicleDocument> VehicleDocuments => Set<VehicleDocument>();
+        public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
+        public DbSet<VehicleDiagnostic> VehicleDiagnostics => Set<VehicleDiagnostic>();
+        public DbSet<ComponentDiagnostic> ComponentDiagnostics => Set<ComponentDiagnostic>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -68,6 +71,37 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Vehicle>()
                     .WithMany()
                     .HasForeignKey(x => x.VehicleId);
+            });
+
+            modelBuilder.Entity<MaintenanceRecord>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Type).HasConversion<string>();
+                entity.Property(x => x.Status).HasConversion<string>();
+                entity.HasOne<Vehicle>()
+                    .WithMany()
+                    .HasForeignKey(x => x.VehicleId);
+            });
+
+            modelBuilder.Entity<VehicleDiagnostic>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasOne<Vehicle>()
+                    .WithMany()
+                    .HasForeignKey(x => x.VehicleId);
+                entity.HasOne<MaintenanceRecord>()
+                    .WithMany()
+                    .HasForeignKey(x => x.MaintenanceRecordId);
+            });
+
+            modelBuilder.Entity<ComponentDiagnostic>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Component).HasConversion<string>();
+                entity.Property(x => x.Condition).HasConversion<string>();
+                entity.HasOne<VehicleDiagnostic>()
+                    .WithMany()
+                    .HasForeignKey(x => x.VehicleDiagnosticId);
             });
         }
     }

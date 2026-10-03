@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Documents;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
+using Checkbus.ApiService.Domain.Entities.Vehicles;
 using Microsoft.EntityFrameworkCore;
 
 namespace Checkbus.ApiService.Infrastructure.Persistence
@@ -12,6 +13,8 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<User> Users => Set<User>();
         public DbSet<Organization> Organizations => Set<Organization>();
         public DbSet<DriverRequirement> DriverRequirements => Set<DriverRequirement>();
+        public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+        public DbSet<VehicleDocument> VehicleDocuments => Set<VehicleDocument>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +46,28 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<User>()
                     .WithMany()
                     .HasForeignKey(x => x.UserId);
+            });
+
+            modelBuilder.Entity<Vehicle>(entity =>
+            {
+                entity.HasKey(v => v.Id);
+                entity.HasIndex(v => v.Patent).IsUnique();
+                entity.Property(v => v.Status).HasConversion<string>();
+                entity.Property(v => v.OwnerType).HasConversion<string>();
+                entity.HasOne(v => v.Organization)
+                    .WithMany()
+                    .HasForeignKey(v => v.OrganizationId);
+            });
+
+            modelBuilder.Entity<VehicleDocument>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasIndex(x => new { x.VehicleId, x.Type }).IsUnique();
+                entity.Property(x => x.Type).HasConversion<string>();
+                entity.Property(x => x.Status).HasConversion<string>();
+                entity.HasOne<Vehicle>()
+                    .WithMany()
+                    .HasForeignKey(x => x.VehicleId);
             });
         }
     }

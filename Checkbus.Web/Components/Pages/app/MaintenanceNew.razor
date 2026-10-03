@@ -1,0 +1,192 @@
+@page "/maintenance/new"
+@attribute [Authorize(Roles = "Mecanico,Administrador")]
+@using System.ComponentModel.DataAnnotations
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Nuevo mantenimiento</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Nuevo mantenimiento
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Registrá un mantenimiento preventivo o reactivo para un vehículo de la organización.
+        </MudText>
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <MudSelect T="Guid?"
+                       @bind-Value="model.VehicleId"
+                       For="@(() => model.VehicleId)"
+                       Label="Vehículo"
+                       Placeholder="Elegí un vehículo"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                @foreach (var vehicle in vehicles)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">
+                        @($"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="WebMaintenanceType?"
+                       @bind-Value="model.Type"
+                       For="@(() => model.Type)"
+                       Label="Tipo"
+                       Placeholder="Elegí un tipo"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebMaintenanceType?" Value="WebMaintenanceType.Preventivo">Preventivo</MudSelectItem>
+                <MudSelectItem T="WebMaintenanceType?" Value="WebMaintenanceType.Reactivo">Reactivo</MudSelectItem>
+            </MudSelect>
+
+            <MudDatePicker Label="Fecha programada"
+                           @bind-Date="model.ScheduledDate"
+                           For="@(() => model.ScheduledDate)"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Description"
+                           For="@(() => model.Description)"
+                           Label="Descripción"
+                           Variant="Variant.Outlined"
+                           Lines="4"
+                           Class="mb-4" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Disabled="isSubmitting"
+                       Class="mt-2">
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Registrar mantenimiento</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private MaintenanceRecordsClient MaintenanceRecordsClient { get; set; } = default!;
+
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private MaintenanceRecordFormModel model = new();
+    private IReadOnlyList<VehicleResponse> vehicles = [];
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var outcome = await VehiclesClient.GetVehiclesAsync();
+
+        switch (outcome)
+        {
+            case VehiclesListOutcome.Success success:
+                vehicles = success.Vehicles;
+                break;
+
+            case VehiclesListOutcome.Forbidden:
+            case VehiclesListOutcome.TransportError:
+                errorMessage = "No pudimos cargar la lista de vehículos.";
+                break;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        try
+        {
+            var outcome = await MaintenanceRecordsClient.CreateAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case MaintenanceRecordActionOutcome.Success:
+                    errorMessage = null;
+                    Snackbar.Add("Mantenimiento registrado.", Severity.Success);
+                    // MaintenanceDetail.razor ("/maintenance/{id}") does not exist yet (that's M6),
+                    // so the created record is shown by returning to the list rather than
+                    // navigating to a detail page that would 404.
+                    NavigationManager.NavigateTo("/maintenance");
+                    break;
+
+                case MaintenanceRecordActionOutcome.ValidationFailed validationFailed:
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case MaintenanceRecordActionOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para registrar mantenimientos. Iniciá sesión de nuevo con una cuenta de mecánico o administrador.";
+                    break;
+
+                case MaintenanceRecordActionOutcome.NotFound:
+                    errorMessage = "El vehículo seleccionado no existe o no pertenece a tu organización.";
+                    break;
+
+                case MaintenanceRecordActionOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    /// <summary>
+    /// Local form-bound model for <see cref="EditForm"/>/<c>DataAnnotationsValidator</c>. Every
+    /// field is nullable so a missing selection fails <c>[Required]</c> validation instead of
+    /// silently defaulting to the enum's/struct's zero value (e.g. <c>WebMaintenanceType.Preventivo</c>
+    /// or <c>default(Guid)</c>), same reasoning as <c>RegisterVehicle.razor</c>'s
+    /// <c>OwnerUserId</c> field.
+    /// </summary>
+    private sealed class MaintenanceRecordFormModel
+    {
+        [Required(ErrorMessage = "Seleccioná un vehículo.")]
+        public Guid? VehicleId { get; set; }
+
+        [Required(ErrorMessage = "Seleccioná un tipo de mantenimiento.")]
+        public WebMaintenanceType? Type { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la fecha programada.")]
+        public DateTime? ScheduledDate { get; set; }
+
+        [Required(ErrorMessage = "Ingresá una descripción.")]
+        public string Description { get; set; } = string.Empty;
+
+        public CreateMaintenanceRecordRequest ToRequest() => new()
+        {
+            VehicleId = VehicleId!.Value,
+            Type = Type!.Value,
+            ScheduledDate = DateOnly.FromDateTime(ScheduledDate!.Value),
+            Description = Description
+        };
+    }
+}

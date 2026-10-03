@@ -1,0 +1,227 @@
+@page "/maintenance"
+@attribute [Authorize(Roles = "Mecanico,Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Mantenimiento</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Mantenimiento
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Build"
+                   OnClick="@(() => NavigationManager.NavigateTo("/maintenance/new"))">
+            Nuevo mantenimiento
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           @bind-Value="filterVehicleId"
+                           Label="Vehículo"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Todos los vehículos</MudSelectItem>
+                    @foreach (var vehicle in vehicles)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">
+                            @($"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="WebMaintenanceStatus?"
+                           @bind-Value="filterStatus"
+                           Label="Estado"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem T="WebMaintenanceStatus?" Value="@((WebMaintenanceStatus?)null)">Todos los estados</MudSelectItem>
+                    @foreach (var status in StatusValues)
+                    {
+                        <MudSelectItem T="WebMaintenanceStatus?" Value="@((WebMaintenanceStatus?)status)">@GetStatusLabel(status)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="WebMaintenanceType?"
+                           @bind-Value="filterType"
+                           Label="Tipo"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem T="WebMaintenanceType?" Value="@((WebMaintenanceType?)null)">Todos los tipos</MudSelectItem>
+                    @foreach (var type in TypeValues)
+                    {
+                        <MudSelectItem T="WebMaintenanceType?" Value="@((WebMaintenanceType?)type)">@GetTypeLabel(type)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => LoadRecordsAsync())">
+                Filtrar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilters">
+                Limpiar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="MaintenanceRecordResponse" Items="@records">
+                <Columns>
+                    <TemplateColumn Title="Vehículo">
+                        <CellTemplate>
+                            @($"{context.Item.VehiclePatent} ({context.Item.VehicleBrand} {context.Item.VehicleModel})")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Tipo">
+                        <CellTemplate>
+                            @GetTypeLabel(context.Item.Type)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small">
+                                @GetStatusLabel(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Fecha programada">
+                        <CellTemplate>
+                            @context.Item.ScheduledDate.ToString("dd/MM/yyyy")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/maintenance/{context.Item.Id}"))">
+                                Ver
+                            </MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private static readonly WebMaintenanceStatus[] StatusValues = Enum.GetValues<WebMaintenanceStatus>();
+    private static readonly WebMaintenanceType[] TypeValues = Enum.GetValues<WebMaintenanceType>();
+
+    [Inject]
+    private MaintenanceRecordsClient MaintenanceRecordsClient { get; set; } = default!;
+
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<MaintenanceRecordResponse> records = [];
+    private IReadOnlyList<VehicleResponse> vehicles = [];
+    private Guid? filterVehicleId;
+    private WebMaintenanceStatus? filterStatus;
+    private WebMaintenanceType? filterType;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVehiclesAsync();
+        await LoadRecordsAsync();
+    }
+
+    private async Task LoadVehiclesAsync()
+    {
+        var outcome = await VehiclesClient.GetVehiclesAsync();
+        if (outcome is VehiclesListOutcome.Success success)
+        {
+            vehicles = success.Vehicles;
+        }
+    }
+
+    private async Task LoadRecordsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await MaintenanceRecordsClient.GetListAsync(filterVehicleId, filterStatus, filterType);
+
+            switch (outcome)
+            {
+                case MaintenanceRecordsListOutcome.Success success:
+                    records = success.Records;
+                    errorMessage = null;
+                    break;
+
+                case MaintenanceRecordsListOutcome.Forbidden:
+                case MaintenanceRecordsListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar los mantenimientos.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        filterVehicleId = null;
+        filterStatus = null;
+        filterType = null;
+        await LoadRecordsAsync();
+    }
+
+    /// <summary>
+    /// Spanish display label for a maintenance type. A direct <c>ToString()</c> would already
+    /// match (both enum member names are Spanish words with no spaces), but this keeps the mapping
+    /// explicit and future-proof, same pattern as <c>Vehiculos.razor</c>'s status/owner-type labels.
+    /// </summary>
+    private static string GetTypeLabel(WebMaintenanceType type) => type switch
+    {
+        WebMaintenanceType.Preventivo => "Preventivo",
+        WebMaintenanceType.Reactivo => "Reactivo",
+        _ => type.ToString()
+    };
+
+    /// <summary>
+    /// Spanish display label for a maintenance status. Not a 1:1 <c>ToString()</c> because
+    /// <see cref="WebMaintenanceStatus.EnProceso"/>'s Spanish phrase has a space the enum member
+    /// name (a single identifier) cannot carry, same reasoning as <c>Vehiculos.razor</c>'s
+    /// <c>EnMantenimiento</c> mapping.
+    /// </summary>
+    private static string GetStatusLabel(WebMaintenanceStatus status) => status switch
+    {
+        WebMaintenanceStatus.Programado => "Programado",
+        WebMaintenanceStatus.EnProceso => "En proceso",
+        WebMaintenanceStatus.Completado => "Completado",
+        WebMaintenanceStatus.Cancelado => "Cancelado",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(WebMaintenanceStatus status) => status switch
+    {
+        WebMaintenanceStatus.Completado => Color.Success,
+        WebMaintenanceStatus.Cancelado => Color.Error,
+        WebMaintenanceStatus.EnProceso => Color.Info,
+        _ => Color.Default
+    };
+}

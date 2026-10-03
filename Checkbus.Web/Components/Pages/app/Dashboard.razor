@@ -38,6 +38,28 @@
                     </MudText>
                 </MudPaper>
             </MudItem>
+            <MudItem xs="3">
+                <MudPaper Elevation="2"
+                          Class="pa-4"
+                          Style="cursor: pointer;"
+                          @onclick="@(() => NavigationManager.NavigateTo("/vehicles"))">
+                    @if (isLoadingVehicleExpiringCount)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (vehicleExpiringCount is not null)
+                    {
+                        <MudText Typo="Typo.h4">@vehicleExpiringCount</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">—</MudText>
+                    }
+                    <MudText Typo="Typo.body2">
+                        @(vehicleExpiringCount is null && !isLoadingVehicleExpiringCount ? "No disponible" : "Documentos de vehículos por vencer")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
         </MudGrid>
     }
 
@@ -61,12 +83,17 @@
     private DriverRequirementsClient DriverRequirementsClient { get; set; } = default!;
 
     [Inject]
+    private VehicleDocumentsClient VehicleDocumentsClient { get; set; } = default!;
+
+    [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
 
     private CurrentUserResponse? currentUser;
     private bool isAdministrador;
     private int? expiringCount;
     private bool isLoadingExpiringCount;
+    private int? vehicleExpiringCount;
+    private bool isLoadingVehicleExpiringCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -77,9 +104,10 @@
         if (isAdministrador)
         {
             isLoadingExpiringCount = true;
+            isLoadingVehicleExpiringCount = true;
             // OnInitializedAsync only re-renders once, after the whole method completes — without
-            // this explicit StateHasChanged, isAdministrador becoming true and the spinner turning
-            // on would never reach the DOM before the count fetch below also finishes.
+            // this explicit StateHasChanged, isAdministrador becoming true and the spinners turning
+            // on would never reach the DOM before the count fetches below also finish.
             StateHasChanged();
             try
             {
@@ -93,6 +121,22 @@
             finally
             {
                 isLoadingExpiringCount = false;
+            }
+
+            try
+            {
+                // Independent card and independent count from the driver-requirements one above —
+                // explicit user decision, never summed into a single combined number.
+                var vehicleOutcome = await VehicleDocumentsClient.GetExpiringCountAsync();
+                vehicleExpiringCount = vehicleOutcome switch
+                {
+                    VehicleDocumentCountOutcome.Success success => success.Count,
+                    _ => null
+                };
+            }
+            finally
+            {
+                isLoadingVehicleExpiringCount = false;
             }
         }
     }

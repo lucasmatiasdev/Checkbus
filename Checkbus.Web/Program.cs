@@ -34,6 +34,8 @@ builder.Services.AddHttpClient("apiservice", client =>
 builder.Services.AddScoped<UserRegistrationClient>();
 builder.Services.AddScoped<UsersClient>();
 builder.Services.AddScoped<DriverRequirementsClient>();
+builder.Services.AddScoped<VehiclesClient>();
+builder.Services.AddScoped<VehicleDocumentsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

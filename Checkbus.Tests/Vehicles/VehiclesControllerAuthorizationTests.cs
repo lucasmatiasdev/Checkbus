@@ -10,9 +10,11 @@ namespace Checkbus.Tests.Vehicles;
 
 /// <summary>
 /// 401/403/400 coverage for <c>api/vehicles</c> via <see cref="CheckbusApiFactory"/>,
-/// following <c>UsersControllerAuthorizationTests</c>'s convention: both actions are
-/// Administrador-only, so every case short-circuits before the handler ever touches a
-/// repository (401/403 at the authorization filter, 400 at FluentValidation).
+/// following <c>UsersControllerAuthorizationTests</c>'s convention. <c>Create</c> is
+/// Administrador-only; <c>GetVehicles</c> is Mecanico-or-Administrador (needed by the
+/// vehicle-maintenance module's vehicle picker). Every forbidden case short-circuits
+/// before the handler ever touches a repository (401/403 at the authorization filter,
+/// 400 at FluentValidation).
 /// </summary>
 public class VehiclesControllerAuthorizationTests : IClassFixture<CheckbusApiFactory>
 {
@@ -125,7 +127,6 @@ public class VehiclesControllerAuthorizationTests : IClassFixture<CheckbusApiFac
     [Theory]
     [InlineData(Role.Chofer)]
     [InlineData(Role.Planificador)]
-    [InlineData(Role.Mecanico)]
     public async Task GetVehicles_NonAdminRole_Returns403(Role role)
     {
         var client = CreateAuthorizedClient(role);

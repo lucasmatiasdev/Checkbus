@@ -26,7 +26,7 @@ namespace Checkbus.ApiService.Controllers
             return StatusCode(StatusCodes.Status201Created, result);
         }
 
-        [Authorize(Roles = nameof(Role.Administrador))]
+        [Authorize(Roles = "Mecanico,Administrador")]
         [HttpGet]
         public async Task<IActionResult> GetVehicles(CancellationToken cancellationToken)
         {

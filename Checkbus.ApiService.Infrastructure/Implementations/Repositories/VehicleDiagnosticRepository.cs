@@ -34,5 +34,16 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .Where(d => d.MaintenanceRecordId == maintenanceRecordId)
                 .ToListAsync(cancellationToken);
         }
+
+        // See IVehicleDiagnosticRepository.GetComponentsByDiagnosticIdsAsync — added in M3 so
+        // GetVehicleDiagnosticsQueryHandler can project nested components without a separate
+        // IComponentDiagnosticRepository (none exists by M1 design).
+        public async Task<IReadOnlyList<ComponentDiagnostic>> GetComponentsByDiagnosticIdsAsync(IEnumerable<Guid> diagnosticIds, CancellationToken cancellationToken)
+        {
+            var idSet = diagnosticIds.ToList();
+            return await _context.ComponentDiagnostics
+                .Where(c => idSet.Contains(c.VehicleDiagnosticId))
+                .ToListAsync(cancellationToken);
+        }
     }
 }

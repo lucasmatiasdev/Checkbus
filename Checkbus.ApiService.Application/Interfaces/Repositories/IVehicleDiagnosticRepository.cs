@@ -10,5 +10,12 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         Task AddAsync(VehicleDiagnostic diagnostic, IEnumerable<ComponentDiagnostic> components, CancellationToken cancellationToken);
         Task<VehicleDiagnostic?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
         Task<IReadOnlyList<VehicleDiagnostic>> GetByMaintenanceRecordIdAsync(Guid maintenanceRecordId, CancellationToken cancellationToken);
+
+        // Components have no independent repository (M1 decision) and GetByMaintenanceRecordIdAsync
+        // deliberately returns diagnostics only — components stay "queryable separately" (see
+        // VehicleDiagnosticRepositoryTests). Added in M3 because GetVehicleDiagnosticsQuery needs to
+        // project a nested ComponentDiagnosticDto list and the Application layer has no other way to
+        // reach ComponentDiagnostic rows (no EF/Infrastructure reference from Application).
+        Task<IReadOnlyList<ComponentDiagnostic>> GetComponentsByDiagnosticIdsAsync(IEnumerable<Guid> diagnosticIds, CancellationToken cancellationToken);
     }
 }

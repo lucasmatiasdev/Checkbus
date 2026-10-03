@@ -1,0 +1,384 @@
+@page "/vehicles/{VehicleId:guid}/documents"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Checkbus - Documentos del Vehículo</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Documentos de @headingName
+        </MudText>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => NavigationManager.NavigateTo("/vehicles"))">
+            Volver
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (errorMessage is null)
+    {
+        @foreach (var type in DocumentTypes)
+        {
+            var document = documents.FirstOrDefault(d => d.Type == type);
+            var hasDocumentRow = document is not null;
+            var vigencia = VehicleDocumentVigencia.Compute(document?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
+            var isValidating = validatingTypes.Contains(type);
+            var isUploading = uploadingTypes.Contains(type);
+
+            <MudPaper Elevation="2" Class="pa-6 mb-6">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+                    <MudText Typo="Typo.h6">@GetTypeLabel(type)</MudText>
+                    @if (hasDocumentRow)
+                    {
+                        <MudStack Row="true" Spacing="2">
+                            <MudChip T="string" Color="@GetStatusColor(document!.Status)" Size="Size.Small">
+                                @GetStatusLabel(document.Status)
+                            </MudChip>
+                            <MudChip T="string" Color="@VehicleDocumentVigencia.GetColor(vigencia)" Size="Size.Small">
+                                @VehicleDocumentVigencia.GetLabel(vigencia)
+                            </MudChip>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small">No cargado</MudChip>
+                    }
+                </MudStack>
+
+                @if (document?.IssueDate is not null)
+                {
+                    <MudText Typo="Typo.body2">@($"Emitido: {document.IssueDate.Value:dd/MM/yyyy}")</MudText>
+                }
+
+                <MudText Typo="Typo.body2" Class="mb-4">
+                    @if (document?.ExpirationDate is not null)
+                    {
+                        @($"Vence: {document.ExpirationDate.Value:dd/MM/yyyy}")
+                    }
+                    else if (hasDocumentRow)
+                    {
+                        @("Todavía no se registró una fecha de vencimiento para este documento.")
+                    }
+                    else
+                    {
+                        @("Nunca se presentó este documento.")
+                    }
+                </MudText>
+
+                @if (document?.DocumentPresent == true)
+                {
+                    <MudLink Href="@($"/vehicle-documents/{VehicleId}/{type}")" Target="_blank" Class="mb-4" Style="display:block;">
+                        Ver documento
+                    </MudLink>
+                }
+
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <InputFile OnChange="@(e => OnFileSelected(type, e))" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker Label="Fecha de vencimiento" @bind-Date="expirationDates[type]" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker Label="Fecha de emisión (opcional)" @bind-Date="issueDates[type]" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (uploadErrors.TryGetValue(type, out var uploadError) && uploadError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4">@uploadError</MudAlert>
+                }
+
+                @if (validateErrors.TryGetValue(type, out var validateError) && validateError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4">@validateError</MudAlert>
+                }
+
+                <MudStack Row="true" Spacing="2" Class="mt-4" Wrap="Wrap.Wrap">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@isUploading"
+                               OnClick="@(() => HandleUpload(type))">
+                        @if (isUploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Subiendo...</span>
+                        }
+                        else
+                        {
+                            <span>Subir documento</span>
+                        }
+                    </MudButton>
+
+                    @if (hasDocumentRow)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   Disabled="@(isValidating || document?.DocumentPresent != true)"
+                                   OnClick="@(() => HandleValidate(type, approved: true))">
+                            Aprobar
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Error"
+                                   Disabled="@isValidating"
+                                   OnClick="@(() => HandleValidate(type, approved: false))">
+                            Rechazar
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
+    // OpenReadStream buffer and matching the backend's 5MB cap, same as MyDocuments.razor.
+    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+
+    private static readonly WebVehicleDocumentType[] DocumentTypes = Enum.GetValues<WebVehicleDocumentType>();
+
+    [Parameter]
+    public Guid VehicleId { get; set; }
+
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private VehicleDocumentsClient DocumentsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private string headingName = string.Empty;
+    private IReadOnlyList<VehicleDocumentResponse> documents = [];
+    private readonly Dictionary<WebVehicleDocumentType, DateTime?> expirationDates = new();
+    private readonly Dictionary<WebVehicleDocumentType, DateTime?> issueDates = new();
+    private readonly Dictionary<WebVehicleDocumentType, IBrowserFile?> selectedFiles = new();
+    private readonly Dictionary<WebVehicleDocumentType, string?> uploadErrors = new();
+    private readonly Dictionary<WebVehicleDocumentType, string?> validateErrors = new();
+    private readonly HashSet<WebVehicleDocumentType> uploadingTypes = [];
+    private readonly HashSet<WebVehicleDocumentType> validatingTypes = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    // OnParametersSetAsync (not OnInitializedAsync) because VehicleId is a routed parameter that can
+    // change via client-side routing (e.g. navigating from one vehicle's documents to another's
+    // without a full page reload) — OnInitializedAsync would only run once for the component's
+    // lifetime and would miss that transition. Same reasoning as DriverDocuments.razor.
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        foreach (var type in DocumentTypes)
+        {
+            expirationDates.TryAdd(type, null);
+            issueDates.TryAdd(type, null);
+            selectedFiles.TryAdd(type, null);
+            uploadErrors.TryAdd(type, null);
+            validateErrors.TryAdd(type, null);
+        }
+
+        await LoadVehicleNameAsync();
+        await LoadDocumentsAsync();
+
+        isLoading = false;
+    }
+
+    private async Task LoadVehicleNameAsync()
+    {
+        var outcome = await VehiclesClient.GetVehiclesAsync();
+
+        // GetVehiclesAsync has no single-vehicle-by-id endpoint to call instead — it returns every
+        // vehicle in the org, so the heading is resolved by filtering the full list client-side,
+        // same pattern as DriverDocuments.razor's BuildHeadingName.
+        headingName = outcome switch
+        {
+            VehiclesListOutcome.Success success => BuildHeadingName(success.Vehicles),
+            _ => VehicleId.ToString()
+        };
+    }
+
+    private string BuildHeadingName(IReadOnlyList<VehicleResponse> vehicles)
+    {
+        var vehicle = vehicles.FirstOrDefault(v => v.Id == VehicleId);
+        return vehicle is null ? VehicleId.ToString() : $"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})";
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        var outcome = await DocumentsClient.GetDocumentsAsync(VehicleId);
+
+        switch (outcome)
+        {
+            case VehicleDocumentsListOutcome.Success success:
+                documents = success.Documents;
+                errorMessage = null;
+                break;
+
+            case VehicleDocumentsListOutcome.Forbidden:
+            case VehicleDocumentsListOutcome.NotFound:
+            case VehicleDocumentsListOutcome.TransportError:
+                errorMessage = "No pudimos cargar los documentos de este vehículo.";
+                break;
+        }
+    }
+
+    private void OnFileSelected(WebVehicleDocumentType type, InputFileChangeEventArgs e)
+    {
+        selectedFiles[type] = e.File;
+        uploadErrors[type] = null;
+    }
+
+    private async Task HandleUpload(WebVehicleDocumentType type)
+    {
+        uploadErrors[type] = null;
+
+        var file = selectedFiles.GetValueOrDefault(type);
+        if (file is null)
+        {
+            uploadErrors[type] = "Elegí un archivo para subir.";
+            return;
+        }
+
+        var expirationDate = expirationDates.GetValueOrDefault(type);
+        if (expirationDate is null)
+        {
+            uploadErrors[type] = "Ingresá la fecha de vencimiento.";
+            return;
+        }
+
+        uploadingTypes.Add(type);
+        try
+        {
+            var issueDate = issueDates.GetValueOrDefault(type);
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: MaxUploadSizeBytes);
+            var outcome = await DocumentsClient.UploadDocumentAsync(
+                VehicleId,
+                type,
+                stream,
+                file.Name,
+                file.ContentType,
+                DateOnly.FromDateTime(expirationDate.Value),
+                issueDate is null ? null : DateOnly.FromDateTime(issueDate.Value));
+
+            switch (outcome)
+            {
+                case VehicleDocumentActionOutcome.Success:
+                    selectedFiles[type] = null;
+                    expirationDates[type] = null;
+                    issueDates[type] = null;
+                    Snackbar.Add("Documento subido correctamente.", Severity.Success);
+                    // A fresh upload of a conditional type (never presented before) creates its row
+                    // on the server for the first time — reloading flips this card from the
+                    // no-row/"No cargado" rendering into the normal row rendering with validate
+                    // buttons now available.
+                    await LoadDocumentsAsync();
+                    break;
+
+                case VehicleDocumentActionOutcome.ValidationFailed validationFailed:
+                    uploadErrors[type] = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case VehicleDocumentActionOutcome.Forbidden:
+                case VehicleDocumentActionOutcome.NotFound:
+                    uploadErrors[type] = "No tenés permiso para subir este documento.";
+                    break;
+
+                case VehicleDocumentActionOutcome.TransportError transportError:
+                    uploadErrors[type] = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            uploadingTypes.Remove(type);
+        }
+    }
+
+    // Validate is only ever offered for a type that already has a row (the UI hides the
+    // Aprobar/Rechazar buttons entirely for a never-uploaded conditional type — see the markup
+    // above), matching the backend's ValidateVehicleDocumentCommand, which throws if the
+    // (VehicleId, Type) row doesn't exist yet rather than creating one.
+    private async Task HandleValidate(WebVehicleDocumentType type, bool approved)
+    {
+        validateErrors[type] = null;
+        validatingTypes.Add(type);
+        try
+        {
+            var outcome = await DocumentsClient.ValidateAsync(VehicleId, type, approved);
+
+            switch (outcome)
+            {
+                case VehicleDocumentActionOutcome.Success:
+                    Snackbar.Add(approved ? "Documento aprobado." : "Documento rechazado.", Severity.Success);
+                    await LoadDocumentsAsync();
+                    break;
+
+                case VehicleDocumentActionOutcome.ValidationFailed validationFailed:
+                    validateErrors[type] = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case VehicleDocumentActionOutcome.Forbidden:
+                case VehicleDocumentActionOutcome.NotFound:
+                    validateErrors[type] = "No tenés permiso para realizar esta acción.";
+                    break;
+
+                case VehicleDocumentActionOutcome.TransportError transportError:
+                    validateErrors[type] = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            validatingTypes.Remove(type);
+        }
+    }
+
+    /// <summary>Spanish display label for a vehicle document type, mirroring
+    /// <c>DriverDocuments.razor</c>'s <c>GetTypeLabel</c> mapping.</summary>
+    private static string GetTypeLabel(WebVehicleDocumentType type) => type switch
+    {
+        WebVehicleDocumentType.Seguro => "Seguro",
+        WebVehicleDocumentType.RTO_VTV => "RTO / VTV",
+        WebVehicleDocumentType.TituloPropiedad => "Título de Propiedad",
+        WebVehicleDocumentType.LeasingInscripto => "Leasing Inscripto",
+        WebVehicleDocumentType.ContratoAlquiler => "Contrato de Alquiler",
+        WebVehicleDocumentType.HabilitacionEspecifica => "Habilitación Específica",
+        _ => type.ToString()
+    };
+
+    private static string GetStatusLabel(WebVehicleDocumentStatus status) => status switch
+    {
+        WebVehicleDocumentStatus.Apto => "Apto",
+        WebVehicleDocumentStatus.NoApto => "No apto",
+        WebVehicleDocumentStatus.Pendiente => "Pendiente",
+        _ => "Pendiente"
+    };
+
+    private static Color GetStatusColor(WebVehicleDocumentStatus status) => status switch
+    {
+        WebVehicleDocumentStatus.Apto => Color.Success,
+        WebVehicleDocumentStatus.NoApto => Color.Error,
+        _ => Color.Default
+    };
+}

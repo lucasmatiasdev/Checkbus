@@ -1,0 +1,125 @@
+@page "/vehicles"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Vehículos</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Vehículos
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.DirectionsBus"
+                   OnClick="@(() => NavigationManager.NavigateTo("/vehicles/new"))">
+            Nuevo vehículo
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="VehicleResponse" Items="@vehicles">
+                <Columns>
+                    <PropertyColumn Property="x => x.Patent" Title="Patente" />
+                    <PropertyColumn Property="x => x.Brand" Title="Marca" />
+                    <PropertyColumn Property="x => x.Model" Title="Modelo" />
+                    <PropertyColumn Property="x => x.Year" Title="Año" />
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            @GetStatusLabel(context.Item.Status)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Titularidad">
+                        <CellTemplate>
+                            @GetOwnerTypeLabel(context.Item.OwnerType)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/vehicles/{context.Item.Id}/documents"))">
+                                Documentos
+                            </MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<VehicleResponse> vehicles = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var outcome = await VehiclesClient.GetVehiclesAsync();
+
+            switch (outcome)
+            {
+                case VehiclesListOutcome.Success success:
+                    vehicles = success.Vehicles;
+                    errorMessage = null;
+                    break;
+
+                case VehiclesListOutcome.Forbidden:
+                case VehiclesListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar la lista de vehículos.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Spanish display label for a vehicle status, used in the grid's "Estado" column. Not a 1:1
+    /// <c>ToString()</c> because <see cref="WebVehicleStatus.EnMantenimiento"/>'s Spanish phrase
+    /// has spaces the enum member name (a single identifier) cannot carry.
+    /// </summary>
+    private static string GetStatusLabel(WebVehicleStatus status) => status switch
+    {
+        WebVehicleStatus.Activo => "Activo",
+        WebVehicleStatus.Inactivo => "Inactivo",
+        WebVehicleStatus.EnMantenimiento => "En mantenimiento",
+        _ => status.ToString()
+    };
+
+    /// <summary>
+    /// Spanish display label for a vehicle's ownership type, used in the grid's "Titularidad"
+    /// column. Not a 1:1 <c>ToString()</c> because <see cref="WebVehicleOwnerType.Organizacion"/>'s
+    /// Spanish word carries an accent (enum member names are ASCII-only).
+    /// </summary>
+    private static string GetOwnerTypeLabel(WebVehicleOwnerType ownerType) => ownerType switch
+    {
+        WebVehicleOwnerType.Organizacion => "Organización",
+        WebVehicleOwnerType.Chofer => "Chofer",
+        WebVehicleOwnerType.Otro => "Otro",
+        _ => ownerType.ToString()
+    };
+}

@@ -1,0 +1,209 @@
+@page "/vehicles/new"
+@attribute [Authorize(Roles = "Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Registrar vehículo</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Registrar vehículo
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Completá los datos del vehículo. Los documentos obligatorios (Seguro y RTO/VTV) se
+            crean automáticamente como pendientes al registrarlo.
+        </MudText>
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Brand"
+                           For="@(() => model.Brand)"
+                           Label="Marca"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Model"
+                           For="@(() => model.Model)"
+                           Label="Modelo"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudNumericField T="int"
+                              @bind-Value="model.Year"
+                              For="@(() => model.Year)"
+                              Label="Año"
+                              Variant="Variant.Outlined"
+                              Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Patent"
+                           For="@(() => model.Patent)"
+                           Label="Patente"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudNumericField T="int"
+                              @bind-Value="model.Capacity"
+                              For="@(() => model.Capacity)"
+                              Label="Capacidad"
+                              Variant="Variant.Outlined"
+                              Class="mb-4" />
+
+            <MudNumericField T="int"
+                              @bind-Value="model.Mileage"
+                              For="@(() => model.Mileage)"
+                              Label="Kilometraje"
+                              Variant="Variant.Outlined"
+                              Class="mb-4" />
+
+            <MudSelect T="WebVehicleStatus"
+                       @bind-Value="model.Status"
+                       For="@(() => model.Status)"
+                       Label="Estado"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebVehicleStatus" Value="WebVehicleStatus.Activo">Activo</MudSelectItem>
+                <MudSelectItem T="WebVehicleStatus" Value="WebVehicleStatus.Inactivo">Inactivo</MudSelectItem>
+                <MudSelectItem T="WebVehicleStatus" Value="WebVehicleStatus.EnMantenimiento">En mantenimiento</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="WebVehicleOwnerType"
+                       @bind-Value="model.OwnerType"
+                       For="@(() => model.OwnerType)"
+                       Label="Titularidad"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebVehicleOwnerType" Value="WebVehicleOwnerType.Organizacion">Organización</MudSelectItem>
+                <MudSelectItem T="WebVehicleOwnerType" Value="WebVehicleOwnerType.Chofer">Chofer</MudSelectItem>
+                <MudSelectItem T="WebVehicleOwnerType" Value="WebVehicleOwnerType.Otro">Otro</MudSelectItem>
+            </MudSelect>
+
+            @if (model.OwnerType == WebVehicleOwnerType.Chofer)
+            {
+                <MudSelect T="Guid?"
+                           @bind-Value="model.OwnerUserId"
+                           For="@(() => model.OwnerUserId)"
+                           Label="Chofer titular"
+                           Placeholder="Elegí un chofer"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var chofer in choferes)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)chofer.Id)">@chofer.Name @chofer.Surname</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else if (model.OwnerType == WebVehicleOwnerType.Otro)
+            {
+                <MudTextField T="string"
+                               @bind-Value="model.OwnerName"
+                               For="@(() => model.OwnerName)"
+                               Label="Nombre del titular"
+                               Variant="Variant.Outlined"
+                               Class="mb-4" />
+
+                <MudTextField T="string"
+                               @bind-Value="model.OwnerDocumentNumber"
+                               For="@(() => model.OwnerDocumentNumber)"
+                               Label="Documento del titular"
+                               Variant="Variant.Outlined"
+                               Class="mb-4" />
+            }
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Disabled="isSubmitting"
+                       Class="mt-2">
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Registrando...</span>
+                }
+                else
+                {
+                    <span>Registrar vehículo</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private VehicleFormModel model = new();
+    private IReadOnlyList<UserListItemResponse> choferes = [];
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var outcome = await UsersClient.GetUsersAsync();
+        if (outcome is UsersListOutcome.Success success)
+        {
+            choferes = success.Users.Where(u => u.Role == WebRole.Chofer).ToArray();
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        try
+        {
+            var outcome = await VehiclesClient.CreateAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case VehicleRegistrationOutcome.Success:
+                    errorMessage = null;
+                    Snackbar.Add("Vehículo registrado.", Severity.Success);
+                    NavigationManager.NavigateTo("/vehicles");
+                    break;
+
+                case VehicleRegistrationOutcome.ValidationFailed validationFailed:
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case VehicleRegistrationOutcome.Conflict conflict:
+                    errorMessage = conflict.Message;
+                    break;
+
+                case VehicleRegistrationOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para registrar vehículos. Iniciá sesión de nuevo con una cuenta de administrador.";
+                    break;
+
+                case VehicleRegistrationOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

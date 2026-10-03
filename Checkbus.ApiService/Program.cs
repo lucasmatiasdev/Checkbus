@@ -80,6 +80,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<AuthExceptionHandler>();
 builder.Services.AddExceptionHandler<UserConflictExceptionHandler>();
 builder.Services.AddExceptionHandler<DriverRequirementExceptionHandler>();
+builder.Services.AddExceptionHandler<VehicleExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

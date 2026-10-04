@@ -1,0 +1,128 @@
+@page "/viajes"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Viajes</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Viajes
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.DirectionsBus"
+                   OnClick="@(() => NavigationManager.NavigateTo("/viajes/new"))">
+            Nuevo viaje
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="ViajeResponse" Items="@viajes" RowClick="@HandleRowClick">
+                <Columns>
+                    <TemplateColumn Title="Evento">
+                        <CellTemplate>
+                            @(context.Item.EventoNombre ?? "-")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Vehículo">
+                        <CellTemplate>
+                            @(context.Item.VehiclePatent is null
+                                ? "-"
+                                : $"{context.Item.VehiclePatent} ({context.Item.VehicleBrand} {context.Item.VehicleModel})")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Chofer">
+                        <CellTemplate>
+                            @(context.Item.ChoferName is null ? "-" : $"{context.Item.ChoferName} {context.Item.ChoferSurname}")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Salida">
+                        <CellTemplate>
+                            @context.Item.FechaSalida.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Llegada">
+                        <CellTemplate>
+                            @context.Item.FechaLlegada.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            @GetEstadoLabel(context.Item.Estado)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Precio">
+                        <CellTemplate>
+                            @context.Item.Precio.ToString("C")
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private ViajesClient ViajesClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<ViajeResponse> viajes = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await ViajesClient.GetListAsync();
+
+            switch (outcome)
+            {
+                case ViajesListOutcome.Success success:
+                    viajes = success.Viajes;
+                    errorMessage = null;
+                    break;
+
+                case ViajesListOutcome.Forbidden:
+                case ViajesListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar los viajes.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void HandleRowClick(DataGridRowClickEventArgs<ViajeResponse> args)
+    {
+        NavigationManager.NavigateTo($"/viajes/{args.Item.Id}");
+    }
+
+    private static string GetEstadoLabel(WebViajeEstado estado) => estado switch
+    {
+        WebViajeEstado.Programado => "Programado",
+        WebViajeEstado.EnProceso => "En proceso",
+        WebViajeEstado.Completado => "Completado",
+        WebViajeEstado.Cancelado => "Cancelado",
+        _ => estado.ToString()
+    };
+}

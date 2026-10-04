@@ -70,6 +70,18 @@ public class WebContractEnumParityTests
         AssertEnumParity<EventoTipo, WebEventoTipo>();
     }
 
+    [Fact]
+    public void WebViajeEstado_StaysNumericallyInSyncWith_RealViajeEstado()
+    {
+        AssertEnumParity<ViajeEstado, WebViajeEstado>();
+    }
+
+    [Fact]
+    public void WebStopTipo_StaysNumericallyInSyncWith_RealStopTipo()
+    {
+        AssertEnumParity<StopTipo, WebStopTipo>();
+    }
+
     private static void AssertEnumParity<TReal, TWeb>()
         where TReal : struct, Enum
         where TWeb : struct, Enum

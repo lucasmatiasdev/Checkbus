@@ -58,5 +58,18 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                     && v.FechaLlegada >= fechaSalida)
                 .ToListAsync(cancellationToken);
         }
+
+        public Task<Ruta?> GetRutaByViajeIdAsync(Guid viajeId, CancellationToken cancellationToken)
+        {
+            return _context.Rutas.FirstOrDefaultAsync(r => r.ViajeId == viajeId, cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<Stop>> GetStopsByRutaIdAsync(Guid rutaId, CancellationToken cancellationToken)
+        {
+            return await _context.Stops
+                .Where(s => s.RutaId == rutaId)
+                .OrderBy(s => s.Orden)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

@@ -148,7 +148,6 @@ public class UsersControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
     [Theory]
     [InlineData(Role.Chofer)]
-    [InlineData(Role.Planificador)]
     [InlineData(Role.Mecanico)]
     public async Task GetUsers_NonAdminRole_Returns403(Role role)
     {

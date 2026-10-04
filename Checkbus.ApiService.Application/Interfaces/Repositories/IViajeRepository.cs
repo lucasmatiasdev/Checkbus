@@ -18,5 +18,10 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
             Guid vehicleId, DateTime fechaSalida, DateTime fechaLlegada, CancellationToken cancellationToken);
         Task<IReadOnlyList<Viaje>> GetOverlappingByChoferIdAsync(
             Guid choferId, DateTime fechaSalida, DateTime fechaLlegada, CancellationToken cancellationToken);
+
+        // Added in R5 so GetViajeQueryHandler can render a Viaje's route/stops detail — R1 only
+        // needed to persist the aggregate, never to read Ruta/Stops back.
+        Task<Ruta?> GetRutaByViajeIdAsync(Guid viajeId, CancellationToken cancellationToken);
+        Task<IReadOnlyList<Stop>> GetStopsByRutaIdAsync(Guid rutaId, CancellationToken cancellationToken);
     }
 }

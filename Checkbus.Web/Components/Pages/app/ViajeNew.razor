@@ -1,0 +1,280 @@
+@page "/viajes/new"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using System.ComponentModel.DataAnnotations
+@using Checkbus.Web.Components.Maps
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Nuevo viaje</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Nuevo viaje
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Publicá un viaje a un evento, elegí el vehículo y el chofer, y armá la ruta en el mapa.
+        </MudText>
+
+        @if (isLoadingPickers)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            @if (errorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+            }
+
+            <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+
+                <MudSelect T="Guid?"
+                           @bind-Value="model.EventoId"
+                           For="@(() => model.EventoId)"
+                           Label="Evento"
+                           Placeholder="Elegí un evento"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var evento in eventos)
+                    {
+                        <MudSelectItem T="Guid?" Value="@evento.Id">@evento.Nombre</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="Guid?"
+                           @bind-Value="model.VehicleId"
+                           For="@(() => model.VehicleId)"
+                           Label="Vehículo"
+                           Placeholder="Elegí un vehículo"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var vehicle in vehicles)
+                    {
+                        <MudSelectItem T="Guid?" Value="@vehicle.Id">@($"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})")</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="Guid?"
+                           @bind-Value="model.ChoferId"
+                           For="@(() => model.ChoferId)"
+                           Label="Chofer"
+                           Placeholder="Elegí un chofer"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var chofer in choferes)
+                    {
+                        <MudSelectItem T="Guid?" Value="@chofer.Id">@($"{chofer.Name} {chofer.Surname}")</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Fecha de salida"
+                               @bind-Date="model.FechaSalida"
+                               For="@(() => model.FechaSalida)"
+                               Class="mb-4" />
+
+                <MudDatePicker Label="Fecha de llegada"
+                               @bind-Date="model.FechaLlegada"
+                               For="@(() => model.FechaLlegada)"
+                               Class="mb-4" />
+
+                <MudNumericField T="decimal?"
+                                  @bind-Value="model.Precio"
+                                  For="@(() => model.Precio)"
+                                  Label="Precio"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-4" />
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Ruta</MudText>
+                <LocationPicker Mode="LocationPickerMode.MultiStop" OnStopsChanged="HandleStopsChanged" />
+
+                @if (model.Stops.Count < 2)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Error" Class="mt-2 mb-4">
+                        Agregá al menos un origen y un destino en el mapa.
+                    </MudText>
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           DropShadow="false"
+                           FullWidth="true"
+                           Disabled="isSubmitting"
+                           Class="mt-2">
+                    @if (isSubmitting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Guardando...</span>
+                    }
+                    else
+                    {
+                        <span>Publicar viaje</span>
+                    }
+                </MudButton>
+            </EditForm>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private ViajesClient ViajesClient { get; set; } = default!;
+
+    [Inject]
+    private EventosClient EventosClient { get; set; } = default!;
+
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private readonly ViajeFormModel model = new();
+    private IReadOnlyList<EventoResponse> eventos = [];
+    private IReadOnlyList<VehicleResponse> vehicles = [];
+    private IReadOnlyList<UserListItemResponse> choferes = [];
+    private bool isLoadingPickers = true;
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoadingPickers = true;
+        try
+        {
+            var eventosOutcome = await EventosClient.GetListAsync();
+            if (eventosOutcome is EventosListOutcome.Success eventosSuccess)
+            {
+                eventos = eventosSuccess.Eventos;
+            }
+
+            var vehiclesOutcome = await VehiclesClient.GetVehiclesAsync();
+            if (vehiclesOutcome is VehiclesListOutcome.Success vehiclesSuccess)
+            {
+                vehicles = vehiclesSuccess.Vehicles;
+            }
+
+            var usersOutcome = await UsersClient.GetUsersAsync();
+            if (usersOutcome is UsersListOutcome.Success usersSuccess)
+            {
+                choferes = usersSuccess.Users.Where(u => u.Role == WebRole.Chofer).ToList();
+            }
+        }
+        finally
+        {
+            isLoadingPickers = false;
+        }
+    }
+
+    private void HandleStopsChanged(IReadOnlyList<PickedLocation> stops)
+    {
+        model.Stops = stops;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (model.Stops.Count < 2)
+        {
+            errorMessage = "Agregá al menos un origen y un destino en el mapa.";
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var outcome = await ViajesClient.CreateAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case ViajeActionOutcome.Success:
+                    errorMessage = null;
+                    Snackbar.Add("Viaje publicado.", Severity.Success);
+                    NavigationManager.NavigateTo("/viajes");
+                    break;
+
+                case ViajeActionOutcome.ValidationFailed validationFailed:
+                    // The habilitación message IS the useful "why" — surface it directly rather
+                    // than replacing it with a generic string.
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case ViajeActionOutcome.NotFound:
+                    errorMessage = "El vehículo, el chofer o el evento seleccionado no existen.";
+                    break;
+
+                case ViajeActionOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para publicar viajes. Iniciá sesión de nuevo con una cuenta de planificador o administrador.";
+                    break;
+
+                case ViajeActionOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    /// <summary>
+    /// Local form-bound model for <see cref="EditForm"/>/<c>DataAnnotationsValidator</c>. Every
+    /// picker field is nullable so a missing selection fails <c>[Required]</c> validation
+    /// instead of silently defaulting to <c>Guid.Empty</c>, same reasoning as
+    /// <c>EventoNew.razor</c>'s <c>EventoFormModel</c>. <see cref="Stops"/> comes from R3's
+    /// <c>LocationPicker</c> in <c>MultiStop</c> mode rather than a data-annotated field, so its
+    /// minimum-count rule is checked explicitly in <c>HandleValidSubmit</c>.
+    /// </summary>
+    private sealed class ViajeFormModel
+    {
+        [Required(ErrorMessage = "Seleccioná un evento.")]
+        public Guid? EventoId { get; set; }
+
+        [Required(ErrorMessage = "Seleccioná un vehículo.")]
+        public Guid? VehicleId { get; set; }
+
+        [Required(ErrorMessage = "Seleccioná un chofer.")]
+        public Guid? ChoferId { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la fecha de salida.")]
+        public DateTime? FechaSalida { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la fecha de llegada.")]
+        public DateTime? FechaLlegada { get; set; }
+
+        [Required(ErrorMessage = "Ingresá el precio.")]
+        public decimal? Precio { get; set; }
+
+        public IReadOnlyList<PickedLocation> Stops { get; set; } = [];
+
+        public CreateViajeRequest ToRequest() => new()
+        {
+            VehicleId = VehicleId!.Value,
+            ChoferId = ChoferId!.Value,
+            EventoId = EventoId!.Value,
+            FechaSalida = FechaSalida!.Value,
+            FechaLlegada = FechaLlegada!.Value,
+            Precio = Precio!.Value,
+            Stops = Stops
+                .Select(stop => new CreateViajeStopRequest
+                {
+                    Nombre = stop.Nombre,
+                    Direccion = stop.Direccion,
+                    PlaceId = stop.PlaceId,
+                    Latitud = stop.Latitud,
+                    Longitud = stop.Longitud
+                })
+                .ToList()
+        };
+    }
+}

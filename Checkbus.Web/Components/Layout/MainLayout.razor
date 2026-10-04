@@ -42,6 +42,12 @@
                     Mantenimiento
                 </MudNavLink>
             </AuthorizeView>
+            <AuthorizeView Roles="Planificador,Administrador">
+                <MudNavLink Href="/eventos" Match="NavLinkMatch.All">
+                    <MudIcon Icon="@Icons.Material.Filled.Event" />
+                    Eventos
+                </MudNavLink>
+            </AuthorizeView>
         </MudNavMenu>
     </MudDrawer>
     <MudMainContent>

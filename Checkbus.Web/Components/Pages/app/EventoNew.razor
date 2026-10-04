@@ -1,0 +1,181 @@
+@page "/eventos/new"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using System.ComponentModel.DataAnnotations
+@using Checkbus.Web.Components.Maps
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Models
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Nuevo evento</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Nuevo evento
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Registrá un concierto o partido al que luego se puedan publicar viajes.
+        </MudText>
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <MudTextField T="string"
+                           @bind-Value="model.Nombre"
+                           For="@(() => model.Nombre)"
+                           Label="Nombre del evento"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudSelect T="WebEventoTipo?"
+                       @bind-Value="model.Tipo"
+                       For="@(() => model.Tipo)"
+                       Label="Tipo"
+                       Placeholder="Elegí un tipo"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebEventoTipo?" Value="WebEventoTipo.Concierto">Concierto</MudSelectItem>
+                <MudSelectItem T="WebEventoTipo?" Value="WebEventoTipo.Partido">Partido</MudSelectItem>
+            </MudSelect>
+
+            <MudDatePicker Label="Fecha"
+                           @bind-Date="model.Fecha"
+                           For="@(() => model.Fecha)"
+                           Class="mb-4" />
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Ubicación</MudText>
+            <LocationPicker Mode="LocationPickerMode.Single" OnLocationPicked="HandleLocationPicked" />
+
+            @if (model.PickedLocation is null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Error" Class="mt-2 mb-4">
+                    Elegí una ubicación en el mapa o buscala por nombre.
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-4">
+                    Seleccionado: @model.PickedLocation.Nombre (@model.PickedLocation.Direccion)
+                </MudText>
+            }
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Disabled="isSubmitting"
+                       Class="mt-2">
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Registrar evento</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private EventosClient EventosClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private EventoFormModel model = new();
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    private void HandleLocationPicked(PickedLocation location)
+    {
+        model.PickedLocation = location;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (model.PickedLocation is null)
+        {
+            errorMessage = "Elegí una ubicación en el mapa o buscala por nombre.";
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var outcome = await EventosClient.CreateAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case EventoActionOutcome.Success:
+                    errorMessage = null;
+                    Snackbar.Add("Evento registrado.", Severity.Success);
+                    NavigationManager.NavigateTo("/eventos");
+                    break;
+
+                case EventoActionOutcome.ValidationFailed validationFailed:
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case EventoActionOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para registrar eventos. Iniciá sesión de nuevo con una cuenta de planificador o administrador.";
+                    break;
+
+                case EventoActionOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    /// <summary>
+    /// Local form-bound model for <see cref="EditForm"/>/<c>DataAnnotationsValidator</c>. Every
+    /// field is nullable so a missing selection fails <c>[Required]</c> validation instead of
+    /// silently defaulting to the enum's/struct's zero value, same reasoning as
+    /// <c>MaintenanceNew.razor</c>'s <c>MaintenanceRecordFormModel</c>. <see cref="PickedLocation"/>
+    /// comes from R3's <c>LocationPicker</c> component rather than a data-annotated field, so its
+    /// presence is checked explicitly in <c>HandleValidSubmit</c>.
+    /// </summary>
+    private sealed class EventoFormModel
+    {
+        [Required(ErrorMessage = "Ingresá el nombre del evento.")]
+        public string Nombre { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Seleccioná un tipo de evento.")]
+        public WebEventoTipo? Tipo { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la fecha del evento.")]
+        public DateTime? Fecha { get; set; }
+
+        public PickedLocation? PickedLocation { get; set; }
+
+        public CreateEventoRequest ToRequest() => new()
+        {
+            Nombre = Nombre,
+            Tipo = Tipo!.Value,
+            Fecha = Fecha!.Value,
+            UbicacionNombre = PickedLocation!.Nombre,
+            Direccion = PickedLocation!.Direccion,
+            PlaceId = PickedLocation!.PlaceId,
+            Latitud = PickedLocation!.Latitud,
+            Longitud = PickedLocation!.Longitud
+        };
+    }
+}

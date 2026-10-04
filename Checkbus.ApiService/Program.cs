@@ -57,6 +57,9 @@ builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 builder.Services.AddScoped<IVehicleDocumentRepository, VehicleDocumentRepository>();
 builder.Services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
 builder.Services.AddScoped<IVehicleDiagnosticRepository, VehicleDiagnosticRepository>();
+builder.Services.AddScoped<IUbicacionRepository, UbicacionRepository>();
+builder.Services.AddScoped<IEventoRepository, EventoRepository>();
+builder.Services.AddScoped<IViajeRepository, ViajeRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {

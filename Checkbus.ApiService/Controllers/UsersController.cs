@@ -26,7 +26,7 @@ namespace Checkbus.ApiService.Controllers
             return StatusCode(StatusCodes.Status201Created, result);
         }
 
-        // Planificador needs this for the rutas-publicacion module's "new Viaje" form chofer
+        // Planificador needs this for the rutas-publicacion module's "new Trip" form chofer
         // picker (same class of fix as VehiclesController.GetVehicles widening for Mecanico).
         // Register stays Administrador-only.
         [Authorize(Roles = "Administrador,Planificador")]

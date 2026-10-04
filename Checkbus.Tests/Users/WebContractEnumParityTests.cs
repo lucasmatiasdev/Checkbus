@@ -65,21 +65,21 @@ public class WebContractEnumParityTests
     }
 
     [Fact]
-    public void WebEventoTipo_StaysNumericallyInSyncWith_RealEventoTipo()
+    public void WebEventType_StaysNumericallyInSyncWith_RealEventType()
     {
-        AssertEnumParity<EventoTipo, WebEventoTipo>();
+        AssertEnumParity<EventType, WebEventType>();
     }
 
     [Fact]
-    public void WebViajeEstado_StaysNumericallyInSyncWith_RealViajeEstado()
+    public void WebTripStatus_StaysNumericallyInSyncWith_RealTripStatus()
     {
-        AssertEnumParity<ViajeEstado, WebViajeEstado>();
+        AssertEnumParity<TripStatus, WebTripStatus>();
     }
 
     [Fact]
-    public void WebStopTipo_StaysNumericallyInSyncWith_RealStopTipo()
+    public void WebStopType_StaysNumericallyInSyncWith_RealStopType()
     {
-        AssertEnumParity<StopTipo, WebStopTipo>();
+        AssertEnumParity<StopType, WebStopType>();
     }
 
     private static void AssertEnumParity<TReal, TWeb>()

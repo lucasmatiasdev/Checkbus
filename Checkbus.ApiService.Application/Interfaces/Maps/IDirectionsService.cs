@@ -3,7 +3,7 @@ namespace Checkbus.ApiService.Application.Interfaces.Maps
     /// <summary>
     /// Server-side port for computing route duration/distance from an ordered list of
     /// coordinates (origin, intermediate stops, destination). The authoritative call made once
-    /// at <c>Viaje</c> creation — never recalculated on read, never trusted from the client.
+    /// at <c>Trip</c> creation — never recalculated on read, never trusted from the client.
     /// </summary>
     public interface IDirectionsService
     {
@@ -20,9 +20,9 @@ namespace Checkbus.ApiService.Application.Interfaces.Maps
     }
 
     /// <summary>
-    /// Result of a Directions lookup. Field names intentionally mirror <c>Ruta</c>'s own fields
-    /// (<c>TiempoEstimado</c>, <c>DistanciaKm</c>) so callers can persist it directly with no
+    /// Result of a Directions lookup. Field names intentionally mirror <c>Route</c>'s own fields
+    /// (<c>EstimatedDuration</c>, <c>DistanceKm</c>) so callers can persist it directly with no
     /// renaming/mapping.
     /// </summary>
-    public record DirectionsResult(TimeSpan TiempoEstimado, decimal DistanciaKm);
+    public record DirectionsResult(TimeSpan EstimatedDuration, decimal DistanceKm);
 }

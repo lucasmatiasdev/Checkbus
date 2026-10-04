@@ -1,6 +1,6 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Documents;
-using Checkbus.ApiService.Domain.Entities.Rutas;
+using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
 using Microsoft.EntityFrameworkCore;
@@ -19,10 +19,10 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
         public DbSet<VehicleDiagnostic> VehicleDiagnostics => Set<VehicleDiagnostic>();
         public DbSet<ComponentDiagnostic> ComponentDiagnostics => Set<ComponentDiagnostic>();
-        public DbSet<Ubicacion> Ubicaciones => Set<Ubicacion>();
-        public DbSet<Evento> Eventos => Set<Evento>();
-        public DbSet<Viaje> Viajes => Set<Viaje>();
-        public DbSet<Ruta> Rutas => Set<Ruta>();
+        public DbSet<Location> Locations => Set<Location>();
+        public DbSet<Event> Events => Set<Event>();
+        public DbSet<Trip> Trips => Set<Trip>();
+        public DbSet<Route> Routes => Set<Route>();
         public DbSet<Stop> Stops => Set<Stop>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -110,58 +110,58 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                     .HasForeignKey(x => x.VehicleDiagnosticId);
             });
 
-            modelBuilder.Entity<Ubicacion>(entity =>
+            modelBuilder.Entity<Location>(entity =>
             {
                 entity.HasKey(x => x.Id);
                 entity.HasIndex(x => x.PlaceId).IsUnique();
             });
 
-            modelBuilder.Entity<Evento>(entity =>
+            modelBuilder.Entity<Event>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                entity.Property(x => x.Tipo).HasConversion<string>();
-                entity.HasOne<Ubicacion>()
+                entity.Property(x => x.Type).HasConversion<string>();
+                entity.HasOne<Location>()
                     .WithMany()
-                    .HasForeignKey(x => x.UbicacionId);
+                    .HasForeignKey(x => x.LocationId);
             });
 
-            modelBuilder.Entity<Viaje>(entity =>
+            modelBuilder.Entity<Trip>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                entity.Property(x => x.Estado).HasConversion<string>();
+                entity.Property(x => x.Status).HasConversion<string>();
                 entity.HasOne(x => x.Organization)
                     .WithMany()
                     .HasForeignKey(x => x.OrganizationId);
                 entity.HasOne<User>()
                     .WithMany()
-                    .HasForeignKey(x => x.ChoferId);
+                    .HasForeignKey(x => x.DriverId);
                 entity.HasOne<Vehicle>()
                     .WithMany()
                     .HasForeignKey(x => x.VehicleId);
-                entity.HasOne<Evento>()
+                entity.HasOne<Event>()
                     .WithMany()
-                    .HasForeignKey(x => x.EventoId);
+                    .HasForeignKey(x => x.EventId);
             });
 
-            modelBuilder.Entity<Ruta>(entity =>
+            modelBuilder.Entity<Route>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                entity.HasIndex(x => x.ViajeId).IsUnique();
-                entity.HasOne<Viaje>()
+                entity.HasIndex(x => x.TripId).IsUnique();
+                entity.HasOne<Trip>()
                     .WithMany()
-                    .HasForeignKey(x => x.ViajeId);
+                    .HasForeignKey(x => x.TripId);
             });
 
             modelBuilder.Entity<Stop>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                entity.Property(x => x.Tipo).HasConversion<string>();
-                entity.HasOne<Ruta>()
+                entity.Property(x => x.Type).HasConversion<string>();
+                entity.HasOne<Route>()
                     .WithMany()
-                    .HasForeignKey(x => x.RutaId);
-                entity.HasOne<Ubicacion>()
+                    .HasForeignKey(x => x.RouteId);
+                entity.HasOne<Location>()
                     .WithMany()
-                    .HasForeignKey(x => x.UbicacionId);
+                    .HasForeignKey(x => x.LocationId);
             });
         }
     }

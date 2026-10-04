@@ -27,7 +27,7 @@ namespace Checkbus.ApiService.Controllers
         }
 
         // Mecanico needs this for the maintenance module's vehicle picker (fixed in fec1e0d);
-        // Planificador needs it for the rutas-publicacion module's "new Viaje" form vehicle
+        // Planificador needs it for the rutas-publicacion module's "new Trip" form vehicle
         // picker. Create stays Administrador-only — registering vehicles stays an admin task.
         [Authorize(Roles = "Mecanico,Planificador,Administrador")]
         [HttpGet]

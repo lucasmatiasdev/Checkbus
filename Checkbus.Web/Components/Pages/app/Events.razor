@@ -1,0 +1,105 @@
+@page "/events"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Eventos</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Eventos
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Event"
+                   OnClick="@(() => NavigationManager.NavigateTo("/events/new"))">
+            Nuevo evento
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="EventResponse" Items="@events">
+                <Columns>
+                    <PropertyColumn Property="x => x.Name" Title="Nombre" />
+                    <TemplateColumn Title="Tipo">
+                        <CellTemplate>
+                            @GetTypeLabel(context.Item.Type)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Fecha">
+                        <CellTemplate>
+                            @context.Item.Date.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Ubicación">
+                        <CellTemplate>
+                            @($"{context.Item.Location.Name} ({context.Item.Location.Address})")
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private EventsClient EventsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<EventResponse> events = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await EventsClient.GetListAsync();
+
+            switch (outcome)
+            {
+                case EventsListOutcome.Success success:
+                    events = success.Events;
+                    errorMessage = null;
+                    break;
+
+                case EventsListOutcome.Forbidden:
+                case EventsListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar los eventos.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Spanish display label for an event type. A direct <c>ToString()</c> would already match
+    /// (both enum member names are Spanish words with no spaces), but this keeps the mapping
+    /// explicit and future-proof, same pattern as <c>Maintenance.razor</c>'s type/status labels.
+    /// </summary>
+    private static string GetTypeLabel(WebEventType type) => type switch
+    {
+        WebEventType.Concierto => "Concierto",
+        WebEventType.Partido => "Partido",
+        _ => type.ToString()
+    };
+}

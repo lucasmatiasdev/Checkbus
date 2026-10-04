@@ -3,7 +3,7 @@ namespace Checkbus.Web.Models;
 /// <summary>
 /// A single location picked through the <c>LocationPicker</c> component — either via a map
 /// click/drag, a Places search selection, reverse-geocoded in both cases. Field names intentionally
-/// match the eventual <c>Ubicacion</c> entity (<c>Nombre</c>, <c>Direccion</c>, <c>PlaceId</c>,
+/// match the eventual <c>Location</c> entity (<c>Nombre</c>, <c>Direccion</c>, <c>PlaceId</c>,
 /// <c>Latitud</c>, <c>Longitud</c>) so the R4/R5 forms that consume this can map it directly with
 /// no renaming.
 /// </summary>

@@ -1,0 +1,137 @@
+@page "/trips/{id:guid}"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using Checkbus.Web.Contracts
+@using Checkbus.Web.Services
+
+<PageTitle>Checkbus - Detalle de viaje</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    }
+    else if (trip is not null)
+    {
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+            Viaje a @trip.EventName
+        </MudText>
+
+        <MudPaper Elevation="2" Class="pa-6 mb-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Datos del viaje</MudText>
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Vehículo</MudText>
+                    <MudText Typo="Typo.body1">@($"{trip.VehiclePatent} ({trip.VehicleBrand} {trip.VehicleModel})")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Chofer</MudText>
+                    <MudText Typo="Typo.body1">@($"{trip.DriverName} {trip.DriverSurname}")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Salida</MudText>
+                    <MudText Typo="Typo.body1">@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Llegada</MudText>
+                    <MudText Typo="Typo.body1">@trip.ArrivalDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Estado</MudText>
+                    <MudText Typo="Typo.body1">@GetStatusLabel(trip.Status)</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Precio</MudText>
+                    <MudText Typo="Typo.body1">@trip.Price.ToString("C")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Capacidad</MudText>
+                    <MudText Typo="Typo.body1">@trip.Capacity</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Asientos disponibles</MudText>
+                    <MudText Typo="Typo.body1">@trip.AvailableSeats</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h6" Class="mb-2">Ruta</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                @trip.Route.DistanceKm.ToString("0.#") km · @trip.Route.EstimatedDuration.ToString(@"hh\:mm")
+            </MudText>
+
+            <MudList T="StopResponse" Dense="true">
+                @foreach (var stop in trip.Route.Stops.OrderBy(s => s.Order))
+                {
+                    <MudListItem T="StopResponse">
+                        <MudText Typo="Typo.body1">@(stop.Order + 1). @GetStopTypeLabel(stop.Type) — @stop.Name</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@stop.Address</MudText>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Inject]
+    private TripsClient TripsClient { get; set; } = default!;
+
+    private TripDetailResponse? trip;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await TripsClient.GetByIdAsync(Id);
+
+            switch (outcome)
+            {
+                case TripOutcome.Success success:
+                    trip = success.Trip;
+                    errorMessage = null;
+                    break;
+
+                case TripOutcome.NotFound:
+                    errorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripOutcome.Forbidden:
+                case TripOutcome.TransportError:
+                    errorMessage = "No pudimos cargar el viaje.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetStatusLabel(WebTripStatus status) => status switch
+    {
+        WebTripStatus.Programado => "Programado",
+        WebTripStatus.EnProceso => "En proceso",
+        WebTripStatus.Completado => "Completado",
+        WebTripStatus.Cancelado => "Cancelado",
+        _ => status.ToString()
+    };
+
+    private static string GetStopTypeLabel(WebStopType type) => type switch
+    {
+        WebStopType.Origen => "Origen",
+        WebStopType.Intermedia => "Parada",
+        WebStopType.Destino => "Destino",
+        _ => type.ToString()
+    };
+}

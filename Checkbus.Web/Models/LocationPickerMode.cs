@@ -5,9 +5,9 @@ namespace Checkbus.Web.Models;
 /// </summary>
 public enum LocationPickerMode
 {
-    /// <summary>Picks exactly one location (e.g. an <c>Evento</c>'s venue).</summary>
+    /// <summary>Picks exactly one location (e.g. an <c>Event</c>'s venue).</summary>
     Single,
 
-    /// <summary>Builds an ordered list of stops (e.g. a <c>Viaje</c>'s route).</summary>
+    /// <summary>Builds an ordered list of stops (e.g. a <c>Trip</c>'s route).</summary>
     MultiStop
 }

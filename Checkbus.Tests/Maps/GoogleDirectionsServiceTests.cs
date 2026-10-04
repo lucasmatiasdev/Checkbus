@@ -77,8 +77,8 @@ public class GoogleDirectionsServiceTests
 
         var result = await service.GetDirectionsAsync(TwoPoints, CancellationToken.None);
 
-        Assert.Equal(TimeSpan.FromSeconds(1800), result.TiempoEstimado);
-        Assert.Equal(15m, result.DistanciaKm);
+        Assert.Equal(TimeSpan.FromSeconds(1800), result.EstimatedDuration);
+        Assert.Equal(15m, result.DistanceKm);
         Assert.NotNull(handler.CapturedRequest);
     }
 
@@ -89,8 +89,8 @@ public class GoogleDirectionsServiceTests
 
         var result = await service.GetDirectionsAsync(ThreePoints, CancellationToken.None);
 
-        Assert.Equal(TimeSpan.FromSeconds(1500), result.TiempoEstimado);
-        Assert.Equal(12.5m, result.DistanciaKm);
+        Assert.Equal(TimeSpan.FromSeconds(1500), result.EstimatedDuration);
+        Assert.Equal(12.5m, result.DistanceKm);
     }
 
     [Fact]

@@ -48,8 +48,8 @@ builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
 builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
-builder.Services.AddScoped<EventosClient>();
-builder.Services.AddScoped<ViajesClient>();
+builder.Services.AddScoped<EventsClient>();
+builder.Services.AddScoped<TripsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

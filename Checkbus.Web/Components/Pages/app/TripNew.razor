@@ -75,9 +75,19 @@
                                For="@(() => model.DepartureDate)"
                                Class="mb-4" />
 
+                <MudTimePicker Label="Hora de salida"
+                               @bind-Time="model.DepartureTime"
+                               For="@(() => model.DepartureTime)"
+                               Class="mb-4" />
+
                 <MudDatePicker Label="Fecha de llegada"
                                @bind-Date="model.ArrivalDate"
                                For="@(() => model.ArrivalDate)"
+                               Class="mb-4" />
+
+                <MudTimePicker Label="Hora de llegada"
+                               @bind-Time="model.ArrivalTime"
+                               For="@(() => model.ArrivalTime)"
                                Class="mb-4" />
 
                 <MudNumericField T="decimal?"
@@ -249,8 +259,14 @@
         [Required(ErrorMessage = "Ingresá la fecha de salida.")]
         public DateTime? DepartureDate { get; set; }
 
+        [Required(ErrorMessage = "Ingresá la hora de salida.")]
+        public TimeSpan? DepartureTime { get; set; }
+
         [Required(ErrorMessage = "Ingresá la fecha de llegada.")]
         public DateTime? ArrivalDate { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la hora de llegada.")]
+        public TimeSpan? ArrivalTime { get; set; }
 
         [Required(ErrorMessage = "Ingresá el precio.")]
         public decimal? Price { get; set; }
@@ -262,8 +278,8 @@
             VehicleId = VehicleId!.Value,
             DriverId = DriverId!.Value,
             EventId = EventId!.Value,
-            DepartureDate = DepartureDate!.Value,
-            ArrivalDate = ArrivalDate!.Value,
+            DepartureDate = DepartureDate!.Value.Date + DepartureTime!.Value,
+            ArrivalDate = ArrivalDate!.Value.Date + ArrivalTime!.Value,
             Price = Price!.Value,
             Stops = Stops
                 .Select(stop => new CreateTripStopRequest

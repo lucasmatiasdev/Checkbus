@@ -89,7 +89,7 @@ async function placeSingleMarker(instance, latLng, nombre, direccion, placeId) {
     instance.map.panTo(latLng);
 
     const picked = await resolveLocation(instance, latLng, nombre, direccion, placeId);
-    await instance.dotNetRef.invokeMethodAsync("OnLocationPicked", picked);
+    await instance.dotNetRef.invokeMethodAsync("OnLocationPickedFromJs", picked);
 }
 
 async function addStopMarker(instance, latLng, nombre, direccion, placeId) {
@@ -119,34 +119,42 @@ function renderStopMarkers(instance) {
     });
 }
 
-function bindPlacesAutocomplete(instance, searchInputId, mode) {
-    const searchInput = document.getElementById(searchInputId);
-    if (!searchInput) {
+// Google retired google.maps.places.Autocomplete for projects created after March 2025 (only the
+// Places API (New) is enabled for those); PlaceAutocompleteElement is its replacement. Unlike the
+// old widget, it is a custom element the page owns directly (no .bindTo, no "place_changed"
+// listener) — it's created and appended into the search container here instead of attaching to a
+// plain <input>.
+function bindPlacesAutocomplete(instance, searchContainerId, mode) {
+    const container = document.getElementById(searchContainerId);
+    if (!container) {
         return null;
     }
 
-    const autocomplete = new instance.maps.places.Autocomplete(searchInput);
-    autocomplete.bindTo("bounds", instance.map);
+    const element = new instance.maps.places.PlaceAutocompleteElement();
+    container.appendChild(element);
 
-    const listener = autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (!place || !place.geometry || !place.geometry.location) {
+    const handleSelect = async ({ placePrediction }) => {
+        const place = placePrediction.toPlace();
+        await place.fetchFields({ fields: ["displayName", "formattedAddress", "location", "id"] });
+
+        if (!place.location) {
             return;
         }
 
-        const latLng = place.geometry.location;
-        const nombre = place.name || null;
-        const direccion = place.formatted_address || null;
-        const placeId = place.place_id || null;
+        const nombre = place.displayName || null;
+        const direccion = place.formattedAddress || null;
+        const placeId = place.id || null;
 
         if (mode === "multi") {
-            addStopMarker(instance, latLng, nombre, direccion, placeId);
+            addStopMarker(instance, place.location, nombre, direccion, placeId);
         } else {
-            placeSingleMarker(instance, latLng, nombre, direccion, placeId);
+            placeSingleMarker(instance, place.location, nombre, direccion, placeId);
         }
-    });
+    };
 
-    return listener;
+    element.addEventListener("gmp-select", handleSelect);
+
+    return { element, handleSelect };
 }
 
 // Buenos Aires — reasonable fallback center until a marker/stop is placed.
@@ -187,7 +195,7 @@ export async function initMap(elementId, searchInputId, apiKey, mode, initialSto
     });
     instance.clickListener = clickListener;
 
-    instance.autocompleteListener = bindPlacesAutocomplete(instance, searchInputId, mode);
+    instance.autocompleteBinding = bindPlacesAutocomplete(instance, searchInputId, mode);
 
     if (mode === "multi" && instance.stops.length > 0) {
         renderStopMarkers(instance);
@@ -226,8 +234,9 @@ export function dispose(elementId) {
     if (instance.clickListener) {
         instance.clickListener.remove();
     }
-    if (instance.autocompleteListener) {
-        instance.autocompleteListener.remove();
+    if (instance.autocompleteBinding) {
+        instance.autocompleteBinding.element.removeEventListener("gmp-select", instance.autocompleteBinding.handleSelect);
+        instance.autocompleteBinding.element.remove();
     }
     if (instance.marker) {
         instance.marker.setMap(null);

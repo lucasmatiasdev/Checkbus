@@ -55,6 +55,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
+            // Checkbus.Web's MudDatePicker produces Kind=Unspecified DateTimes; Npgsql's "timestamp
+            // with time zone" columns (and any comparison against them, including the overlap
+            // queries below) only accept Utc. Normalized once here and reused for the rest of the
+            // handler instead of re-converting at every use site.
+            var departureDate = DateTime.SpecifyKind(request.DepartureDate, DateTimeKind.Utc);
+            var arrivalDate = DateTime.SpecifyKind(request.ArrivalDate, DateTimeKind.Utc);
+
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
@@ -62,8 +69,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new VehicleNotFoundException();
             }
 
-            await EnsureVehicleEligibleAsync(vehicle, request.ArrivalDate, cancellationToken);
-            await EnsureVehicleNoOverlapAsync(request.VehicleId, request.DepartureDate, request.ArrivalDate, cancellationToken);
+            await EnsureVehicleEligibleAsync(vehicle, arrivalDate, cancellationToken);
+            await EnsureVehicleNoOverlapAsync(request.VehicleId, departureDate, arrivalDate, cancellationToken);
 
             var driver = await _userRepository.FindByIdAsync(request.DriverId, cancellationToken);
             if (driver is null || driver.OrganizationId != callerOrganizationId || driver.Role != Role.Chofer)
@@ -73,8 +80,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new DriverNotFoundException();
             }
 
-            await EnsureDriverEligibleAsync(driver, request.ArrivalDate, cancellationToken);
-            await EnsureDriverNoOverlapAsync(request.DriverId, request.DepartureDate, request.ArrivalDate, cancellationToken);
+            await EnsureDriverEligibleAsync(driver, arrivalDate, cancellationToken);
+            await EnsureDriverNoOverlapAsync(request.DriverId, departureDate, arrivalDate, cancellationToken);
 
             var @event = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken);
             if (@event is null)
@@ -121,8 +128,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 DriverId = request.DriverId,
                 VehicleId = request.VehicleId,
                 EventId = request.EventId,
-                DepartureDate = request.DepartureDate,
-                ArrivalDate = request.ArrivalDate,
+                DepartureDate = departureDate,
+                ArrivalDate = arrivalDate,
                 Capacity = vehicle.Capacity,
                 AvailableSeats = vehicle.Capacity,
                 Price = request.Price,

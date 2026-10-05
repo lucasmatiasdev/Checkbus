@@ -47,7 +47,11 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 Id = Guid.NewGuid(),
                 Name = request.Name,
                 Type = request.Type,
-                Date = request.Date,
+                // Checkbus.Web's MudDatePicker produces a Kind=Unspecified DateTime (it survives
+                // the JSON round-trip as-is, with no offset); Npgsql's "timestamp with time zone"
+                // column only accepts Utc. The picked date has no real time-of-day/timezone
+                // meaning, so it's tagged Utc rather than converted.
+                Date = DateTime.SpecifyKind(request.Date, DateTimeKind.Utc),
                 LocationId = location.Id,
                 CreatedAt = createdAt,
                 UpdatedAt = createdAt

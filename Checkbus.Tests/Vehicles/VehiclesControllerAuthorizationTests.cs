@@ -126,7 +126,6 @@ public class VehiclesControllerAuthorizationTests : IClassFixture<CheckbusApiFac
 
     [Theory]
     [InlineData(Role.Chofer)]
-    [InlineData(Role.Planificador)]
     public async Task GetVehicles_NonAdminRole_Returns403(Role role)
     {
         var client = CreateAuthorizedClient(role);

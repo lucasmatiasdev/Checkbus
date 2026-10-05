@@ -1,10 +1,12 @@
 using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
+using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
+using Checkbus.ApiService.Infrastructure.Implementations.Maps;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
 using Checkbus.ApiService.Infrastructure.Persistence;
@@ -35,6 +37,17 @@ fileStorageOptions.LocalRootPath =
 
 builder.Services.AddSingleton(fileStorageOptions);
 
+// Unlike Jwt/FileStorage, GoogleMaps binds permissively: no API key has been provisioned yet
+// (added later via dotnet user-secrets), so a missing section/key must not fail startup.
+var googleMapsOptions = builder.Configuration.GetSection("GoogleMaps").Get<GoogleMapsOptions>()
+    ?? new GoogleMapsOptions();
+
+builder.Services.AddSingleton(googleMapsOptions);
+builder.Services.AddHttpClient<IDirectionsService, GoogleDirectionsService>(client =>
+{
+    client.BaseAddress = new Uri("https://maps.googleapis.com/");
+});
+
 builder.Services.AddScoped<IPasswordHasher, IdentityPasswordHasher>();
 builder.Services.AddScoped<IJwtGenerator, JwtGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -44,6 +57,9 @@ builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 builder.Services.AddScoped<IVehicleDocumentRepository, VehicleDocumentRepository>();
 builder.Services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
 builder.Services.AddScoped<IVehicleDiagnosticRepository, VehicleDiagnosticRepository>();
+builder.Services.AddScoped<ILocationRepository, LocationRepository>();
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<ITripRepository, TripRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {
@@ -85,6 +101,7 @@ builder.Services.AddExceptionHandler<DriverRequirementExceptionHandler>();
 builder.Services.AddExceptionHandler<VehicleExceptionHandler>();
 builder.Services.AddExceptionHandler<VehicleDocumentExceptionHandler>();
 builder.Services.AddExceptionHandler<MaintenanceRecordExceptionHandler>();
+builder.Services.AddExceptionHandler<TripExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

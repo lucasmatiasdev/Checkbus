@@ -1,0 +1,53 @@
+@namespace Checkbus.Web.Components.Maps
+@using Checkbus.Web.Models
+@implements IAsyncDisposable
+
+<div class="location-picker">
+    <div id="@_searchInputId"
+         class="location-picker-search"
+         style="width: 100%; margin-bottom: 8px;"></div>
+
+    <div id="@_mapElementId" style="width: 100%; height: 420px; border-radius: 4px;"></div>
+
+    @if (Mode == LocationPickerMode.MultiStop)
+    {
+        @if (_stops.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                Hacé clic en el mapa o buscá un lugar para agregar la primera parada.
+            </MudText>
+        }
+        else
+        {
+            <MudList T="PickedLocation" Class="mt-2" Dense="true">
+                @for (var i = 0; i < _stops.Count; i++)
+                {
+                    var index = i;
+                    var stop = _stops[index];
+                    <MudListItem T="PickedLocation">
+                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                            <div>
+                                <MudText Typo="Typo.body1">@(index + 1). @stop.Nombre</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@stop.Direccion</MudText>
+                            </div>
+                            <div>
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                               Size="Size.Small"
+                                               Disabled="@(index == 0)"
+                                               OnClick="@(() => MoveStopUpAsync(index))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
+                                               Size="Size.Small"
+                                               Disabled="@(index == _stops.Count - 1)"
+                                               OnClick="@(() => MoveStopDownAsync(index))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveStopAsync(index))" />
+                            </div>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    }
+</div>

@@ -64,6 +64,24 @@ public class WebContractEnumParityTests
         AssertEnumParity<ComponentCondition, WebComponentCondition>();
     }
 
+    [Fact]
+    public void WebEventType_StaysNumericallyInSyncWith_RealEventType()
+    {
+        AssertEnumParity<EventType, WebEventType>();
+    }
+
+    [Fact]
+    public void WebTripStatus_StaysNumericallyInSyncWith_RealTripStatus()
+    {
+        AssertEnumParity<TripStatus, WebTripStatus>();
+    }
+
+    [Fact]
+    public void WebStopType_StaysNumericallyInSyncWith_RealStopType()
+    {
+        AssertEnumParity<StopType, WebStopType>();
+    }
+
     private static void AssertEnumParity<TReal, TWeb>()
         where TReal : struct, Enum
         where TWeb : struct, Enum

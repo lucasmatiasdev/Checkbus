@@ -1,6 +1,7 @@
 using Checkbus.Web;
 using Checkbus.Web.Components;
 using Checkbus.Web.Extensions;
+using Checkbus.Web.Models;
 using Checkbus.Web.Services;
 using MudBlazor.Services;
 using System.Net.Http.Headers;
@@ -22,6 +23,15 @@ builder.Services.AddMudServices();
 
 builder.Services.AddOutputCache();
 
+// Browser-exposed Google Maps key for LocationPicker's client-side Maps JavaScript API load —
+// a different key from Checkbus.ApiService's server-side Directions key (see
+// GoogleMapsBrowserOptions's doc comment). Binds permissively like its ApiService counterpart:
+// no key has been provisioned yet, so a missing "GoogleMaps" section must not fail startup.
+var googleMapsBrowserOptions = builder.Configuration.GetSection("GoogleMaps").Get<GoogleMapsBrowserOptions>()
+    ?? new GoogleMapsBrowserOptions();
+
+builder.Services.AddSingleton(googleMapsBrowserOptions);
+
 builder.Services.AddTransient<AuthenticationStateHandler>();
 
 builder.Services.AddHttpClient("apiservice", client =>
@@ -38,6 +48,8 @@ builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
 builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
+builder.Services.AddScoped<EventsClient>();
+builder.Services.AddScoped<TripsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

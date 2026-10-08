@@ -1,0 +1,166 @@
+@page "/reservar/{tripId:guid}"
+@layout LandingLayout
+@attribute [AllowAnonymous]
+@using Checkbus.Web.Features.PublicReservations.Contracts
+@using Checkbus.Web.Features.PublicReservations.Services
+
+<PageTitle>Checkbus - Reservar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (notFound)
+    {
+        <MudAlert Severity="Severity.Error">Viaje no encontrado.</MudAlert>
+    }
+    else if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    }
+    else if (seatMap is not null)
+    {
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Elegí tus asientos
+        </MudText>
+        <MudText Typo="Typo.body1" Class="mb-6">
+            Precio por asiento: @seatMap.Price.ToString("C")
+        </MudText>
+
+        <MudPaper Elevation="2" Class="p-6 mb-6">
+            @foreach (var row in SeatRows)
+            {
+                <MudStack Row="true" Justify="Justify.Center" Spacing="2" Class="mb-2">
+                    @foreach (var slot in row)
+                    {
+                        @if (slot is null)
+                        {
+                            <!-- Aisle gap: empty slot between the left and right seat pairs. -->
+                            <div style="width: 48px;"></div>
+                        }
+                        else
+                        {
+                            var seatNumber = slot.Value;
+                            var occupied = occupiedSeatNumbers.Contains(seatNumber);
+                            var selected = selectedSeatNumbers.Contains(seatNumber);
+
+                            <MudButton Variant="@(selected ? Variant.Filled : Variant.Outlined)"
+                                       Color="@(occupied ? Color.Default : (selected ? Color.Primary : Color.Secondary))"
+                                       Disabled="@occupied"
+                                       OnClick="@(() => ToggleSeat(seatNumber))"
+                                       Style="min-width: 48px;">
+                                @seatNumber
+                            </MudButton>
+                        }
+                    }
+                </MudStack>
+            }
+        </MudPaper>
+
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.body1">
+                Asientos seleccionados: @(selectedSeatNumbers.Count == 0 ? "ninguno" : string.Join(", ", selectedSeatNumbers.OrderBy(n => n)))
+            </MudText>
+            <!-- TODO (R4): "Continuar" submits the batch create (TripId + one
+                 (SeatId, PassengerData) pair per selected seat, all-or-nothing). Placeholder
+                 only for R3 — the passenger form fields themselves are out of scope here. -->
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@(selectedSeatNumbers.Count == 0)"
+                       OnClick="HandleContinue">
+                Continuar
+            </MudButton>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid TripId { get; set; }
+
+    [Inject]
+    private PublicTripsClient PublicTripsClient { get; set; } = default!;
+
+    private PublicTripSeatMapResponse? seatMap;
+    private bool isLoading = true;
+    private bool notFound;
+    private string? errorMessage;
+    private readonly HashSet<int> occupiedSeatNumbers = [];
+    private readonly HashSet<int> selectedSeatNumbers = [];
+
+    // Standard 2+2-with-aisle grid computed from Capacity: each row is
+    // [seatA, seatB, aisle-gap, seatC, seatD]. The null entry marks the aisle gap.
+    private List<int?[]> SeatRows { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await PublicTripsClient.GetSeatMapAsync(TripId);
+
+            switch (outcome)
+            {
+                case PublicTripSeatMapOutcome.Success success:
+                    seatMap = success.SeatMap;
+                    occupiedSeatNumbers.Clear();
+                    foreach (var number in success.SeatMap.OccupiedSeatNumbers)
+                    {
+                        occupiedSeatNumbers.Add(number);
+                    }
+                    SeatRows = BuildSeatRows(success.SeatMap.Capacity);
+                    break;
+
+                case PublicTripSeatMapOutcome.NotFound:
+                    notFound = true;
+                    break;
+
+                case PublicTripSeatMapOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static List<int?[]> BuildSeatRows(int capacity)
+    {
+        var rows = new List<int?[]>();
+        var seatNumber = 1;
+
+        while (seatNumber <= capacity)
+        {
+            var row = new int?[5];
+            for (var slot = 0; slot < 5 && seatNumber <= capacity; slot++)
+            {
+                row[slot] = slot == 2 ? null : seatNumber++;
+            }
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
+    private void ToggleSeat(int seatNumber)
+    {
+        if (occupiedSeatNumbers.Contains(seatNumber))
+        {
+            return;
+        }
+
+        if (!selectedSeatNumbers.Remove(seatNumber))
+        {
+            selectedSeatNumbers.Add(seatNumber);
+        }
+    }
+
+    private void HandleContinue()
+    {
+        // TODO (R4): submit the all-or-nothing batch reservation create for
+        // selectedSeatNumbers. No-op placeholder for R3.
+    }
+}

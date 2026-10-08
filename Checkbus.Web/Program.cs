@@ -4,6 +4,7 @@ using Checkbus.Web.Extensions;
 using Checkbus.Web.Features.DriverRequirements.Services;
 using Checkbus.Web.Features.Events.Services;
 using Checkbus.Web.Features.MaintenanceRecords.Services;
+using Checkbus.Web.Features.PublicReservations.Services;
 using Checkbus.Web.Features.Trips.Services;
 using Checkbus.Web.Features.Users.Services;
 using Checkbus.Web.Features.VehicleDiagnostics.Services;
@@ -58,6 +59,7 @@ builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();
 builder.Services.AddScoped<TripsClient>();
+builder.Services.AddScoped<PublicTripsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

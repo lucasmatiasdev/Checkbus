@@ -137,6 +137,9 @@ public class CreateTripCommandHandlerTests
         public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
 
+        public Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
+
         public Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
 

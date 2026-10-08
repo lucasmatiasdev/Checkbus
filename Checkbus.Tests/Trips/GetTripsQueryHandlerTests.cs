@@ -19,6 +19,9 @@ public class GetTripsQueryHandlerTests
         public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripsQueryHandler.");
 
+        public Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripsQueryHandler.");
+
         public Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(trips.Where(v => v.OrganizationId == organizationId).ToList() as IReadOnlyList<Trip>);
 

@@ -9,6 +9,10 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // aggregate — same shape as IVehicleDiagnosticRepository.AddAsync(diagnostic, components).
         Task AddAsync(Trip trip, Route route, IEnumerable<Stop> stops, CancellationToken cancellationToken);
         Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+        // Status-transition updates (e.g. PublishTripCommandHandler) only ever touch the Trip
+        // row itself, never Route/Stops, so this is a plain single-entity update unlike AddAsync.
+        Task UpdateAsync(Trip trip, CancellationToken cancellationToken);
         Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
         // Both overlap queries exist for R5's eligibility checks: an existing Trip

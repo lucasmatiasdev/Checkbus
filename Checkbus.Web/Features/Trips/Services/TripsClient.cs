@@ -74,6 +74,60 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
         }
     }
 
+    public async Task<TripPublishOutcome> PublishAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync($"Trips/{id}/publish", null, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new TripPublishOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.NoContent:
+                        return new TripPublishOutcome.Success();
+
+                    case HttpStatusCode.BadRequest:
+                        var validationProblem = await response.Content
+                            .ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                        IReadOnlyDictionary<string, string[]> errors = validationProblem is null
+                            ? new Dictionary<string, string[]>()
+                            : (IReadOnlyDictionary<string, string[]>)validationProblem.Errors;
+                        return new TripPublishOutcome.ValidationFailed(errors);
+
+                    case HttpStatusCode.NotFound:
+                        return new TripPublishOutcome.NotFound();
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new TripPublishOutcome.Forbidden();
+
+                    default:
+                        return new TripPublishOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
+                // up as an unhandled exception — the caller only ever expects a typed outcome.
+                return new TripPublishOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<TripsListOutcome> GetListAsync(CancellationToken cancellationToken = default)
     {
         HttpResponseMessage response;

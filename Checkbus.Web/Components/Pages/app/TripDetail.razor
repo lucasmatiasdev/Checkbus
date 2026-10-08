@@ -16,9 +16,33 @@
     }
     else if (trip is not null)
     {
-        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
-            Viaje a @trip.EventName
-        </MudText>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6" Wrap="Wrap.Wrap">
+            <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+                Viaje a @trip.EventName
+            </MudText>
+            @if (trip.Status == WebTripStatus.Programado)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@isPublishing"
+                           OnClick="HandlePublish">
+                    @if (isPublishing)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Publicando...</span>
+                    }
+                    else
+                    {
+                        <span>Publicar Viaje</span>
+                    }
+                </MudButton>
+            }
+        </MudStack>
+
+        @if (publishErrorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@publishErrorMessage</MudAlert>
+        }
 
         <MudPaper Elevation="2" Class="pa-6 mb-6">
             <MudText Typo="Typo.h6" Class="mb-4">Datos del viaje</MudText>
@@ -84,9 +108,14 @@
     [Inject]
     private TripsClient TripsClient { get; set; } = default!;
 
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
     private TripDetailResponse? trip;
     private bool isLoading = true;
     private string? errorMessage;
+    private bool isPublishing;
+    private string? publishErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,12 +147,53 @@
         }
     }
 
+    private async Task HandlePublish()
+    {
+        publishErrorMessage = null;
+        isPublishing = true;
+        try
+        {
+            var outcome = await TripsClient.PublishAsync(Id);
+
+            switch (outcome)
+            {
+                case TripPublishOutcome.Success:
+                    // Flip locally rather than re-fetching — the only field this action changes
+                    // is Status, and we already have the rest of the detail loaded.
+                    trip = trip! with { Status = WebTripStatus.Publicado };
+                    Snackbar.Add("Viaje publicado correctamente.", Severity.Success);
+                    break;
+
+                case TripPublishOutcome.ValidationFailed validationFailed:
+                    publishErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripPublishOutcome.NotFound:
+                    publishErrorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripPublishOutcome.Forbidden:
+                    publishErrorMessage = "No tenés permiso para publicar este viaje.";
+                    break;
+
+                case TripPublishOutcome.TransportError transportError:
+                    publishErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isPublishing = false;
+        }
+    }
+
     private static string GetStatusLabel(WebTripStatus status) => status switch
     {
         WebTripStatus.Programado => "Programado",
         WebTripStatus.EnProceso => "En proceso",
         WebTripStatus.Completado => "Completado",
         WebTripStatus.Cancelado => "Cancelado",
+        WebTripStatus.Publicado => "Publicado",
         _ => status.ToString()
     };
 

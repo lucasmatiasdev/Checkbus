@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Application.Trips.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -35,5 +36,30 @@ namespace Checkbus.ApiService.Controllers.Public
             var result = await _mediator.Send(new GetPublicTripSeatMapQuery { TripId = id }, cancellationToken);
             return Ok(result);
         }
+
+        // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4). The
+        // second anonymous action on this same public controller, not a new one — the natural
+        // next step after GetSeatMap on the same public flow. A 409 Conflict (not 404/400) is
+        // the correct mapping for "one or more selected seats are no longer available" — see
+        // SeatsNoLongerAvailableException/ReservationExceptionHandler.
+        [AllowAnonymous]
+        [HttpPost("{id:guid}/reservations")]
+        public async Task<IActionResult> CreateReservation(
+            Guid id, [FromBody] CreatePublicReservationRequestBody body, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(
+                new CreatePublicReservationCommand { TripId = id, Passengers = body.Passengers },
+                cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+    }
+
+    // The route already carries the TripId ({id:guid}), so the request body only needs the
+    // per-seat passenger entries — kept separate from CreatePublicReservationCommand itself so
+    // the command's TripId is always the one resolved from the route, never trusted from the
+    // body.
+    public class CreatePublicReservationRequestBody
+    {
+        public required IReadOnlyList<PassengerSeatRequest> Passengers { get; set; }
     }
 }

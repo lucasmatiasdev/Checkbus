@@ -189,6 +189,14 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Status).HasConversion<string>();
+                // Real double-booking guard (odd/tasks/reservas-publicas.md R4): one Seat can
+                // have at most one Reservation per Trip. No ReservationStatus.Cancelada exists
+                // yet (Fase 4, out of scope), so every row for a (TripId, SeatId) pair is
+                // "active" — a plain unfiltered unique index is correct, no filtered-index
+                // subtlety needed until cancellation lands. This is the actual correctness
+                // guarantee against the TOCTOU race; the handler's pre-check is just a nicer
+                // error path for the common non-racing case.
+                entity.HasIndex(x => new { x.TripId, x.SeatId }).IsUnique();
                 entity.HasOne<Trip>()
                     .WithMany()
                     .HasForeignKey(x => x.TripId);

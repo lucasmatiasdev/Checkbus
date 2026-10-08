@@ -3,6 +3,7 @@
 @attribute [AllowAnonymous]
 @using Checkbus.Web.Features.PublicReservations.Contracts
 @using Checkbus.Web.Features.PublicReservations.Services
+@using Checkbus.Web.Features.Users.Contracts
 
 <PageTitle>Checkbus - Reservar</PageTitle>
 
@@ -14,6 +15,23 @@
     else if (notFound)
     {
         <MudAlert Severity="Severity.Error">Viaje no encontrado.</MudAlert>
+    }
+    else if (confirmation is not null)
+    {
+        <!-- R4 inline success view only — the dedicated, persistent/shareable confirmation
+             page keyed by these Reservation ids is explicitly R5's job, not built here. -->
+        <MudAlert Severity="Severity.Success" Class="mb-4">¡Reserva confirmada!</MudAlert>
+        <MudPaper Elevation="2" Class="pa-6">
+            @foreach (var reservation in confirmation.Reservations.OrderBy(r => r.SeatNumber))
+            {
+                <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
+                    <MudText>
+                        Asiento @reservation.SeatNumber — @reservation.PassengerName @reservation.PassengerSurname
+                    </MudText>
+                    <MudText>@reservation.Price.ToString("C")</MudText>
+                </MudStack>
+            }
+        </MudPaper>
     }
     else if (errorMessage is not null)
     {
@@ -27,6 +45,16 @@
         <MudText Typo="Typo.body1" Class="mb-6">
             Precio por asiento: @seatMap.Price.ToString("C")
         </MudText>
+
+        @if (conflictMessage is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">@conflictMessage</MudAlert>
+        }
+
+        @if (submitErrorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@submitErrorMessage</MudAlert>
+        }
 
         <MudPaper Elevation="2" Class="p-6 mb-6">
             @foreach (var row in SeatRows)
@@ -58,18 +86,68 @@
             }
         </MudPaper>
 
+        @if (selectedSeatNumbers.Count > 0)
+        {
+            <MudText Typo="Typo.h6" Class="mb-4">Datos de los pasajeros</MudText>
+
+            @foreach (var seatNumber in selectedSeatNumbers.OrderBy(n => n))
+            {
+                var form = passengerForms[seatNumber];
+
+                <MudPaper Elevation="1" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Asiento @seatNumber</MudText>
+
+                    @if (fieldErrors.TryGetValue(seatNumber, out var errors) && errors.Count > 0)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-2" Dense="true">
+                            @string.Join(" ", errors)
+                        </MudAlert>
+                    }
+
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="form.Name" Label="Nombre" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="form.Surname" Label="Apellido" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudSelect T="WebDocumentType" @bind-Value="form.DocumentType" Label="Tipo de documento" Variant="Variant.Outlined">
+                                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.DNI">DNI</MudSelectItem>
+                                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.Pasaporte">Pasaporte</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="form.DocumentNumber" Label="Número de documento" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="form.Email" Label="Email" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="form.Phone" Label="Teléfono" Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        }
+
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.body1">
                 Asientos seleccionados: @(selectedSeatNumbers.Count == 0 ? "ninguno" : string.Join(", ", selectedSeatNumbers.OrderBy(n => n)))
             </MudText>
-            <!-- TODO (R4): "Continuar" submits the batch create (TripId + one
-                 (SeatId, PassengerData) pair per selected seat, all-or-nothing). Placeholder
-                 only for R3 — the passenger form fields themselves are out of scope here. -->
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
-                       Disabled="@(selectedSeatNumbers.Count == 0)"
+                       Disabled="@(selectedSeatNumbers.Count == 0 || isSubmitting)"
                        OnClick="HandleContinue">
-                Continuar
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Reservando...</span>
+                }
+                else
+                {
+                    <span>Continuar</span>
+                }
             </MudButton>
         </MudStack>
     }
@@ -86,14 +164,25 @@
     private bool isLoading = true;
     private bool notFound;
     private string? errorMessage;
+    private string? conflictMessage;
+    private string? submitErrorMessage;
+    private bool isSubmitting;
+    private CreateReservationResponse? confirmation;
     private readonly HashSet<int> occupiedSeatNumbers = [];
     private readonly HashSet<int> selectedSeatNumbers = [];
+    private readonly Dictionary<int, PassengerFormModel> passengerForms = [];
+    private readonly Dictionary<int, List<string>> fieldErrors = [];
 
     // Standard 2+2-with-aisle grid computed from Capacity: each row is
     // [seatA, seatB, aisle-gap, seatC, seatD]. The null entry marks the aisle gap.
     private List<int?[]> SeatRows { get; set; } = [];
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadSeatMapAsync();
+    }
+
+    private async Task LoadSeatMapAsync()
     {
         isLoading = true;
         try
@@ -152,15 +241,194 @@
             return;
         }
 
-        if (!selectedSeatNumbers.Remove(seatNumber))
+        if (selectedSeatNumbers.Remove(seatNumber))
+        {
+            passengerForms.Remove(seatNumber);
+            fieldErrors.Remove(seatNumber);
+        }
+        else
         {
             selectedSeatNumbers.Add(seatNumber);
+            passengerForms[seatNumber] = new PassengerFormModel();
         }
     }
 
-    private void HandleContinue()
+    private async Task HandleContinue()
     {
-        // TODO (R4): submit the all-or-nothing batch reservation create for
-        // selectedSeatNumbers. No-op placeholder for R3.
+        submitErrorMessage = null;
+        conflictMessage = null;
+        fieldErrors.Clear();
+
+        if (seatMap is null || selectedSeatNumbers.Count == 0)
+        {
+            return;
+        }
+
+        if (!TryBuildClientSideValidForms(out var passengers))
+        {
+            submitErrorMessage = "Completá todos los datos de cada pasajero antes de continuar.";
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var request = new CreateReservationRequest { Passengers = passengers };
+            var outcome = await PublicTripsClient.CreateReservationAsync(TripId, request);
+
+            switch (outcome)
+            {
+                case CreateReservationOutcome.Success success:
+                    confirmation = success.Result;
+                    selectedSeatNumbers.Clear();
+                    passengerForms.Clear();
+                    break;
+
+                case CreateReservationOutcome.Conflict:
+                    // No partial success, no silently dropping just the taken seat — clear
+                    // the whole selection and refetch so the grid reflects current occupancy.
+                    conflictMessage = "Uno de los asientos elegidos ya fue reservado por otra persona, elegí de nuevo.";
+                    selectedSeatNumbers.Clear();
+                    passengerForms.Clear();
+                    await LoadSeatMapAsync();
+                    break;
+
+                case CreateReservationOutcome.ValidationFailed validationFailed:
+                    ApplyValidationErrors(validationFailed.Errors);
+                    break;
+
+                case CreateReservationOutcome.NotFound:
+                    notFound = true;
+                    break;
+
+                case CreateReservationOutcome.TransportError transportError:
+                    submitErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // Minimal client-side gate before hitting the server: every mini-form must have its
+    // required fields filled. The server (CreatePublicReservationCommandValidator) still owns
+    // the authoritative rules (e.g. Email format) — this only avoids an obviously-incomplete
+    // round trip.
+    private bool TryBuildClientSideValidForms(out List<Checkbus.Web.Features.PublicReservations.Contracts.PassengerSeatRequest> passengers)
+    {
+        passengers = [];
+        var seatIdByNumber = seatMap!.Seats.ToDictionary(s => s.Number, s => s.SeatId);
+        var allValid = true;
+
+        foreach (var seatNumber in selectedSeatNumbers.OrderBy(n => n))
+        {
+            var form = passengerForms[seatNumber];
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(form.Name)) errors.Add("Ingresá el nombre.");
+            if (string.IsNullOrWhiteSpace(form.Surname)) errors.Add("Ingresá el apellido.");
+            if (string.IsNullOrWhiteSpace(form.DocumentNumber)) errors.Add("Ingresá el número de documento.");
+            if (string.IsNullOrWhiteSpace(form.Email)) errors.Add("Ingresá el email.");
+            if (string.IsNullOrWhiteSpace(form.Phone)) errors.Add("Ingresá el teléfono.");
+
+            if (errors.Count > 0)
+            {
+                fieldErrors[seatNumber] = errors;
+                allValid = false;
+                continue;
+            }
+
+            if (!seatIdByNumber.TryGetValue(seatNumber, out var seatId))
+            {
+                // Should not happen (the seat map is the source of these numbers), but guard
+                // against a stale client-side selection rather than submitting a bogus id.
+                fieldErrors[seatNumber] = ["Este asiento ya no está disponible, elegí otro."];
+                allValid = false;
+                continue;
+            }
+
+            passengers.Add(new Checkbus.Web.Features.PublicReservations.Contracts.PassengerSeatRequest
+            {
+                SeatId = seatId,
+                Name = form.Name,
+                Surname = form.Surname,
+                DocumentType = form.DocumentType,
+                DocumentNumber = form.DocumentNumber,
+                Email = form.Email,
+                Phone = form.Phone
+            });
+        }
+
+        return allValid;
+    }
+
+    // Server errors are keyed like "Passengers[1].Email" (FluentValidation's RuleForEach
+    // ChildRules convention) — mapped back to the mini-form at that same position in the
+    // (ordered) selected-seat list. Anything that doesn't parse falls back to a page-level
+    // message instead of being silently dropped.
+    private void ApplyValidationErrors(IReadOnlyDictionary<string, string[]> errors)
+    {
+        var orderedSeatNumbers = selectedSeatNumbers.OrderBy(n => n).ToList();
+        var unmatched = new List<string>();
+
+        foreach (var (key, messages) in errors)
+        {
+            var index = ParsePassengerIndex(key);
+            if (index is int i && i >= 0 && i < orderedSeatNumbers.Count)
+            {
+                var seatNumber = orderedSeatNumbers[i];
+                if (!fieldErrors.TryGetValue(seatNumber, out var list))
+                {
+                    list = [];
+                    fieldErrors[seatNumber] = list;
+                }
+                list.AddRange(messages);
+            }
+            else
+            {
+                unmatched.AddRange(messages);
+            }
+        }
+
+        if (unmatched.Count > 0)
+        {
+            submitErrorMessage = string.Join(" ", unmatched);
+        }
+    }
+
+    private static int? ParsePassengerIndex(string key)
+    {
+        const string prefix = "Passengers[";
+        if (!key.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var closingBracket = key.IndexOf(']', prefix.Length);
+        if (closingBracket < 0)
+        {
+            return null;
+        }
+
+        var digits = key[prefix.Length..closingBracket];
+        return int.TryParse(digits, out var index) ? index : null;
+    }
+
+    /// <summary>
+    /// Local mutable model for one selected seat's passenger mini-form. Plain fields (not
+    /// data-annotated) — basic required-ness is checked manually in
+    /// <see cref="TryBuildClientSideValidForms"/>; the server-side validator remains the
+    /// authoritative source of truth (e.g. Email format).
+    /// </summary>
+    private sealed class PassengerFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Surname { get; set; } = string.Empty;
+        public WebDocumentType DocumentType { get; set; } = WebDocumentType.DNI;
+        public string DocumentNumber { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
     }
 }

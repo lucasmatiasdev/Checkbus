@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Checkbus.Web.Features.PublicReservations.Contracts;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Checkbus.Web.Features.PublicReservations.Services;
@@ -59,6 +60,67 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
                 // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
                 // up as an unhandled exception — the caller only ever expects a typed outcome.
                 return new PublicTripSeatMapOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
+    public async Task<CreateReservationOutcome> CreateReservationAsync(
+        Guid tripId,
+        CreateReservationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsJsonAsync(
+                $"public/trips/{tripId}/reservations", request, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new CreateReservationOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.Created:
+                        var result = await response.Content
+                            .ReadFromJsonAsync<CreateReservationResponse>(cancellationToken);
+                        return new CreateReservationOutcome.Success(result!);
+
+                    case HttpStatusCode.BadRequest:
+                        var validationProblem = await response.Content
+                            .ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                        IReadOnlyDictionary<string, string[]> errors = validationProblem is null
+                            ? new Dictionary<string, string[]>()
+                            : (IReadOnlyDictionary<string, string[]>)validationProblem.Errors;
+                        return new CreateReservationOutcome.ValidationFailed(errors);
+
+                    case HttpStatusCode.Conflict:
+                        var conflictProblem = await response.Content
+                            .ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+                        return new CreateReservationOutcome.Conflict(
+                            conflictProblem?.Detail
+                                ?? "Uno de los asientos elegidos ya fue reservado por otra persona.");
+
+                    case HttpStatusCode.NotFound:
+                        return new CreateReservationOutcome.NotFound();
+
+                    default:
+                        return new CreateReservationOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
+                // up as an unhandled exception — the caller only ever expects a typed outcome.
+                return new CreateReservationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }

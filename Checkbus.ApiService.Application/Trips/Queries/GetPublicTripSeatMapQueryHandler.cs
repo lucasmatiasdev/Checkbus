@@ -60,12 +60,18 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                 .OrderBy(number => number)
                 .ToList();
 
+            var seatMapSeats = seats
+                .Select(s => new SeatMapSeatDto { SeatId = s.Id, Number = s.Number })
+                .OrderBy(s => s.Number)
+                .ToList();
+
             return new PublicTripSeatMapDto
             {
                 TripId = trip.Id,
                 Capacity = capacity,
                 Price = trip.Price,
-                OccupiedSeatNumbers = occupiedSeatNumbers
+                OccupiedSeatNumbers = occupiedSeatNumbers,
+                Seats = seatMapSeats
             };
         }
     }

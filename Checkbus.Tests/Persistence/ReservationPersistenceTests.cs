@@ -238,4 +238,101 @@ public class ReservationPersistenceTests
         Assert.Equal(seat.Id, reloaded.SeatId);
         Assert.Equal(passenger.Id, reloaded.PassengerId);
     }
+
+    [Fact]
+    public async Task Reservation_UniqueIndex_DuplicateTripIdAndSeatId_IsRejected()
+    {
+        // The real double-booking guard added in R4 (odd/tasks/reservas-publicas.md): a
+        // unique index on Reservation(TripId, SeatId). Two different Passengers trying to
+        // book the same Seat on the same Trip must be rejected at the DB level even if an
+        // application-level pre-check were somehow bypassed.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var driver = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Juan",
+            Surname = "Perez",
+            Email = "driver2@checkbus.test",
+            PasswordHash = "hash",
+            DocumentNumber = "30111223",
+            Role = Role.Chofer,
+            OrganizationId = organization.Id
+        };
+        var location = new Location
+        {
+            Id = Guid.NewGuid(),
+            Name = "Estadio Monumental",
+            Address = "Av. Pres. Figueroa Alcorta 7597",
+            PlaceId = "ChIJ-reservation-unique-test",
+            Latitude = -34.5453,
+            Longitude = -58.4498
+        };
+        db.Users.Add(driver);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var @event = new Event
+        {
+            Id = Guid.NewGuid(),
+            Name = "River vs Boca",
+            Type = EventType.Partido,
+            Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
+            LocationId = location.Id
+        };
+        db.Events.Add(@event);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var trip = new Trip
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            EventId = @event.Id,
+            DepartureDate = new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            ArrivalDate = new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc),
+            Capacity = 45,
+            AvailableSeats = 45,
+            Price = 1500m,
+            Status = TripStatus.Publicado
+        };
+        db.Trips.Add(trip);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 };
+        db.Seats.Add(seat);
+        var firstPassenger = CreatePassenger("30111222");
+        var secondPassenger = CreatePassenger("30111224");
+        db.Passengers.Add(firstPassenger);
+        db.Passengers.Add(secondPassenger);
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.Reservations.Add(new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = firstPassenger.Id,
+            Price = trip.Price
+        });
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.Reservations.Add(new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = secondPassenger.Id,
+            Price = trip.Price
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync(cancellationToken));
+    }
 }

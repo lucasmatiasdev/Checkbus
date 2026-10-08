@@ -15,6 +15,12 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <!-- Only Microsoft.EntityFrameworkCore's abstractions are needed here, for the
+         DbUpdateException type CreatePublicReservationCommandHandler catches when the unique
+         index on Reservation(TripId, SeatId) is hit by a concurrent submit
+         (odd/tasks/reservas-publicas.md R4). No DbContext/provider reference — this layer
+         still never talks to the database directly. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

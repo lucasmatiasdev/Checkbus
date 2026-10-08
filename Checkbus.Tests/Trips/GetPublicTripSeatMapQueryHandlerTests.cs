@@ -85,6 +85,12 @@ public class GetPublicTripSeatMapQueryHandlerTests
     {
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<Reservation>>(reservations.Where(r => r.TripId == tripId).ToList());
+
+        public Task CreateBatchAsync(
+            IReadOnlyCollection<Checkbus.ApiService.Domain.Entities.Passengers.Passenger> passengers,
+            IReadOnlyCollection<Reservation> newReservations,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
     }
 
     private static Trip CreateTrip(TripStatus status = TripStatus.Publicado) => new()
@@ -150,6 +156,8 @@ public class GetPublicTripSeatMapQueryHandlerTests
         Assert.Equal(4, result.Capacity);
         Assert.Equal(trip.Price, result.Price);
         Assert.Equal([2], result.OccupiedSeatNumbers);
+        Assert.Equal(4, result.Seats.Count);
+        Assert.Equal(seats[1].Id, result.Seats.Single(s => s.Number == 2).SeatId);
     }
 
     [Fact]

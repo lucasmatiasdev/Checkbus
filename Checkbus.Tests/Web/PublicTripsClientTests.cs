@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using Checkbus.Tests.Infrastructure;
 using Checkbus.Web.Features.PublicReservations.Contracts;
 using Checkbus.Web.Features.PublicReservations.Services;
+using Checkbus.Web.Features.Users.Contracts;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.Tests.Web;
 
@@ -36,7 +39,10 @@ public class PublicTripsClientTests
         TripId = TripId,
         Capacity = 45,
         Price = 15000m,
-        OccupiedSeatNumbers = [2, 5]
+        OccupiedSeatNumbers = [2, 5],
+        Seats = Enumerable.Range(1, 45)
+            .Select(number => new SeatMapSeat { SeatId = Guid.NewGuid(), Number = number })
+            .ToList()
     };
 
     [Fact]
@@ -94,5 +100,129 @@ public class PublicTripsClientTests
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"public/trips/{TripId}/seatmap", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
+    private static CreateReservationRequest MakeCreateRequest() => new()
+    {
+        Passengers =
+        [
+            new PassengerSeatRequest
+            {
+                SeatId = Guid.NewGuid(),
+                Name = "Juan",
+                Surname = "Perez",
+                DocumentType = WebDocumentType.DNI,
+                DocumentNumber = "30111222",
+                Email = "juan@checkbus.test",
+                Phone = "+54 11 5555-5555"
+            }
+        ]
+    };
+
+    [Fact]
+    public async Task CreateReservationAsync_WhenCreated_ReturnsSuccessWithDeserializedResult()
+    {
+        var expected = new CreateReservationResponse
+        {
+            Reservations =
+            [
+                new CreatedReservation
+                {
+                    ReservationId = Guid.NewGuid(),
+                    SeatNumber = 1,
+                    PassengerName = "Juan",
+                    PassengerSurname = "Perez",
+                    Price = 15000m
+                }
+            ]
+        };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = JsonContent.Create(expected)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        var success = Assert.IsType<CreateReservationOutcome.Success>(outcome);
+        Assert.Single(success.Result.Reservations);
+        Assert.Equal(1, success.Result.Reservations[0].SeatNumber);
+    }
+
+    [Fact]
+    public async Task CreateReservationAsync_WhenBadRequest_ReturnsValidationFailedWithErrors()
+    {
+        var problem = new ValidationProblemDetails(new Dictionary<string, string[]>
+        {
+            ["Passengers[0].Email"] = ["Email must be a valid email address."]
+        })
+        {
+            Status = StatusCodes.Status400BadRequest
+        };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = JsonContent.Create(problem)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        var validationFailed = Assert.IsType<CreateReservationOutcome.ValidationFailed>(outcome);
+        Assert.True(validationFailed.Errors.ContainsKey("Passengers[0].Email"));
+    }
+
+    [Fact]
+    public async Task CreateReservationAsync_WhenConflict_ReturnsConflictWithServerMessage()
+    {
+        var problem = new ProblemDetails { Status = 409, Title = "Conflict", Detail = "Seat already taken." };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = JsonContent.Create(problem)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        var conflict = Assert.IsType<CreateReservationOutcome.Conflict>(outcome);
+        Assert.Equal("Seat already taken.", conflict.Message);
+    }
+
+    [Fact]
+    public async Task CreateReservationAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<CreateReservationOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task CreateReservationAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<CreateReservationOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
+
+    [Fact]
+    public async Task CreateReservationAsync_PostsToExpectedRoute()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = JsonContent.Create(new CreateReservationResponse { Reservations = [] })
+        });
+        var client = CreateClient(stub);
+
+        await client.CreateReservationAsync(TripId, MakeCreateRequest(), TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
+        Assert.Contains($"public/trips/{TripId}/reservations", stub.CapturedRequest.RequestUri!.ToString());
     }
 }

@@ -16,4 +16,14 @@ public sealed record PublicTripSeatMapResponse
     public int Capacity { get; init; }
     public decimal Price { get; init; }
     public required IReadOnlyList<int> OccupiedSeatNumbers { get; init; }
+
+    // Added for R4: resolves "seat number the visitor clicked" -> "SeatId to submit" on the
+    // reservation-create request, without a second round trip.
+    public required IReadOnlyList<SeatMapSeat> Seats { get; init; }
+}
+
+public sealed record SeatMapSeat
+{
+    public required Guid SeatId { get; init; }
+    public required int Number { get; init; }
 }

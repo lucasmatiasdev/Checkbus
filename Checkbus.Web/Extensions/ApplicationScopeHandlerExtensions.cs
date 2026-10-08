@@ -1,4 +1,4 @@
-using Checkbus.Web.Services;
+using Checkbus.Web.Shared.Services;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 

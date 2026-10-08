@@ -1,7 +1,9 @@
 @page "/maintenance"
 @attribute [Authorize(Roles = "Mecanico,Administrador")]
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.MaintenanceRecords.Contracts
+@using Checkbus.Web.Features.MaintenanceRecords.Services
+@using Checkbus.Web.Features.Vehicles.Contracts
+@using Checkbus.Web.Features.Vehicles.Services
 
 <PageTitle>Checkbus - Mantenimiento</PageTitle>
 

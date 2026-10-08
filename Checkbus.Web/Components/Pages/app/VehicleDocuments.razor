@@ -1,8 +1,10 @@
 @page "/vehicles/{VehicleId:guid}/documents"
 @attribute [Authorize(Roles = "Administrador")]
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Models
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.VehicleDocuments.Contracts
+@using Checkbus.Web.Features.VehicleDocuments.Models
+@using Checkbus.Web.Features.VehicleDocuments.Services
+@using Checkbus.Web.Features.Vehicles.Contracts
+@using Checkbus.Web.Features.Vehicles.Services
 @using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>Checkbus - Documentos del Vehículo</PageTitle>
@@ -35,7 +37,7 @@
         {
             var document = documents.FirstOrDefault(d => d.Type == type);
             var hasDocumentRow = document is not null;
-            var vigencia = VehicleDocumentVigencia.Compute(document?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
+            var vigencia = VehicleDocumentValidity.Compute(document?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
             var isValidating = validatingTypes.Contains(type);
             var isUploading = uploadingTypes.Contains(type);
 
@@ -48,8 +50,8 @@
                             <MudChip T="string" Color="@GetStatusColor(document!.Status)" Size="Size.Small">
                                 @GetStatusLabel(document.Status)
                             </MudChip>
-                            <MudChip T="string" Color="@VehicleDocumentVigencia.GetColor(vigencia)" Size="Size.Small">
-                                @VehicleDocumentVigencia.GetLabel(vigencia)
+                            <MudChip T="string" Color="@VehicleDocumentValidity.GetColor(vigencia)" Size="Size.Small">
+                                @VehicleDocumentValidity.GetLabel(vigencia)
                             </MudChip>
                         </MudStack>
                     }

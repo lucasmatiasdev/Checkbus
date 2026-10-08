@@ -2,9 +2,15 @@
 @attribute [Authorize(Roles = "Planificador,Administrador")]
 @using System.ComponentModel.DataAnnotations
 @using Checkbus.Web.Components.Maps
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Models
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.Events.Contracts
+@using Checkbus.Web.Features.Events.Services
+@using Checkbus.Web.Features.Trips.Contracts
+@using Checkbus.Web.Features.Trips.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.Users.Services
+@using Checkbus.Web.Features.Vehicles.Contracts
+@using Checkbus.Web.Features.Vehicles.Services
+@using Checkbus.Web.Shared.Models
 
 <PageTitle>Checkbus - Nuevo viaje</PageTitle>
 

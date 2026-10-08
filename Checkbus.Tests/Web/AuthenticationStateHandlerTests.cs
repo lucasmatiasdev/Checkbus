@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Checkbus.Tests.Infrastructure;
 using Checkbus.Web.Extensions;
-using Checkbus.Web.Services;
+using Checkbus.Web.Shared.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Checkbus.Tests.Web;

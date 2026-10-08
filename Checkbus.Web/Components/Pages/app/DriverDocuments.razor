@@ -1,8 +1,10 @@
 @page "/users/{UserId:guid}/documents"
 @attribute [Authorize(Roles = "Administrador")]
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Models
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.DriverRequirements.Contracts
+@using Checkbus.Web.Features.DriverRequirements.Models
+@using Checkbus.Web.Features.DriverRequirements.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.Users.Services
 
 <PageTitle>Checkbus - Documentos</PageTitle>
 
@@ -38,7 +40,7 @@
         @foreach (var type in RequirementTypes)
         {
             var requirement = requirements.FirstOrDefault(r => r.Type == type);
-            var vigencia = DriverRequirementVigencia.Compute(requirement?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
+            var vigencia = DriverRequirementValidity.Compute(requirement?.ExpirationDate, DateOnly.FromDateTime(DateTime.UtcNow));
             var isActing = actingTypes.Contains(type);
 
             <MudPaper Elevation="2" Class="pa-6 mb-6">
@@ -48,8 +50,8 @@
                         <MudChip T="string" Color="@GetStatusColor(requirement?.Status)" Size="Size.Small">
                             @GetStatusLabel(requirement?.Status)
                         </MudChip>
-                        <MudChip T="string" Color="@DriverRequirementVigencia.GetColor(vigencia)" Size="Size.Small">
-                            @DriverRequirementVigencia.GetLabel(vigencia)
+                        <MudChip T="string" Color="@DriverRequirementValidity.GetColor(vigencia)" Size="Size.Small">
+                            @DriverRequirementValidity.GetLabel(vigencia)
                         </MudChip>
                     </MudStack>
                 </MudStack>

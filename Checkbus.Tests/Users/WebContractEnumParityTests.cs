@@ -1,6 +1,11 @@
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Enums;
-using Checkbus.Web.Contracts;
+using Checkbus.Web.Features.DriverRequirements.Contracts;
+using Checkbus.Web.Features.Events.Contracts;
+using Checkbus.Web.Features.MaintenanceRecords.Contracts;
+using Checkbus.Web.Features.Trips.Contracts;
+using Checkbus.Web.Features.Users.Contracts;
+using Checkbus.Web.Features.VehicleDiagnostics.Contracts;
 
 namespace Checkbus.Tests.Users;
 

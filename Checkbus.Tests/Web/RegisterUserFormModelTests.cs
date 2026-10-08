@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using Checkbus.Web.Contracts;
-using Checkbus.Web.Models;
+using Checkbus.Web.Features.Users.Contracts;
+using Checkbus.Web.Features.Users.Models;
 
 namespace Checkbus.Tests.Web;
 

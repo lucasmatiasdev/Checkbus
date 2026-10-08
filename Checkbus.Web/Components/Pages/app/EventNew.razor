@@ -48,6 +48,11 @@
                            For="@(() => model.Date)"
                            Class="mb-4" />
 
+            <MudTimePicker Label="Hora"
+                           @bind-Time="model.Time"
+                           For="@(() => model.Time)"
+                           Class="mb-4" />
+
             <MudText Typo="Typo.subtitle2" Class="mb-2">Ubicación</MudText>
             <LocationPicker Mode="LocationPickerMode.Single" OnLocationPicked="HandleLocationPicked" />
 
@@ -164,13 +169,16 @@
         [Required(ErrorMessage = "Ingresá la fecha del evento.")]
         public DateTime? Date { get; set; }
 
+        [Required(ErrorMessage = "Ingresá la hora del evento.")]
+        public TimeSpan? Time { get; set; }
+
         public PickedLocation? PickedLocation { get; set; }
 
         public CreateEventRequest ToRequest() => new()
         {
             Name = Name,
             Type = Type!.Value,
-            Date = Date!.Value,
+            Date = Date!.Value.Date + Time!.Value,
             LocationName = PickedLocation!.Nombre,
             Address = PickedLocation!.Direccion,
             PlaceId = PickedLocation!.PlaceId,

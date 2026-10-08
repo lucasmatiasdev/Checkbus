@@ -22,6 +22,9 @@ odd/
 ## Local AI-tooling metadata (skill registry index)
 .atl/
 
+## CodeGraph local index (DB, logs, pid - machine-local)
+.codegraph/
+
 ## Local reference material (not part of the app)
 notes/
 

@@ -5,6 +5,7 @@ namespace Checkbus.ApiService.Domain.Enums
         Programado,
         EnProceso,
         Completado,
-        Cancelado
+        Cancelado,
+        Publicado
     }
 }

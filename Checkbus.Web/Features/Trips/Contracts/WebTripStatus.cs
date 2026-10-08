@@ -11,5 +11,6 @@ public enum WebTripStatus
     Programado,
     EnProceso,
     Completado,
-    Cancelado
+    Cancelado,
+    Publicado
 }

@@ -1,0 +1,241 @@
+using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Seats;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
+using Checkbus.ApiService.Domain.Entities.Trips;
+using Checkbus.ApiService.Domain.Entities.Vehicles;
+using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Infrastructure.Persistence;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+
+namespace Checkbus.Tests.Persistence;
+
+/// <summary>
+/// Fase 1 of reservas-publicas has no repositories yet (R1 is domain + persistence only) —
+/// these tests exercise <see cref="Seat"/>, <see cref="Passenger"/> and <see cref="Reservation"/>
+/// directly against <see cref="CheckbusDbContext"/>, same SQLite-in-memory setup used by every
+/// other persistence test in this folder (e.g. VehicleDocumentRepositoryTests).
+/// </summary>
+public class ReservationPersistenceTests
+{
+    private static SqliteConnection CreateOpenConnection()
+    {
+        var connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        connection.Open();
+        return connection;
+    }
+
+    private static CheckbusDbContext CreateContext(SqliteConnection connection)
+    {
+        var options = new DbContextOptionsBuilder<CheckbusDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        return new CheckbusDbContext(options);
+    }
+
+    private static Organization CreateOrganization(string slug) => new()
+    {
+        Id = Guid.NewGuid(),
+        CUIT = "20-12345678-9",
+        Name = "Checkbus Demo",
+        Slug = slug,
+        LogoUrl = "",
+        IsActive = true
+    };
+
+    private static Vehicle CreateVehicle(Guid organizationId, string patent) => new()
+    {
+        Id = Guid.NewGuid(),
+        Brand = "Mercedes-Benz",
+        Model = "O500",
+        Year = 2020,
+        Patent = patent,
+        Capacity = 45,
+        Mileage = 1000,
+        Status = VehicleStatus.Activo,
+        OrganizationId = organizationId,
+        OwnerType = VehicleOwnerType.Organizacion
+    };
+
+    private static Passenger CreatePassenger(string documentNumber) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = "Juan",
+        Surname = "Perez",
+        DocumentType = DocumentType.DNI,
+        DocumentNumber = documentNumber,
+        Email = $"{documentNumber}@checkbus.test",
+        Phone = "+54 11 5555-5555"
+    };
+
+    [Fact]
+    public async Task Seat_PersistsAndRoundTrips()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 };
+        db.Seats.Add(seat);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var reloaded = await db.Seats.FirstAsync(s => s.Id == seat.Id, cancellationToken);
+        Assert.Equal(vehicle.Id, reloaded.VehicleId);
+        Assert.Equal(1, reloaded.Number);
+    }
+
+    [Fact]
+    public async Task Seat_UniqueIndex_DuplicateVehicleIdAndNumber_IsRejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.Seats.Add(new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 });
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.Seats.Add(new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task Passenger_AllowsDuplicateDocumentNumber_NoDedup()
+    {
+        // Explicit design decision in odd/tasks/reservas-publicas.md: Passenger is NOT a
+        // reusable catalog — a fresh row is created on every reservation even when the
+        // DocumentNumber repeats. No unique index exists on DocumentNumber.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        db.Passengers.Add(CreatePassenger("30111222"));
+        db.Passengers.Add(CreatePassenger("30111222"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var count = await db.Passengers.CountAsync(p => p.DocumentNumber == "30111222", cancellationToken);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task Passenger_DocumentType_RoundTripsViaStringConversion()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var passenger = CreatePassenger("30111222");
+        passenger.DocumentType = DocumentType.Pasaporte;
+        db.Passengers.Add(passenger);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var reloaded = await db.Passengers.FirstAsync(p => p.Id == passenger.Id, cancellationToken);
+        Assert.Equal(DocumentType.Pasaporte, reloaded.DocumentType);
+    }
+
+    [Fact]
+    public async Task Reservation_PersistsWithConfirmadaStatus_AndRoundTripsViaStringConversion()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var driver = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Juan",
+            Surname = "Perez",
+            Email = "driver@checkbus.test",
+            PasswordHash = "hash",
+            DocumentNumber = "30111222",
+            Role = Role.Chofer,
+            OrganizationId = organization.Id
+        };
+        var location = new Location
+        {
+            Id = Guid.NewGuid(),
+            Name = "Estadio Monumental",
+            Address = "Av. Pres. Figueroa Alcorta 7597",
+            PlaceId = "ChIJ-reservation-test",
+            Latitude = -34.5453,
+            Longitude = -58.4498
+        };
+        db.Users.Add(driver);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var @event = new Event
+        {
+            Id = Guid.NewGuid(),
+            Name = "River vs Boca",
+            Type = EventType.Partido,
+            Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
+            LocationId = location.Id
+        };
+        db.Events.Add(@event);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var trip = new Trip
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            EventId = @event.Id,
+            DepartureDate = new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            ArrivalDate = new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc),
+            Capacity = 45,
+            AvailableSeats = 45,
+            Price = 1500m,
+            Status = TripStatus.Publicado
+        };
+        db.Trips.Add(trip);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 };
+        db.Seats.Add(seat);
+        var passenger = CreatePassenger("30111222");
+        db.Passengers.Add(passenger);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var reservation = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = passenger.Id,
+            Price = trip.Price
+        };
+        db.Reservations.Add(reservation);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var reloaded = await db.Reservations.FirstAsync(r => r.Id == reservation.Id, cancellationToken);
+        Assert.Equal(ReservationStatus.Confirmada, reloaded.Status);
+        Assert.Equal(trip.Price, reloaded.Price);
+        Assert.Equal(seat.Id, reloaded.SeatId);
+        Assert.Equal(passenger.Id, reloaded.PassengerId);
+    }
+}

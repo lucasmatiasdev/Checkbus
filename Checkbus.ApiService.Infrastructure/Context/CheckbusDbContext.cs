@@ -1,5 +1,8 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Documents;
+using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Seats;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
@@ -24,6 +27,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Trip> Trips => Set<Trip>();
         public DbSet<Route> Routes => Set<Route>();
         public DbSet<Stop> Stops => Set<Stop>();
+        public DbSet<Seat> Seats => Set<Seat>();
+        public DbSet<Passenger> Passengers => Set<Passenger>();
+        public DbSet<Reservation> Reservations => Set<Reservation>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -162,6 +168,36 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Location>()
                     .WithMany()
                     .HasForeignKey(x => x.LocationId);
+            });
+
+            modelBuilder.Entity<Seat>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasIndex(x => new { x.VehicleId, x.Number }).IsUnique();
+                entity.HasOne<Vehicle>()
+                    .WithMany()
+                    .HasForeignKey(x => x.VehicleId);
+            });
+
+            modelBuilder.Entity<Passenger>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.DocumentType).HasConversion<string>();
+            });
+
+            modelBuilder.Entity<Reservation>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Status).HasConversion<string>();
+                entity.HasOne<Trip>()
+                    .WithMany()
+                    .HasForeignKey(x => x.TripId);
+                entity.HasOne<Seat>()
+                    .WithMany()
+                    .HasForeignKey(x => x.SeatId);
+                entity.HasOne<Passenger>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PassengerId);
             });
         }
     }

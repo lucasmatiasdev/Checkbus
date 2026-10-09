@@ -54,7 +54,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
         public Task<IReadOnlyList<Vehicle>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
     }
 

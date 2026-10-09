@@ -56,7 +56,7 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
                 }
             }
 
-            if (await _vehicleRepository.PatentExistsAsync(request.Patent, cancellationToken))
+            if (await _vehicleRepository.PatentExistsAsync(request.Patent, organizationId, cancellationToken))
             {
                 throw new PatentAlreadyRegisteredException();
             }

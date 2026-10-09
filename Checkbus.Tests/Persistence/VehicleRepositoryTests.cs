@@ -95,7 +95,7 @@ public class VehicleRepositoryTests
     }
 
     [Fact]
-    public async Task PatentExistsAsync_ExistingPatent_ReturnsTrue_NonExisting_ReturnsFalse()
+    public async Task PatentExistsAsync_ExistingPatentInSameOrganization_ReturnsTrue_NonExisting_ReturnsFalse()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
@@ -109,8 +109,55 @@ public class VehicleRepositoryTests
         var repository = new VehicleRepository(db);
         await repository.AddAsync(CreateVehicle(organization.Id, "AB123CD"), cancellationToken);
 
-        Assert.True(await repository.PatentExistsAsync("AB123CD", cancellationToken));
-        Assert.False(await repository.PatentExistsAsync("ZZ999ZZ", cancellationToken));
+        Assert.True(await repository.PatentExistsAsync("AB123CD", organization.Id, cancellationToken));
+        Assert.False(await repository.PatentExistsAsync("ZZ999ZZ", organization.Id, cancellationToken));
+    }
+
+    [Fact]
+    public async Task PatentExistsAsync_SamePatentInDifferentOrganization_ReturnsFalse()
+    {
+        // A patent is a real-world, physical identifier — but two different organizations can
+        // legitimately share one (e.g. a leased/rented vehicle), so uniqueness must be scoped
+        // per organization, never checked globally.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organizationA = CreateOrganization("checkbus-demo");
+        var organizationB = CreateOrganization("brahman");
+        db.Organizations.AddRange(organizationA, organizationB);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleRepository(db);
+        await repository.AddAsync(CreateVehicle(organizationA.Id, "AB123CD"), cancellationToken);
+
+        Assert.True(await repository.PatentExistsAsync("AB123CD", organizationA.Id, cancellationToken));
+        Assert.False(await repository.PatentExistsAsync("AB123CD", organizationB.Id, cancellationToken));
+    }
+
+    [Fact]
+    public async Task AddAsync_SamePatentDifferentOrganization_BothSucceed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organizationA = CreateOrganization("checkbus-demo");
+        var organizationB = CreateOrganization("brahman");
+        db.Organizations.AddRange(organizationA, organizationB);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleRepository(db);
+        await repository.AddAsync(CreateVehicle(organizationA.Id, "AB123CD"), cancellationToken);
+
+        // Must not throw — this is the exact bug reported by the user: a second organization
+        // registering the same patent as its own first vehicle was wrongly rejected.
+        await repository.AddAsync(CreateVehicle(organizationB.Id, "AB123CD"), cancellationToken);
+
+        var allVehicles = await db.Vehicles.ToListAsync(cancellationToken);
+        Assert.Equal(2, allVehicles.Count);
     }
 
     [Fact]

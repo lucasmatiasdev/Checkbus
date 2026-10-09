@@ -15,6 +15,7 @@ public class CreateVehicleCommandHandlerTests
     {
         public List<Vehicle> AddedVehicles { get; } = [];
         public bool PatentExists { get; set; }
+        public Guid? PatentExistsCalledWithOrganizationId { get; private set; }
 
         public Task<Vehicle?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateVehicleCommandHandler.");
@@ -28,8 +29,11 @@ public class CreateVehicleCommandHandlerTests
         public Task<IReadOnlyList<Vehicle>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateVehicleCommandHandler.");
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
-            => Task.FromResult(PatentExists);
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
+        {
+            PatentExistsCalledWithOrganizationId = organizationId;
+            return Task.FromResult(PatentExists);
+        }
     }
 
     private sealed class FakeVehicleDocumentRepository : IVehicleDocumentRepository
@@ -271,6 +275,21 @@ public class CreateVehicleCommandHandlerTests
 
         Assert.Empty(vehicleRepository.AddedVehicles);
         Assert.Empty(vehicleDocumentRepository.AddedDocuments);
+    }
+
+    [Fact]
+    public async Task Handle_PatentExistsInCallerOrganization_PassesCallerOrganizationIdToPatentExistsAsync()
+    {
+        // Patent uniqueness is scoped per organization (same patent reused by a different
+        // organization — e.g. a leased vehicle — must be allowed), so the handler has to pass
+        // the CALLER's own OrganizationId into PatentExistsAsync, never check it globally.
+        var organizationId = Guid.NewGuid();
+        var vehicleRepository = new FakeVehicleRepository();
+        var handler = CreateHandler(vehicleRepository: vehicleRepository, hasOrganizationIdOverride: true, organizationIdOverride: organizationId);
+
+        await handler.Handle(CreateOrganizacionCommand(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(organizationId, vehicleRepository.PatentExistsCalledWithOrganizationId);
     }
 
     [Fact]

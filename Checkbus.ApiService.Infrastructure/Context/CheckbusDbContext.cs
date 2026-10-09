@@ -66,7 +66,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             modelBuilder.Entity<Vehicle>(entity =>
             {
                 entity.HasKey(v => v.Id);
-                entity.HasIndex(v => v.Patent).IsUnique();
+                entity.HasIndex(v => new { v.OrganizationId, v.Patent }).IsUnique();
                 entity.Property(v => v.Status).HasConversion<string>();
                 entity.Property(v => v.OwnerType).HasConversion<string>();
                 entity.HasOne(v => v.Organization)

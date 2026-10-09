@@ -32,9 +32,9 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
         {
-            return _context.Vehicles.AnyAsync(v => v.Patent == patent, cancellationToken);
+            return _context.Vehicles.AnyAsync(v => v.OrganizationId == organizationId && v.Patent == patent, cancellationToken);
         }
     }
 }

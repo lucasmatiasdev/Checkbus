@@ -13,5 +13,6 @@ public sealed record EventResponse
     public required string Name { get; init; }
     public required WebEventType Type { get; init; }
     public DateTime Date { get; init; }
+    public bool HasImage { get; init; }
     public required LocationResponse Location { get; init; }
 }

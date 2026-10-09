@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Checkbus.Web.Features.Events.Contracts;
 using Checkbus.Web.Features.MaintenanceRecords.Services;
@@ -66,6 +67,69 @@ public sealed class EventsClient([FromKeyedServices("apiservice")] HttpClient ht
                 // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
                 // up as an unhandled exception — the caller only ever expects a typed outcome.
                 return new EventActionOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
+    public async Task<EventImageUploadOutcome> UploadImageAsync(
+        Guid eventId,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        var multipartContent = new MultipartFormDataContent();
+
+        var fileContent = new StreamContent(fileStream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        multipartContent.Add(fileContent, "File", fileName);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync($"Events/{eventId}/image", multipartContent, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new EventImageUploadOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.NoContent:
+                        return new EventImageUploadOutcome.Success();
+
+                    case HttpStatusCode.BadRequest:
+                        var validationProblem = await response.Content
+                            .ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                        IReadOnlyDictionary<string, string[]> errors = validationProblem is null
+                            ? new Dictionary<string, string[]>()
+                            : (IReadOnlyDictionary<string, string[]>)validationProblem.Errors;
+                        return new EventImageUploadOutcome.ValidationFailed(errors);
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new EventImageUploadOutcome.Forbidden();
+
+                    case HttpStatusCode.NotFound:
+                        return new EventImageUploadOutcome.NotFound();
+
+                    default:
+                        return new EventImageUploadOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
+                // up as an unhandled exception — the caller only ever expects a typed outcome.
+                return new EventImageUploadOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }

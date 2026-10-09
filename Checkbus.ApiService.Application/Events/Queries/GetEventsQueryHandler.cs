@@ -46,6 +46,7 @@ namespace Checkbus.ApiService.Application.Events.Queries
                 Name = @event.Name,
                 Type = @event.Type,
                 Date = @event.Date,
+                HasImage = @event.ImageKey is not null,
                 Location = new EventDto.LocationDto
                 {
                     Name = location?.Name ?? string.Empty,

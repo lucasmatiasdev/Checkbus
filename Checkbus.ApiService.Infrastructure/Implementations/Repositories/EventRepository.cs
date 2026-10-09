@@ -29,5 +29,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         {
             return await _context.Events.ToListAsync(cancellationToken);
         }
+
+        public async Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+        {
+            _context.Events.Update(@event);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

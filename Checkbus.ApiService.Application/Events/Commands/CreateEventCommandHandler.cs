@@ -65,6 +65,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 Name = @event.Name,
                 Type = @event.Type,
                 Date = @event.Date,
+                HasImage = false, // a freshly created Event never has an image yet
                 Location = new EventDto.LocationDto
                 {
                     Name = location.Name,

@@ -20,5 +20,13 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .Select(o => o.Slug)
                 .FirstOrDefaultAsync(cancellationToken);
         }
+
+        public Task<string?> GetNameByIdAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            return _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .Select(o => o.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
     }
 }

@@ -65,6 +65,50 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
         }
     }
 
+    public async Task<PublicTripDetailOutcome> GetDetailsAsync(
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"public/trips/{tripId}/details", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new PublicTripDetailOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var detail = await response.Content
+                            .ReadFromJsonAsync<PublicTripDetailResponse>(cancellationToken);
+                        return new PublicTripDetailOutcome.Success(detail!);
+
+                    case HttpStatusCode.NotFound:
+                        return new PublicTripDetailOutcome.NotFound();
+
+                    default:
+                        return new PublicTripDetailOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
+                // up as an unhandled exception — the caller only ever expects a typed outcome.
+                return new PublicTripDetailOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<CreateReservationOutcome> CreateReservationAsync(
         Guid tripId,
         CreateReservationRequest request,

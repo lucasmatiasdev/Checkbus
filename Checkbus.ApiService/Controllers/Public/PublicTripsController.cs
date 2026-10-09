@@ -42,6 +42,17 @@ namespace Checkbus.ApiService.Controllers.Public
             return Ok(result);
         }
 
+        // Step 1 ("detalle del viaje") data for the public reservation page
+        // (odd/tasks/detalle-reserva-publica.md T2) — the third anonymous action on this same
+        // public controller, not a new one. Same visibility gate as GetSeatMap.
+        [AllowAnonymous]
+        [HttpGet("{id:guid}/details")]
+        public async Task<IActionResult> GetDetails(Guid id, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetPublicTripDetailQuery { TripId = id }, cancellationToken);
+            return Ok(result);
+        }
+
         // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4). The
         // second anonymous action on this same public controller, not a new one — the natural
         // next step after GetSeatMap on the same public flow. A 409 Conflict (not 404/400) is

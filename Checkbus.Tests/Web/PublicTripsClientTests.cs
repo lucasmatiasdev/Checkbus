@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Checkbus.Tests.Infrastructure;
 using Checkbus.Web.Features.PublicReservations.Contracts;
 using Checkbus.Web.Features.PublicReservations.Services;
+using Checkbus.Web.Features.Trips.Contracts;
 using Checkbus.Web.Features.Users.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -100,6 +101,89 @@ public class PublicTripsClientTests
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"public/trips/{TripId}/seatmap", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
+    private static PublicTripDetailResponse MakeDetail() => new()
+    {
+        TripId = TripId,
+        OrganizationName = "Brahman",
+        EventId = Guid.NewGuid(),
+        EventName = "Coldplay en River",
+        EventHasImage = true,
+        Price = 15000m,
+        AvailableSeats = 40,
+        DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
+        ArrivalDate = new DateTime(2026, 5, 1, 18, 0, 0, DateTimeKind.Utc),
+        Stops =
+        [
+            new PublicTripStop
+            {
+                Order = 0,
+                Type = WebStopType.Origen,
+                Name = "Terminal",
+                Address = "Av. Siempre Viva 123",
+                Latitude = -34.6,
+                Longitude = -58.4
+            }
+        ]
+    };
+
+    [Fact]
+    public async Task GetDetailsAsync_WhenOk_ReturnsSuccessWithDeserializedDetail()
+    {
+        var expected = MakeDetail();
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(expected)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetDetailsAsync(TripId, TestContext.Current.CancellationToken);
+
+        var success = Assert.IsType<PublicTripDetailOutcome.Success>(outcome);
+        Assert.Equal(TripId, success.Detail.TripId);
+        Assert.Equal("Brahman", success.Detail.OrganizationName);
+        Assert.True(success.Detail.EventHasImage);
+        Assert.Single(success.Detail.Stops);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetDetailsAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<PublicTripDetailOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.GetDetailsAsync(TripId, TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<PublicTripDetailOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_GetsExpectedRoute()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(MakeDetail())
+        });
+        var client = CreateClient(stub);
+
+        await client.GetDetailsAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
+        Assert.Contains($"public/trips/{TripId}/details", stub.CapturedRequest.RequestUri!.ToString());
     }
 
     private static CreateReservationRequest MakeCreateRequest() => new()

@@ -32,7 +32,7 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
+        Assert.Equal(["AuthController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PublicReservationsController", "PublicTripsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
     }
 
     [Fact]
@@ -46,6 +46,6 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController.Login"], anonymousActions);
+        Assert.Equal(["AuthController.Login", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetSeatMap"], anonymousActions);
     }
 }

@@ -15,10 +15,12 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +96,35 @@ builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// Rate limiting (odd/tasks/reservas-publicas.md R6). Scoped tightly to the project's public,
+// unauthenticated surface only (PublicTripsController/PublicReservationsController, via
+// [EnableRateLimiting] on those controllers) — deliberately NOT a global DefaultPolicy, the
+// same "not a blanket opt-out" principle R3-R5 applied to [AllowAnonymous]. Every authenticated
+// staff endpoint is unaffected: no policy is attached to it, so no limiter ever runs for it.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Partitioned per caller IP, sliding window. 20 requests/minute/IP: generous enough for a
+    // genuine family-of-3 visitor (a few seat-map loads/refreshes while picking seats, plus one
+    // batch submit, well under 20 in a minute) while still shutting down a seat-scraping or
+    // reservation-spam script long before it can meaningfully exhaust seats or data. Not a hard
+    // number from measured traffic (none exists yet for a brand-new public surface) — a
+    // deliberately conservative starting point, easy to retune later from real usage.
+    options.AddPolicy("public-reservations", httpContext =>
+    {
+        var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(remoteIp, _ => new SlidingWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 4,
+            PermitLimit = 20,
+            QueueLimit = 0,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+        });
+    });
+});
+
 builder.Services.AddControllers(options => options.Filters.Add(new AuthorizeFilter()));
 
 // Add services to the container.
@@ -140,6 +171,7 @@ app.MapDefaultEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 

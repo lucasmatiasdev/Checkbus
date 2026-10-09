@@ -2,6 +2,7 @@ using Checkbus.ApiService.Application.Trips.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Checkbus.ApiService.Controllers.Public
 {
@@ -13,6 +14,9 @@ namespace Checkbus.ApiService.Controllers.Public
     // Same physical/namespace separation from every authenticated controller as
     // PublicTripsController, and the same R6 caveat: ControllerAuthorizationInventoryTests.cs
     // is EXPECTED to fail once this controller lands, until R6 updates it deliberately.
+    // Same "public-reservations" rate-limit policy as PublicTripsController, attached here at
+    // the controller level for the same reason — see Program.cs and that controller's comment.
+    [EnableRateLimiting("public-reservations")]
     [Route("api/public/reservations")]
     [ApiController]
     public class PublicReservationsController : ControllerBase

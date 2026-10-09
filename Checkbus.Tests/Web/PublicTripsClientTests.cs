@@ -186,6 +186,66 @@ public class PublicTripsClientTests
         Assert.Contains($"public/trips/{TripId}/details", stub.CapturedRequest.RequestUri!.ToString());
     }
 
+    [Fact]
+    public async Task GetEventImageAsync_WhenOk_ReturnsSuccessWithBytesAndContentType()
+    {
+        var bytes = new byte[] { 1, 2, 3, 4 };
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(bytes)
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        var stub = new StubHttpMessageHandler(response);
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetEventImageAsync(TripId, TestContext.Current.CancellationToken);
+
+        var success = Assert.IsType<PublicTripEventImageOutcome.Success>(outcome);
+        Assert.Equal(bytes, success.Content);
+        Assert.Equal("image/png", success.ContentType);
+    }
+
+    [Fact]
+    public async Task GetEventImageAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetEventImageAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<PublicTripEventImageOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task GetEventImageAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.GetEventImageAsync(TripId, TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<PublicTripEventImageOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
+
+    [Fact]
+    public async Task GetEventImageAsync_GetsExpectedRoute()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        var stub = new StubHttpMessageHandler(response);
+        var client = CreateClient(stub);
+
+        await client.GetEventImageAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
+        Assert.Contains($"public/trips/{TripId}/event-image", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
     private static CreateReservationRequest MakeCreateRequest() => new()
     {
         Passengers =

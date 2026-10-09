@@ -47,4 +47,16 @@ public class PublicTripsControllerAuthorizationTests : IClassFixture<CheckbusApi
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetEventImage_NoBearerToken_IsNotRejectedAtAuthLayer()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(
+            $"{BasePath}/{Guid.NewGuid()}/event-image", TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

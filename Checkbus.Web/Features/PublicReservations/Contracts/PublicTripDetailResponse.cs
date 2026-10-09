@@ -20,7 +20,9 @@ public sealed record PublicTripDetailResponse
     public required string EventName { get; init; }
 
     // Mirrors EventResponse.HasImage — never the raw storage key. When true, the page fetches
-    // GET api/Events/{EventId}/image directly.
+    // GET api/public/trips/{TripId}/event-image (T1's GET api/Events/{EventId}/image is
+    // Planificador/Administrador-only and cannot serve an anonymous passenger — see T4's
+    // GetPublicTripEventImageQueryHandler).
     public bool EventHasImage { get; init; }
 
     public decimal Price { get; init; }

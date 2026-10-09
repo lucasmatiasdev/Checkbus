@@ -46,6 +46,6 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController.Login", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetSeatMap"], anonymousActions);
+        Assert.Equal(["AuthController.Login", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap"], anonymousActions);
     }
 }

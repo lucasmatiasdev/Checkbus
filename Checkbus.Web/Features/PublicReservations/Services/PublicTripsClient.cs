@@ -109,6 +109,51 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
         }
     }
 
+    // Added in T4 — the Step 1 detail page's event image. Binary response, not JSON: unlike
+    // every other method here, this reads raw bytes + the response Content-Type header rather
+    // than deserializing a DTO.
+    public async Task<PublicTripEventImageOutcome> GetEventImageAsync(
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"public/trips/{tripId}/event-image", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new PublicTripEventImageOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+                        return new PublicTripEventImageOutcome.Success(bytes, contentType);
+
+                    case HttpStatusCode.NotFound:
+                        return new PublicTripEventImageOutcome.NotFound();
+
+                    default:
+                        return new PublicTripEventImageOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new PublicTripEventImageOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<CreateReservationOutcome> CreateReservationAsync(
         Guid tripId,
         CreateReservationRequest request,

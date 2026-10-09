@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Application.Trips.Queries;
 using MediatR;
@@ -51,6 +52,29 @@ namespace Checkbus.ApiService.Controllers.Public
         {
             var result = await _mediator.Send(new GetPublicTripDetailQuery { TripId = id }, cancellationToken);
             return Ok(result);
+        }
+
+        // Serves the Step 1 event image anonymously (odd/tasks/detalle-reserva-publica.md T4) —
+        // T1's GET api/Events/{id}/image is role-gated, so it can't serve a passenger directly.
+        // Resolved through the Trip (not a bare EventId route param) so the same
+        // Trip.Status == Publicado gate as every other action here applies — no generic
+        // "any Event's image by id" anonymous endpoint is exposed.
+        [AllowAnonymous]
+        [HttpGet("{id:guid}/event-image")]
+        public async Task<IActionResult> GetEventImage(
+            Guid id,
+            [FromServices] IFileStorageService fileStorageService,
+            CancellationToken cancellationToken)
+        {
+            var file = await _mediator.Send(new GetPublicTripEventImageQuery { TripId = id }, cancellationToken);
+            if (file.ImageKey is null)
+                return NotFound();
+
+            var stream = await fileStorageService.OpenReadAsync(file.ImageKey, cancellationToken);
+            if (stream is null)
+                return NotFound();
+
+            return File(stream, file.ImageContentType ?? "application/octet-stream");
         }
 
         // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4). The

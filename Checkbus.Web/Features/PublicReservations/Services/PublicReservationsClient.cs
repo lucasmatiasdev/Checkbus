@@ -20,11 +20,13 @@ public sealed class PublicReservationsClient([FromKeyedServices("apiservice")] H
         IReadOnlyList<Guid> reservationIds,
         CancellationToken cancellationToken = default)
     {
-        var query = string.Join(",", reservationIds);
+        // The API model-binds IReadOnlyList<Guid> from repeated "ids=" query keys, not a
+        // single comma-joined value — a comma-joined "ids=a,b" fails binding with a 400.
+        var query = string.Join("&", reservationIds.Select(id => $"ids={id}"));
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient.GetAsync($"public/reservations?ids={query}", cancellationToken);
+            response = await _httpClient.GetAsync($"public/reservations?{query}", cancellationToken);
         }
         catch (Exception)
         {

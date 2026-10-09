@@ -21,7 +21,7 @@
         <!-- R4 inline success view only — the dedicated, persistent/shareable confirmation
              page keyed by these Reservation ids is explicitly R5's job, not built here. -->
         <MudAlert Severity="Severity.Success" Class="mb-4">¡Reserva confirmada!</MudAlert>
-        <MudPaper Elevation="2" Class="pa-6">
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
             @foreach (var reservation in confirmation.Reservations.OrderBy(r => r.SeatNumber))
             {
                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
@@ -32,6 +32,9 @@
                 </MudStack>
             }
         </MudPaper>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@ConfirmationUrl">
+            Ver confirmación
+        </MudButton>
     }
     else if (errorMessage is not null)
     {
@@ -168,6 +171,12 @@
     private string? submitErrorMessage;
     private bool isSubmitting;
     private CreateReservationResponse? confirmation;
+
+    // Additive link to R5's dedicated confirmation page, built from the just-created
+    // Reservation ids — does not replace this inline success view.
+    private string ConfirmationUrl => confirmation is null
+        ? string.Empty
+        : $"/reservas/confirmacion/{string.Join(",", confirmation.Reservations.Select(r => r.ReservationId))}";
     private readonly HashSet<int> occupiedSeatNumbers = [];
     private readonly HashSet<int> selectedSeatNumbers = [];
     private readonly Dictionary<int, PassengerFormModel> passengerForms = [];

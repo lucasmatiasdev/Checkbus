@@ -87,6 +87,9 @@ public class CreatePublicReservationCommandHandlerTests
             SavedReservations = reservations.ToList();
             return Task.CompletedTask;
         }
+
+        public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
     private static Trip CreateTrip(Guid vehicleId, TripStatus status = TripStatus.Publicado, decimal price = 15000m) => new()

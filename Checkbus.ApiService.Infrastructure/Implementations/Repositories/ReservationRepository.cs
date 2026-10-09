@@ -22,6 +22,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return await _context.Reservations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+        }
+
         // Passenger + Reservation rows for the whole batch are added to the same ChangeTracker
         // and saved in one SaveChangesAsync call, so they are persisted atomically as a single
         // aggregate — same convention as TripRepository.AddAsync. Deliberately does NOT catch

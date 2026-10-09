@@ -1,0 +1,132 @@
+@page "/reservas/confirmacion/{reservationIds}"
+@layout LandingLayout
+@attribute [AllowAnonymous]
+@using Checkbus.Web.Features.PublicReservations.Contracts
+@using Checkbus.Web.Features.PublicReservations.Services
+
+<PageTitle>Checkbus - Confirmación de reserva</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (notFound)
+    {
+        <!-- Covers both "no valid guid in the route at all" and the API's own 404 (none of
+             the submitted ids resolved to a real Reservation) — same read-only, no-crash
+             requirement either way. -->
+        <MudAlert Severity="Severity.Error">No encontramos esa reserva.</MudAlert>
+    }
+    else if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    }
+    else if (confirmation is not null)
+    {
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-4">
+            Confirmación de reserva
+        </MudText>
+
+        @foreach (var reservation in confirmation.Reservations.OrderBy(r => r.SeatNumber))
+        {
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-2">@reservation.EventName</MudText>
+                <MudText Typo="Typo.body2" Class="mb-4">
+                    Salida: @reservation.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                </MudText>
+
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Asiento</MudText>
+                        <MudText Typo="Typo.body1">@reservation.SeatNumber</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Estado</MudText>
+                        <MudText Typo="Typo.body1">@reservation.Status</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Pasajero</MudText>
+                        <MudText Typo="Typo.body1">@reservation.PassengerName @reservation.PassengerSurname</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Documento</MudText>
+                        <MudText Typo="Typo.body1">@reservation.PassengerDocumentType @reservation.PassengerDocumentNumber</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Precio</MudText>
+                        <MudText Typo="Typo.body1">@reservation.Price.ToString("C")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string ReservationIds { get; set; } = string.Empty;
+
+    [Inject]
+    private PublicReservationsClient PublicReservationsClient { get; set; } = default!;
+
+    private ReservationsConfirmationResponse? confirmation;
+    private bool isLoading = true;
+    private bool notFound;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ids = ParseReservationIds(ReservationIds);
+        if (ids.Count == 0)
+        {
+            // No valid GUID in the route segment at all — same user-facing message as the
+            // API's own "none resolved" 404, no separate error state needed.
+            notFound = true;
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            var outcome = await PublicReservationsClient.GetConfirmationAsync(ids);
+
+            switch (outcome)
+            {
+                case ReservationsConfirmationOutcome.Success success:
+                    confirmation = success.Confirmation;
+                    break;
+
+                case ReservationsConfirmationOutcome.NotFound:
+                    notFound = true;
+                    break;
+
+                case ReservationsConfirmationOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // The route segment is a comma-separated list of Reservation ids (the small batch
+    // returned together by one R4 submission) — any entry that isn't a valid GUID is
+    // dropped rather than failing the whole page, same "omit, don't error" posture as the
+    // API handler.
+    private static List<Guid> ParseReservationIds(string raw)
+    {
+        var ids = new List<Guid>();
+        foreach (var segment in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Guid.TryParse(segment, out var id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        return ids;
+    }
+}

@@ -60,6 +60,7 @@ builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();
 builder.Services.AddScoped<TripsClient>();
 builder.Services.AddScoped<PublicTripsClient>();
+builder.Services.AddScoped<PublicReservationsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

@@ -17,6 +17,9 @@ public class GetEventsQueryHandlerTests
 
         public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
             => Task.FromResult(events);
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetEventsQueryHandler.");
     }
 
     private sealed class FakeLocationRepository(IReadOnlyList<Location> locations) : ILocationRepository

@@ -98,6 +98,9 @@ public class CreateTripCommandHandlerTests
 
         public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
     }
 
     private sealed class FakeLocationRepository : ILocationRepository

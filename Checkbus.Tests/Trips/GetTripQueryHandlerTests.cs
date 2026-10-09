@@ -82,6 +82,9 @@ public class GetTripQueryHandlerTests
 
         public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
     }
 
     private sealed class FakeLocationRepository(Dictionary<Guid, Location> locationsById) : ILocationRepository

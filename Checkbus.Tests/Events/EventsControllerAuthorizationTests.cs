@@ -113,4 +113,56 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    // ---- UploadImage (POST {id}/image) ----
+
+    [Fact]
+    public async Task UploadImage_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+        using var content = new MultipartFormDataContent();
+
+        var response = await client.PostAsync(
+            $"{BasePath}/{Guid.NewGuid()}/image", content, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Mecanico)]
+    public async Task UploadImage_DisallowedRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+        using var content = new MultipartFormDataContent();
+
+        var response = await client.PostAsync(
+            $"{BasePath}/{Guid.NewGuid()}/image", content, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // ---- DownloadImage (GET {id}/image) ----
+
+    [Fact]
+    public async Task DownloadImage_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"{BasePath}/{Guid.NewGuid()}/image", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Mecanico)]
+    public async Task DownloadImage_DisallowedRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+
+        var response = await client.GetAsync($"{BasePath}/{Guid.NewGuid()}/image", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

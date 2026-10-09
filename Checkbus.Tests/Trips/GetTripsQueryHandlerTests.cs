@@ -87,6 +87,9 @@ public class GetTripsQueryHandlerTests
 
         public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripsQueryHandler.");
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripsQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

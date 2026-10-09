@@ -1,6 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Interfaces.Storage;
-using Checkbus.ApiService.Domain.Exceptions.Events;
+using Checkbus.ApiService.Domain.Exceptions.Trips;
 using MediatR;
 
 namespace Checkbus.ApiService.Application.Events.Commands

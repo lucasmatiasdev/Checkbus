@@ -74,13 +74,14 @@ public class TripRepositoryTests
         Longitude = -58.4498
     };
 
-    private static Event CreateEvent(Guid locationId) => new()
+    private static Event CreateEvent(Guid organizationId, Guid locationId) => new()
     {
         Id = Guid.NewGuid(),
         Name = "River vs Boca",
         Type = EventType.Partido,
         Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
-        LocationId = locationId
+        LocationId = locationId,
+        OrganizationId = organizationId
     };
 
     private static Trip CreateTrip(
@@ -133,7 +134,7 @@ public class TripRepositoryTests
         db.Locations.Add(location);
         await db.SaveChangesAsync(cancellationToken);
 
-        var @event = CreateEvent(location.Id);
+        var @event = CreateEvent(organization.Id, location.Id);
         db.Events.Add(@event);
         await db.SaveChangesAsync(cancellationToken);
 

@@ -84,8 +84,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             await EnsureDriverNoOverlapAsync(request.DriverId, departureDate, arrivalDate, cancellationToken);
 
             var @event = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken);
-            if (@event is null)
+            if (@event is null || @event.OrganizationId != callerOrganizationId)
             {
+                // IDOR-safe: cross-tenant existence is never leaked to the caller.
                 throw new EventNotFoundException();
             }
 

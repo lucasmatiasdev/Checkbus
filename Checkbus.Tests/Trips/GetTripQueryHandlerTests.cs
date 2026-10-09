@@ -80,7 +80,7 @@ public class GetTripQueryHandlerTests
 
         public Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(@event);
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
 
         public Task UpdateAsync(Event @event, CancellationToken cancellationToken)

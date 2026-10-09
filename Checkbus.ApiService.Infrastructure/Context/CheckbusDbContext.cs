@@ -126,6 +126,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Type).HasConversion<string>();
+                entity.HasOne(x => x.Organization)
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId);
                 entity.HasOne<Location>()
                     .WithMany()
                     .HasForeignKey(x => x.LocationId);

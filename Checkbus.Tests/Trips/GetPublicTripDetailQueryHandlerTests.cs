@@ -90,7 +90,7 @@ public class GetPublicTripDetailQueryHandlerTests
         public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 

@@ -2,8 +2,8 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Events.Queries
 {
-    // Unscoped — Event is a shared catalog (no OrganizationId), so there is nothing to
-    // tenant-filter by. No parameters: every Planificador/Administrador sees every Event.
+    // Tenant comes exclusively from the authenticated caller's claim inside the handler — no
+    // OrganizationId field here, same reasoning as GetVehiclesQuery/GetUsersQuery.
     public class GetEventsQuery : IRequest<IReadOnlyList<EventDto>>
     {
     }

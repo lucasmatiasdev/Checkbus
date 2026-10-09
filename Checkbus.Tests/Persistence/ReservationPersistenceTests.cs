@@ -195,7 +195,8 @@ public class ReservationPersistenceTests
             Name = "River vs Boca",
             Type = EventType.Partido,
             Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
-            LocationId = location.Id
+            LocationId = location.Id,
+            OrganizationId = organization.Id
         };
         db.Events.Add(@event);
         await db.SaveChangesAsync(cancellationToken);
@@ -287,7 +288,8 @@ public class ReservationPersistenceTests
             Name = "River vs Boca",
             Type = EventType.Partido,
             Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
-            LocationId = location.Id
+            LocationId = location.Id,
+            OrganizationId = organization.Id
         };
         db.Events.Add(@event);
         await db.SaveChangesAsync(cancellationToken);

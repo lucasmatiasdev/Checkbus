@@ -96,7 +96,7 @@ public class CreateTripCommandHandlerTests
 
         public Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(@event);
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
 
         public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
@@ -242,6 +242,7 @@ public class CreateTripCommandHandlerTests
         Type = EventType.Partido,
         Date = new DateTime(2026, 5, 1, 20, 0, 0, DateTimeKind.Utc),
         LocationId = Guid.NewGuid(),
+        OrganizationId = OrganizationId,
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
@@ -465,6 +466,24 @@ public class CreateTripCommandHandlerTests
 
         await Assert.ThrowsAsync<EventNotFoundException>(() =>
             harness.BuildHandler().Handle(CreateCommand(vehicle.Id, driver.Id, Guid.NewGuid()), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_EventBelongsToDifferentOrganization_ThrowsEventNotFound()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var otherOrgEvent = CreateEvent();
+        otherOrgEvent.OrganizationId = Guid.NewGuid();
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(otherOrgEvent)
+        };
+
+        await Assert.ThrowsAsync<EventNotFoundException>(() =>
+            harness.BuildHandler().Handle(CreateCommand(vehicle.Id, driver.Id, otherOrgEvent.Id), TestContext.Current.CancellationToken));
     }
 
     // ---- Happy path ----

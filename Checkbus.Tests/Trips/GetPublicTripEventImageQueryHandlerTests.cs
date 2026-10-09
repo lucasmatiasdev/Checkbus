@@ -50,7 +50,7 @@ public class GetPublicTripEventImageQueryHandlerTests
         public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
     }
 

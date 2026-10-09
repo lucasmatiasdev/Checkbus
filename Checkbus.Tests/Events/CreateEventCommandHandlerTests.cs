@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Events.Commands;
+using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
@@ -39,11 +40,20 @@ public class CreateEventCommandHandlerTests
         public Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateEventCommandHandler.");
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateEventCommandHandler.");
 
         public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateEventCommandHandler.");
+    }
+
+    private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
+    {
+        public bool IsAuthenticated => true;
+        public Guid? UserId => Guid.NewGuid();
+        public Guid? OrganizationId => organizationId;
+        public string? Role => "Planificador";
+        public string? Email => "planificador@checkbus-demo.com";
     }
 
     private static CreateEventCommand CreateCommand() => new()
@@ -61,9 +71,10 @@ public class CreateEventCommandHandlerTests
     [Fact]
     public async Task Handle_NewPlaceId_CreatesLocationAndEvent()
     {
+        var organizationId = Guid.NewGuid();
         var locationRepository = new FakeLocationRepository(existingByPlaceId: null);
         var eventRepository = new FakeEventRepository();
-        var handler = new CreateEventCommandHandler(locationRepository, eventRepository);
+        var handler = new CreateEventCommandHandler(locationRepository, eventRepository, new FakeCurrentUserService(organizationId));
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -78,6 +89,7 @@ public class CreateEventCommandHandlerTests
         Assert.Equal(createdLocation.Id, createdEvent.LocationId);
         Assert.Equal("Final Copa Argentina", createdEvent.Name);
         Assert.Equal(EventType.Partido, createdEvent.Type);
+        Assert.Equal(organizationId, createdEvent.OrganizationId);
 
         Assert.Equal(createdEvent.Id, result.Id);
         Assert.Equal("Final Copa Argentina", result.Name);
@@ -102,7 +114,7 @@ public class CreateEventCommandHandlerTests
         };
         var locationRepository = new FakeLocationRepository(existing);
         var eventRepository = new FakeEventRepository();
-        var handler = new CreateEventCommandHandler(locationRepository, eventRepository);
+        var handler = new CreateEventCommandHandler(locationRepository, eventRepository, new FakeCurrentUserService(Guid.NewGuid()));
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -118,7 +130,7 @@ public class CreateEventCommandHandlerTests
     {
         var locationRepository = new FakeLocationRepository(existingByPlaceId: null);
         var eventRepository = new FakeEventRepository();
-        var handler = new CreateEventCommandHandler(locationRepository, eventRepository);
+        var handler = new CreateEventCommandHandler(locationRepository, eventRepository, new FakeCurrentUserService(Guid.NewGuid()));
         var command = CreateCommand();
 
         var result = await handler.Handle(command, TestContext.Current.CancellationToken);
@@ -130,5 +142,15 @@ public class CreateEventCommandHandlerTests
         Assert.Equal(command.Address, result.Location.Address);
         Assert.Equal(command.Latitude, result.Location.Latitude);
         Assert.Equal(command.Longitude, result.Location.Longitude);
+    }
+
+    [Fact]
+    public async Task Handle_NullOrganizationIdClaim_ThrowsInvalidOperationException()
+    {
+        var handler = new CreateEventCommandHandler(
+            new FakeLocationRepository(existingByPlaceId: null), new FakeEventRepository(), new FakeCurrentUserService(organizationId: null));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.Handle(CreateCommand(), TestContext.Current.CancellationToken));
     }
 }

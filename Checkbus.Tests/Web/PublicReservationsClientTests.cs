@@ -91,8 +91,11 @@ public class PublicReservationsClientTests
     }
 
     [Fact]
-    public async Task GetConfirmationAsync_GetsExpectedRouteWithCommaSeparatedIds()
+    public async Task GetConfirmationAsync_GetsExpectedRouteWithRepeatedIdsKeys()
     {
+        // ASP.NET Core model-binds IReadOnlyList<Guid> from repeated "ids=" query keys, not a
+        // single comma-joined value — a comma-joined "ids=a,b" fails binding with a 400 (found
+        // during R7 manual smoke testing).
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
@@ -105,6 +108,6 @@ public class PublicReservationsClientTests
 
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
-        Assert.Contains($"public/reservations?ids={id1},{id2}", stub.CapturedRequest.RequestUri!.ToString());
+        Assert.Contains($"public/reservations?ids={id1}&ids={id2}", stub.CapturedRequest.RequestUri!.ToString());
     }
 }

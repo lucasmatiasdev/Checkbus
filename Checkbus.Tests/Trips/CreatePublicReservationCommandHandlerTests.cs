@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Domain.Entities.Passengers;
@@ -9,6 +10,7 @@ using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.Trips;
 
@@ -92,6 +94,62 @@ public class CreatePublicReservationCommandHandlerTests
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
+    private sealed class FakeEventRepository(Event? @event) : IEventRepository
+    {
+        public Task AddAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(@event);
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+    }
+
+    // Same shape as FakeFileStorageService (UploadVehicleDocumentCommandHandlerTests): public
+    // list for assertions, NotSupportedException for anything unused, no mocking library.
+    private sealed class FakeEmailService(bool throwOnSend = false) : IEmailService
+    {
+        public List<EmailMessage> SentMessages { get; } = [];
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+        {
+            if (throwOnSend)
+            {
+                throw new InvalidOperationException("Simulated SMTP failure.");
+            }
+
+            SentMessages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private static Event CreateEvent(string name = "Cosquin Rock") => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        Type = EventType.Concierto,
+        Date = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
+        LocationId = Guid.NewGuid(),
+        OrganizationId = Guid.NewGuid()
+    };
+
+    private static CreatePublicReservationCommandHandler CreateHandler(
+        Trip? trip,
+        IReadOnlyList<Seat> seats,
+        FakeReservationRepository reservationRepository,
+        Event? @event = null,
+        FakeEmailService? emailService = null) => new(
+            new FakeTripRepository(trip),
+            new FakeSeatRepository(seats),
+            reservationRepository,
+            new FakeEventRepository(@event ?? CreateEvent()),
+            emailService ?? new FakeEmailService(),
+            new PublicWebOptions { BaseUrl = "https://localhost:7123" },
+            NullLogger<CreatePublicReservationCommandHandler>.Instance);
+
     private static Trip CreateTrip(Guid vehicleId, TripStatus status = TripStatus.Publicado, decimal price = 15000m) => new()
     {
         Id = Guid.NewGuid(),
@@ -125,9 +183,9 @@ public class CreatePublicReservationCommandHandlerTests
         var trip = CreateTrip(vehicleId);
         var seats = new List<Seat> { new() { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 } };
         var reservationRepository = new FakeReservationRepository([]);
+        var emailService = new FakeEmailService();
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository(seats), reservationRepository);
+        var handler = CreateHandler(trip, seats, reservationRepository, emailService: emailService);
 
         var result = await handler.Handle(
             new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seats[0].Id)] },
@@ -140,6 +198,12 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Single(reservationRepository.SavedPassengers!);
         Assert.Single(reservationRepository.SavedReservations!);
         Assert.Equal(ReservationStatus.Confirmada, reservationRepository.SavedReservations![0].Status);
+
+        var sentMessage = Assert.Single(emailService.SentMessages);
+        Assert.Equal("juan1@checkbus.test", sentMessage.To);
+        Assert.Contains("Juan1 Perez", sentMessage.HtmlBody);
+        Assert.Contains("Asiento", sentMessage.HtmlBody);
+        Assert.Contains($"/reservas/confirmacion/{result.Reservations[0].ReservationId}", sentMessage.HtmlBody);
     }
 
     [Fact]
@@ -154,9 +218,9 @@ public class CreatePublicReservationCommandHandlerTests
             new() { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 3 }
         };
         var reservationRepository = new FakeReservationRepository([]);
+        var emailService = new FakeEmailService();
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository(seats), reservationRepository);
+        var handler = CreateHandler(trip, seats, reservationRepository, emailService: emailService);
 
         var command = new CreatePublicReservationCommand
         {
@@ -175,13 +239,19 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Equal(3, reservationRepository.SavedPassengers!.Count);
         Assert.Equal(3, reservationRepository.SavedReservations!.Count);
         Assert.All(reservationRepository.SavedReservations!, r => Assert.Equal(trip.Price, r.Price));
+
+        // One email per Passenger/Reservation row (a family of 3 may enter 3 different
+        // addresses on their own mini-form) — not one aggregate email per batch.
+        Assert.Equal(3, emailService.SentMessages.Count);
+        Assert.Equal(
+            ["juan1@checkbus.test", "juan2@checkbus.test", "juan3@checkbus.test"],
+            emailService.SentMessages.Select(m => m.To).ToList());
     }
 
     [Fact]
     public async Task Handle_TripNotFound_ThrowsTripNotFound()
     {
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(null), new FakeSeatRepository([]), new FakeReservationRepository([]));
+        var handler = CreateHandler(null, [], new FakeReservationRepository([]));
 
         await Assert.ThrowsAsync<TripNotFoundException>(() =>
             handler.Handle(
@@ -200,8 +270,7 @@ public class CreatePublicReservationCommandHandlerTests
         var trip = CreateTrip(vehicleId, status);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([seat]), new FakeReservationRepository([]));
+        var handler = CreateHandler(trip, [seat], new FakeReservationRepository([]));
 
         await Assert.ThrowsAsync<TripNotFoundException>(() =>
             handler.Handle(
@@ -218,8 +287,7 @@ public class CreatePublicReservationCommandHandlerTests
         // silently accepted.
         var foreignSeat = new Seat { Id = Guid.NewGuid(), VehicleId = Guid.NewGuid(), Number = 1 };
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([foreignSeat]), new FakeReservationRepository([]));
+        var handler = CreateHandler(trip, [foreignSeat], new FakeReservationRepository([]));
 
         await Assert.ThrowsAsync<SeatsNoLongerAvailableException>(() =>
             handler.Handle(
@@ -239,8 +307,7 @@ public class CreatePublicReservationCommandHandlerTests
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([seat]), new FakeReservationRepository([]));
+        var handler = CreateHandler(trip, [seat], new FakeReservationRepository([]));
 
         var command = new CreatePublicReservationCommand
         {
@@ -252,8 +319,7 @@ public class CreatePublicReservationCommandHandlerTests
         // builds two Reservation rows for the same (TripId, SeatId) pair, which the batch save
         // would reject via the unique index; here that is simulated by throwOnSave.
         var reservationRepository = new FakeReservationRepository([], throwOnSave: true);
-        var handlerWithThrow = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([seat]), reservationRepository);
+        var handlerWithThrow = CreateHandler(trip, [seat], reservationRepository);
 
         await Assert.ThrowsAsync<SeatsNoLongerAvailableException>(() =>
             handlerWithThrow.Handle(command, TestContext.Current.CancellationToken));
@@ -274,8 +340,7 @@ public class CreatePublicReservationCommandHandlerTests
             Price = trip.Price
         };
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([seat]), new FakeReservationRepository([existingReservation]));
+        var handler = CreateHandler(trip, [seat], new FakeReservationRepository([existingReservation]));
 
         await Assert.ThrowsAsync<SeatsNoLongerAvailableException>(() =>
             handler.Handle(
@@ -297,12 +362,34 @@ public class CreatePublicReservationCommandHandlerTests
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
         var reservationRepository = new FakeReservationRepository([], throwOnSave: true);
 
-        var handler = new CreatePublicReservationCommandHandler(
-            new FakeTripRepository(trip), new FakeSeatRepository([seat]), reservationRepository);
+        var handler = CreateHandler(trip, [seat], reservationRepository);
 
         await Assert.ThrowsAsync<SeatsNoLongerAvailableException>(() =>
             handler.Handle(
                 new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
                 TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_EmailServiceThrows_DoesNotPropagateAndStillReturnsSuccessResult()
+    {
+        // Failure to send does NOT roll back or fail the reservation response (same posture
+        // as EventNew.razor's "Event created but image upload failed" warning pattern) —
+        // caught per-passenger, logged, and the already-built success result is still returned.
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var reservationRepository = new FakeReservationRepository([]);
+        var emailService = new FakeEmailService(throwOnSend: true);
+
+        var handler = CreateHandler(trip, [seat], reservationRepository, emailService: emailService);
+
+        var result = await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Reservations);
+        Assert.Equal(1, result.Reservations[0].SeatNumber);
+        Assert.Empty(emailService.SentMessages);
     }
 }

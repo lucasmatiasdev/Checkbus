@@ -1,11 +1,14 @@
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
@@ -31,15 +34,27 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly ITripRepository _tripRepository;
         private readonly ISeatRepository _seatRepository;
         private readonly IReservationRepository _reservationRepository;
+        private readonly IEventRepository _eventRepository;
+        private readonly IEmailService _emailService;
+        private readonly PublicWebOptions _publicWebOptions;
+        private readonly ILogger<CreatePublicReservationCommandHandler> _logger;
 
         public CreatePublicReservationCommandHandler(
             ITripRepository tripRepository,
             ISeatRepository seatRepository,
-            IReservationRepository reservationRepository)
+            IReservationRepository reservationRepository,
+            IEventRepository eventRepository,
+            IEmailService emailService,
+            PublicWebOptions publicWebOptions,
+            ILogger<CreatePublicReservationCommandHandler> logger)
         {
             _tripRepository = tripRepository;
             _seatRepository = seatRepository;
             _reservationRepository = reservationRepository;
+            _eventRepository = eventRepository;
+            _emailService = emailService;
+            _publicWebOptions = publicWebOptions;
+            _logger = logger;
         }
 
         public async Task<CreatePublicReservationResultDto> Handle(
@@ -134,7 +149,61 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new SeatsNoLongerAvailableException();
             }
 
+            // Event.Name is the only piece of ticket content not already in memory — one extra
+            // lookup, not persisted, scoped to the email body only.
+            var @event = await _eventRepository.GetByIdAsync(trip.EventId, cancellationToken);
+
+            // Sending happens after the batch is durably persisted: the reservation is already
+            // real at this point, so a flaky SMTP relay must never turn into a failed response
+            // for the passenger (same posture as EventNew.razor's "created but image upload
+            // failed" warning). One email per Passenger/Reservation row — a family of 3 may
+            // enter 3 different addresses on their own mini-form, and each gets their own ticket.
+            for (var i = 0; i < passengers.Count; i++)
+            {
+                var passenger = passengers[i];
+                var reservation = reservations[i];
+
+                if (string.IsNullOrWhiteSpace(passenger.Email))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var message = BuildTicketEmail(@event?.Name, trip, passenger, reservation, created[i].SeatNumber);
+                    await _emailService.SendAsync(message, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to send reservation confirmation email for ReservationId {ReservationId}",
+                        reservation.Id);
+                }
+            }
+
             return new CreatePublicReservationResultDto { Reservations = created };
+        }
+
+        private EmailMessage BuildTicketEmail(
+            string? eventName, Trip trip, Passenger passenger, Reservation reservation, int seatNumber)
+        {
+            var confirmationLink = $"{_publicWebOptions.BaseUrl}/reservas/confirmacion/{reservation.Id}";
+            var subject = $"Tu reserva para {eventName ?? "tu viaje"} está confirmada";
+            var body = $"""
+                <h2>¡Reserva confirmada!</h2>
+                <p>Hola {passenger.Name} {passenger.Surname},</p>
+                <p>Tu lugar para <strong>{eventName ?? "el evento"}</strong> quedó confirmado.</p>
+                <ul>
+                    <li>Fecha de salida: {trip.DepartureDate:dd/MM/yyyy HH:mm}</li>
+                    <li>Asiento: {seatNumber}</li>
+                    <li>Precio: {reservation.Price:C}</li>
+                </ul>
+                <p>Podés ver el detalle de tu reserva en el siguiente enlace:</p>
+                <p><a href="{confirmationLink}">{confirmationLink}</a></p>
+                """;
+
+            return new EmailMessage(passenger.Email, subject, body);
         }
     }
 }

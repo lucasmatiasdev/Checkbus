@@ -1,11 +1,13 @@
 using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
+using Checkbus.ApiService.Infrastructure.Implementations.Email;
 using Checkbus.ApiService.Infrastructure.Implementations.Maps;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
@@ -48,6 +50,22 @@ builder.Services.AddSingleton(googleMapsOptions);
 builder.Services.AddHttpClient<IDirectionsService, GoogleDirectionsService>(client =>
 {
     client.BaseAddress = new Uri("https://maps.googleapis.com/");
+});
+
+// Email binds permissively too: the real Brevo SMTP credentials have not been provisioned yet
+// (added later via dotnet user-secrets), so a missing section/values must not fail startup.
+var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
+    ?? new EmailOptions();
+
+builder.Services.AddSingleton(emailOptions);
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
+// The Web app's externally-reachable base URL, used to build links embedded in outgoing
+// emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
+// on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
+builder.Services.AddSingleton(new PublicWebOptions
+{
+    BaseUrl = builder.Configuration["PublicWebBaseUrl"] ?? string.Empty
 });
 
 builder.Services.AddScoped<IPasswordHasher, IdentityPasswordHasher>();

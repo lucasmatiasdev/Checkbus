@@ -83,6 +83,7 @@ builder.Services.AddScoped<ITripRepository, TripRepository>();
 builder.Services.AddScoped<ISeatRepository, SeatRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
+builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {
@@ -155,6 +156,7 @@ builder.Services.AddExceptionHandler<VehicleDocumentExceptionHandler>();
 builder.Services.AddExceptionHandler<MaintenanceRecordExceptionHandler>();
 builder.Services.AddExceptionHandler<TripExceptionHandler>();
 builder.Services.AddExceptionHandler<ReservationExceptionHandler>();
+builder.Services.AddExceptionHandler<BoardingExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

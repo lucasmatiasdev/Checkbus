@@ -1,0 +1,291 @@
+@page "/my-trips/{TripId:guid}/boarding"
+@attribute [Authorize(Roles = "Chofer")]
+@using Checkbus.Web.Features.Boarding.Contracts
+@using Checkbus.Web.Features.Boarding.Models
+@using Checkbus.Web.Features.Boarding.Services
+
+<PageTitle>Checkbus - Embarque</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Embarque
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Disabled="@(isLoading || isClosing)"
+                   OnClick="@HandleCloseBoardingAsync">
+            Cerrar embarque
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudText Typo="Typo.h6" Class="mb-4">Validar por código</MudText>
+        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Start">
+            <MudTextField T="string"
+                           @bind-Value="codeInput"
+                           Label="Código de reserva (ID)"
+                           Variant="Variant.Outlined"
+                           Class="flex-grow-1"
+                           Error="@(codeError is not null)"
+                           ErrorText="@codeError" />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@isValidatingCode"
+                       OnClick="@HandleValidateCodeAsync">
+                Validar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-6">
+        <MudTextField T="string"
+                       Value="searchText"
+                       ValueChanged="OnSearchTextChanged"
+                       Immediate="true"
+                       Label="Buscar por nombre, apellido o documento"
+                       Variant="Variant.Outlined"
+                       Adornment="Adornment.Start"
+                       AdornmentIcon="@Icons.Material.Filled.Search"
+                       Class="mb-4" />
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="BoardingPassengerResponse" Items="@filteredPassengers">
+                <Columns>
+                    <PropertyColumn Property="x => x.SeatNumber" Title="Asiento" />
+                    <TemplateColumn Title="Pasajero">
+                        <CellTemplate>
+                            @($"{context.Item.PassengerName} {context.Item.PassengerSurname}")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.PassengerDocumentNumber" Title="Documento" />
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small">
+                                @GetStatusLabel(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Disabled="@(context.Item.Status != WebBoardingStatus.Pendiente || validatingReservationIds.Contains(context.Item.ReservationId))"
+                                       OnClick="@(() => HandleValidateRowAsync(context.Item.ReservationId))">
+                                Validar
+                            </MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid TripId { get; set; }
+
+    [Inject]
+    private BoardingClient BoardingClient { get; set; } = default!;
+
+    [Inject]
+    private IDialogService DialogService { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private IReadOnlyList<BoardingPassengerResponse> allPassengers = [];
+    private IReadOnlyList<BoardingPassengerResponse> filteredPassengers = [];
+    private string? searchText;
+    private string codeInput = string.Empty;
+    private string? codeError;
+    private bool isLoading = true;
+    private bool isValidatingCode;
+    private bool isClosing;
+    private readonly HashSet<Guid> validatingReservationIds = [];
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoardingListAsync();
+    }
+
+    private async Task LoadBoardingListAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await BoardingClient.GetBoardingListAsync(TripId);
+
+            switch (outcome)
+            {
+                case TripBoardingListOutcome.Success success:
+                    allPassengers = success.List.Passengers;
+                    filteredPassengers = BoardingSearchFilter.Apply(allPassengers, searchText);
+                    errorMessage = null;
+                    break;
+
+                case TripBoardingListOutcome.NotFound:
+                    errorMessage = "Este viaje no existe o no te pertenece.";
+                    break;
+
+                case TripBoardingListOutcome.Forbidden:
+                case TripBoardingListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar la lista de embarque.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnSearchTextChanged(string? text)
+    {
+        searchText = text;
+        filteredPassengers = BoardingSearchFilter.Apply(allPassengers, searchText);
+    }
+
+    private async Task HandleValidateCodeAsync()
+    {
+        codeError = null;
+
+        if (!Guid.TryParse(codeInput.Trim(), out var reservationId))
+        {
+            codeError = "Ingresá un código de reserva válido.";
+            return;
+        }
+
+        isValidatingCode = true;
+        try
+        {
+            await ValidateAsync(reservationId, WebValidationMethod.Codigo);
+            codeInput = string.Empty;
+        }
+        finally
+        {
+            isValidatingCode = false;
+        }
+    }
+
+    private async Task HandleValidateRowAsync(Guid reservationId)
+    {
+        validatingReservationIds.Add(reservationId);
+        try
+        {
+            await ValidateAsync(reservationId, WebValidationMethod.Busqueda);
+        }
+        finally
+        {
+            validatingReservationIds.Remove(reservationId);
+        }
+    }
+
+    private async Task ValidateAsync(Guid reservationId, WebValidationMethod method)
+    {
+        var outcome = await BoardingClient.ValidateAsync(reservationId, method);
+
+        switch (outcome)
+        {
+            case BoardingActionOutcome.Success:
+                Snackbar.Add("Embarque validado correctamente.", Severity.Success);
+                await LoadBoardingListAsync();
+                break;
+
+            case BoardingActionOutcome.NotFound:
+                if (method == WebValidationMethod.Codigo)
+                {
+                    codeError = "Ese código no corresponde a ninguna reserva de este viaje.";
+                }
+                else
+                {
+                    Snackbar.Add("Esa reserva no corresponde a este viaje.", Severity.Error);
+                }
+                break;
+
+            case BoardingActionOutcome.Conflict conflict:
+                Snackbar.Add(conflict.Message, Severity.Warning);
+                await LoadBoardingListAsync();
+                break;
+
+            case BoardingActionOutcome.ValidationFailed validationFailed:
+                Snackbar.Add(string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages)), Severity.Error);
+                break;
+
+            case BoardingActionOutcome.Forbidden:
+            case BoardingActionOutcome.TransportError:
+                Snackbar.Add("No pudimos validar el embarque.", Severity.Error);
+                break;
+        }
+    }
+
+    private async Task HandleCloseBoardingAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Cerrar embarque",
+            "Esta acción marca como Ausente a todos los pasajeros pendientes de este viaje y no se puede deshacer. ¿Confirmás?",
+            yesText: "Cerrar embarque",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        isClosing = true;
+        try
+        {
+            var outcome = await BoardingClient.CloseBoardingAsync(TripId);
+
+            switch (outcome)
+            {
+                case BoardingActionOutcome.Success:
+                    Snackbar.Add("Embarque cerrado.", Severity.Success);
+                    await LoadBoardingListAsync();
+                    break;
+
+                case BoardingActionOutcome.NotFound:
+                    errorMessage = "Este viaje no existe o no te pertenece.";
+                    break;
+
+                case BoardingActionOutcome.Forbidden:
+                case BoardingActionOutcome.Conflict:
+                case BoardingActionOutcome.ValidationFailed:
+                case BoardingActionOutcome.TransportError:
+                    Snackbar.Add("No se pudo cerrar el embarque.", Severity.Error);
+                    break;
+            }
+        }
+        finally
+        {
+            isClosing = false;
+        }
+    }
+
+    private static string GetStatusLabel(WebBoardingStatus status) => status switch
+    {
+        WebBoardingStatus.Pendiente => "Pendiente",
+        WebBoardingStatus.Abordado => "Abordado",
+        WebBoardingStatus.Ausente => "Ausente",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(WebBoardingStatus status) => status switch
+    {
+        WebBoardingStatus.Abordado => Color.Success,
+        WebBoardingStatus.Ausente => Color.Error,
+        _ => Color.Default
+    };
+}

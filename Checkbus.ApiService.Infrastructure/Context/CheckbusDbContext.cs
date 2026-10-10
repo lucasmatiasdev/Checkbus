@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Documents;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Reservations;
@@ -30,6 +31,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Seat> Seats => Set<Seat>();
         public DbSet<Passenger> Passengers => Set<Passenger>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
+        public DbSet<BoardingRecord> BoardingRecords => Set<BoardingRecord>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -209,6 +211,18 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Passenger>()
                     .WithMany()
                     .HasForeignKey(x => x.PassengerId);
+            });
+
+            modelBuilder.Entity<BoardingRecord>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Status).HasConversion<string>();
+                entity.Property(x => x.Method).HasConversion<string>();
+                // True 1:1 with Reservation (odd/tasks/reservas-publicas.md Fase 3 / A1).
+                entity.HasIndex(x => x.ReservationId).IsUnique();
+                entity.HasOne<Reservation>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ReservationId);
             });
         }
     }

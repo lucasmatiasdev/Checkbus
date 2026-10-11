@@ -17,10 +17,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             _context = context;
         }
 
+        // Excludes Cancelada rows — see IReservationRepository's doc comment.
         public async Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
         {
             return await _context.Reservations
-                .Where(r => r.TripId == tripId)
+                .Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada)
                 .ToListAsync(cancellationToken);
         }
 

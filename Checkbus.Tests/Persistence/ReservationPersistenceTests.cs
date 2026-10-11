@@ -552,4 +552,112 @@ public class ReservationPersistenceTests
         });
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    [Fact]
+    public async Task ReservationRepository_GetByTripIdAsync_ExcludesCanceladaReservations()
+    {
+        // Follow-up to Fase 4 / C1 (odd/tasks/reservas-publicas.md): a Cancelada Reservation
+        // must not count as occupying its Seat. GetByTripIdAsync now filters it out at the
+        // repository level so every caller (GetPublicTripSeatMapQueryHandler,
+        // GetPublicTripDetailQueryHandler, CreatePublicReservationCommandHandler's pre-check)
+        // stays correct without each one re-deriving "active" itself.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var driver = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Juan",
+            Surname = "Perez",
+            Email = "driver5@checkbus.test",
+            PasswordHash = "hash",
+            DocumentNumber = "30111229",
+            Role = Role.Chofer,
+            OrganizationId = organization.Id
+        };
+        var location = new Location
+        {
+            Id = Guid.NewGuid(),
+            Name = "Estadio Monumental",
+            Address = "Av. Pres. Figueroa Alcorta 7597",
+            PlaceId = "ChIJ-reservation-getbytripid-test",
+            Latitude = -34.5453,
+            Longitude = -58.4498
+        };
+        db.Users.Add(driver);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var @event = new Event
+        {
+            Id = Guid.NewGuid(),
+            Name = "River vs Boca",
+            Type = EventType.Partido,
+            Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
+            LocationId = location.Id,
+            OrganizationId = organization.Id
+        };
+        db.Events.Add(@event);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var trip = new Trip
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            EventId = @event.Id,
+            DepartureDate = new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            ArrivalDate = new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc),
+            Capacity = 45,
+            AvailableSeats = 45,
+            Price = 1500m,
+            Status = TripStatus.Publicado
+        };
+        db.Trips.Add(trip);
+        var cancelledSeat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 };
+        var activeSeat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 2 };
+        db.Seats.Add(cancelledSeat);
+        db.Seats.Add(activeSeat);
+        var cancelledPassenger = CreatePassenger("30111230");
+        var activePassenger = CreatePassenger("30111231");
+        db.Passengers.Add(cancelledPassenger);
+        db.Passengers.Add(activePassenger);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var cancelledReservation = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = cancelledSeat.Id,
+            PassengerId = cancelledPassenger.Id,
+            Price = trip.Price,
+            Status = ReservationStatus.Cancelada
+        };
+        var activeReservation = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = activeSeat.Id,
+            PassengerId = activePassenger.Id,
+            Price = trip.Price
+        };
+        db.Reservations.Add(cancelledReservation);
+        db.Reservations.Add(activeReservation);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new ReservationRepository(db);
+        var reservations = await repository.GetByTripIdAsync(trip.Id, cancellationToken);
+
+        Assert.Single(reservations);
+        Assert.Equal(activeReservation.Id, reservations[0].Id);
+    }
 }

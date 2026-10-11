@@ -5,10 +5,16 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
 {
     public interface IReservationRepository
     {
-        // Any Status (right now only Confirmada exists) — used by
-        // GetPublicTripSeatMapQueryHandler to compute which Seat.Numbers are occupied for a
-        // published Trip, and by CreatePublicReservationCommandHandler's pre-check (R4) to
-        // reject obviously-taken seats before attempting a write.
+        // Excludes Cancelada rows (Fase 4 / follow-up to C1): a cancelled Reservation must not
+        // count as occupying its Seat. Used by GetPublicTripSeatMapQueryHandler to compute
+        // which Seat.Numbers are occupied for a published Trip, by
+        // GetPublicTripDetailQueryHandler to compute AvailableSeats, and by
+        // CreatePublicReservationCommandHandler's pre-check (R4) to reject obviously-taken
+        // seats before attempting a write — filtering here, once, keeps all three callers
+        // correct without each one re-deriving "active" itself, and matches the filtered
+        // unique index on Reservation(TripId, SeatId) added in C1 (a Cancelada row already
+        // doesn't block a new Reservation at the DB level; this method's result is now
+        // consistent with that).
         Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken);
 
         // Added for R5 (odd/tasks/reservas-publicas.md): resolves one Reservation by its own

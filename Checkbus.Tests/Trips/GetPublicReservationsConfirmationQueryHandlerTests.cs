@@ -30,6 +30,9 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => Task.FromResult(reservations.FirstOrDefault(r => r.Id == id));
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
     }
 
     private sealed class FakeSeatRepository(IReadOnlyList<Seat> seats) : ISeatRepository

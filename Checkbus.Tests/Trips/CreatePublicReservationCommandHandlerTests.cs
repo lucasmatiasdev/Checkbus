@@ -92,6 +92,9 @@ public class CreatePublicReservationCommandHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository

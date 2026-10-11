@@ -69,6 +69,9 @@ public class GetPublicTripDetailQueryHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 
     private sealed class FakeOrganizationRepository(string? name) : IOrganizationRepository

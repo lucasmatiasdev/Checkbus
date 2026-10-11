@@ -33,4 +33,18 @@ public class PublicReservationsControllerAuthorizationTests : IClassFixture<Chec
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Cancel_NoBearerToken_IsNotRejectedAtAuthLayer()
+    {
+        // Proves the new Fase 4 cancel action (odd/tasks/reservas-publicas.md C3) is also
+        // [AllowAnonymous], same convention as GetConfirmation above.
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsync(
+            $"{BasePath}/{Guid.NewGuid()}/cancel", null, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

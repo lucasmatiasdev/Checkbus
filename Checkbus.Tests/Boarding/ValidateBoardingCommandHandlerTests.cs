@@ -29,6 +29,9 @@ public class ValidateBoardingCommandHandlerTests
 
         public Task CreateBatchAsync(IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by ValidateBoardingCommandHandler.");
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ValidateBoardingCommandHandler.");
     }
 
     private sealed class FakeTripRepository(Trip? trip) : ITripRepository

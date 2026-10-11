@@ -79,6 +79,9 @@ public class GetTripBoardingListQueryHandlerTests
 
         public Task CreateBatchAsync(IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
     }
 
     private sealed class FakeSeatRepository(IReadOnlyList<Seat> seats) : ISeatRepository

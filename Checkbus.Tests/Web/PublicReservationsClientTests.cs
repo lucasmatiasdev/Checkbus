@@ -4,6 +4,7 @@ using Checkbus.Tests.Infrastructure;
 using Checkbus.Web.Features.PublicReservations.Contracts;
 using Checkbus.Web.Features.PublicReservations.Services;
 using Checkbus.Web.Features.Users.Contracts;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.Tests.Web;
 
@@ -109,5 +110,73 @@ public class PublicReservationsClientTests
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"public/reservations?ids={id1}&ids={id2}", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
+    // Proves PublicReservationsClient.CancelReservationAsync (odd/tasks/reservas-publicas.md
+    // Fase 4 / C5) maps every realistic api/public/reservations/{id}/cancel response into the
+    // matching CancelReservationOutcome case. Mirrors the GetConfirmationAsync tests above.
+
+    [Fact]
+    public async Task CancelReservationAsync_WhenNoContent_ReturnsSuccess()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        var outcome = await client.CancelReservationAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<CancelReservationOutcome.Success>(outcome);
+    }
+
+    [Fact]
+    public async Task CancelReservationAsync_WhenConflict_ReturnsNotCancellableWithServerMessage()
+    {
+        var problem = new ProblemDetails { Detail = "Ya abordaste este viaje, no se puede cancelar la reserva." };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = JsonContent.Create(problem)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.CancelReservationAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        var notCancellable = Assert.IsType<CancelReservationOutcome.NotCancellable>(outcome);
+        Assert.Equal(problem.Detail, notCancellable.Message);
+    }
+
+    [Fact]
+    public async Task CancelReservationAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.CancelReservationAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<CancelReservationOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task CancelReservationAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.CancelReservationAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<CancelReservationOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
+
+    [Fact]
+    public async Task CancelReservationAsync_PostsToExpectedRoute()
+    {
+        var reservationId = Guid.NewGuid();
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        await client.CancelReservationAsync(reservationId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
+        Assert.Contains($"public/reservations/{reservationId}/cancel", stub.CapturedRequest.RequestUri!.ToString());
     }
 }

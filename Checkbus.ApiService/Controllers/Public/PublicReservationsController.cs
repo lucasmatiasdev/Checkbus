@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Application.Trips.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -52,6 +53,19 @@ namespace Checkbus.ApiService.Controllers.Public
             }
 
             return Ok(result);
+        }
+
+        // POST api/public/reservations/{id}/cancel (odd/tasks/reservas-publicas.md Fase 4 /
+        // C3) — passenger-initiated cancellation, no new token: Reservation.Id alone is the
+        // access control, same reasoning as GetConfirmation above. Exceptions are mapped by
+        // ReservationExceptionHandler (404 for ReservationNotFoundException, 409 for
+        // ReservationNotCancellableException).
+        [AllowAnonymous]
+        [HttpPost("{id:guid}/cancel")]
+        public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(new CancelReservationCommand { ReservationId = id }, cancellationToken);
+            return NoContent();
         }
     }
 }

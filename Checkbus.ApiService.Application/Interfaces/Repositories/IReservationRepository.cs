@@ -32,5 +32,15 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
             IReadOnlyCollection<Passenger> passengers,
             IReadOnlyCollection<Reservation> reservations,
             CancellationToken cancellationToken);
+
+        // Added for Fase 4 (Cancelación), business-named same as
+        // IBoardingRecordRepository.ValidateAsync. Sets Status = Cancelada and saves in one
+        // SaveChangesAsync call — deliberately carries NO business-rule checks itself (the
+        // Abordado / 24h-window policy checks are CancelReservationCommandHandler's job, same
+        // "thin persistence, caller owns the rules" split every other repository in this
+        // codebase follows). Throws ReservationNotFoundException if reservationId doesn't
+        // resolve — defensive, not a business rule: the handler already resolved it once
+        // before calling this.
+        Task CancelAsync(Guid reservationId, CancellationToken cancellationToken);
     }
 }

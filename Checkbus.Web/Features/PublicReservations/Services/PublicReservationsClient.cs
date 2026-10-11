@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Checkbus.Web.Features.PublicReservations.Contracts;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Checkbus.Web.Features.PublicReservations.Services;
@@ -59,6 +60,59 @@ public sealed class PublicReservationsClient([FromKeyedServices("apiservice")] H
                 // bubble up as an unhandled exception — the caller only ever expects a typed
                 // outcome.
                 return new ReservationsConfirmationOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
+    // POST api/public/reservations/{id}/cancel (odd/tasks/reservas-publicas.md Fase 4 / C5) —
+    // no request body, the Reservation id comes from the route, same shape GetConfirmation's
+    // simplicity suggested rather than inventing a body for a parameterless action.
+    public async Task<CancelReservationOutcome> CancelReservationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync(
+                $"public/reservations/{reservationId}/cancel", null, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new CancelReservationOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.NoContent:
+                        return new CancelReservationOutcome.Success();
+
+                    case HttpStatusCode.Conflict:
+                        var conflictProblem = await response.Content
+                            .ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+                        return new CancelReservationOutcome.NotCancellable(
+                            conflictProblem?.Detail
+                                ?? "No se puede cancelar esta reserva.");
+
+                    case HttpStatusCode.NotFound:
+                        return new CancelReservationOutcome.NotFound();
+
+                    default:
+                        return new CancelReservationOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body must not bubble up as an
+                // unhandled exception — the caller only ever expects a typed outcome.
+                return new CancelReservationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }

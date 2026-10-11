@@ -94,6 +94,9 @@ public class GetPublicTripSeatMapQueryHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
+
+        public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
     }
 
     private static Trip CreateTrip(TripStatus status = TripStatus.Publicado) => new()

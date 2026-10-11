@@ -1,6 +1,8 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,6 +41,21 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         {
             _context.Passengers.AddRange(passengers);
             _context.Reservations.AddRange(reservations);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Thin persistence only, no business-rule checks — see IReservationRepository's doc
+        // comment. CancelReservationCommandHandler already resolved and checked this
+        // Reservation once before calling here; the not-found throw below is purely
+        // defensive.
+        public async Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
+        {
+            var reservation = await _context.Reservations
+                .FirstOrDefaultAsync(r => r.Id == reservationId, cancellationToken)
+                ?? throw new ReservationNotFoundException();
+
+            reservation.Status = ReservationStatus.Cancelada;
+
             await _context.SaveChangesAsync(cancellationToken);
         }
     }

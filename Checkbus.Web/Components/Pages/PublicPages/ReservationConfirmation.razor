@@ -3,6 +3,11 @@
 @attribute [AllowAnonymous]
 @using Checkbus.Web.Features.PublicReservations.Contracts
 @using Checkbus.Web.Features.PublicReservations.Services
+@* This .razor file's own generated page class is also named "ReservationConfirmation" (same
+   convention Blazor always uses: file name -> class name), which shadows the contract record
+   of the same name from the Contracts namespace above — the alias below disambiguates every
+   explicit reference to the DTO in this file's @code block. *@
+@using ReservationConfirmationDto = Checkbus.Web.Features.PublicReservations.Contracts.ReservationConfirmation
 
 <PageTitle>Checkbus - Confirmación de reserva</PageTitle>
 
@@ -28,7 +33,7 @@
             Confirmación de reserva
         </MudText>
 
-        @foreach (var reservation in confirmation.Reservations.OrderBy(r => r.SeatNumber))
+        @foreach (var reservation in displayedReservations.OrderBy(r => r.SeatNumber))
         {
             <MudPaper Elevation="2" Class="pa-6 mb-4">
                 <MudText Typo="Typo.h6" Class="mb-2">@reservation.EventName</MudText>
@@ -58,6 +63,22 @@
                         <MudText Typo="Typo.body1">@reservation.Price.ToString("C")</MudText>
                     </MudItem>
                 </MudGrid>
+
+                @if (reservation.Status != CanceladaStatus)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               Class="mt-4"
+                               Disabled="@cancellingReservationIds.Contains(reservation.ReservationId)"
+                               OnClick="@(() => HandleCancelAsync(reservation))">
+                        Cancelar reserva
+                    </MudButton>
+                }
+
+                @if (rowErrorsByReservationId.TryGetValue(reservation.ReservationId, out var rowError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-2">@rowError</MudAlert>
+                }
             </MudPaper>
         }
     }
@@ -70,7 +91,28 @@
     [Inject]
     private PublicReservationsClient PublicReservationsClient { get; set; } = default!;
 
+    [Inject]
+    private IDialogService DialogService { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    // Reservation.Status is exposed as a plain string by the API (see
+    // ReservationsConfirmationResponse's doc comment) — this page only ever compares against
+    // this one literal, matching the server's HasConversion<string>() representation.
+    private const string CanceladaStatus = "Cancelada";
+
     private ReservationsConfirmationResponse? confirmation;
+
+    // Mutable local copy of confirmation.Reservations (itself an IReadOnlyList<record> with
+    // init-only properties) so a successful cancel can flip just that one row's displayed
+    // Status in place — same "flip the one field that changed" precedent R2's TripDetail.razor
+    // used — without a full page reload/refetch.
+    private List<ReservationConfirmationDto> displayedReservations = [];
+
+    private readonly HashSet<Guid> cancellingReservationIds = [];
+    private readonly Dictionary<Guid, string> rowErrorsByReservationId = [];
+
     private bool isLoading = true;
     private bool notFound;
     private string? errorMessage;
@@ -95,6 +137,7 @@
             {
                 case ReservationsConfirmationOutcome.Success success:
                     confirmation = success.Confirmation;
+                    displayedReservations = confirmation.Reservations.ToList();
                     break;
 
                 case ReservationsConfirmationOutcome.NotFound:
@@ -109,6 +152,58 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task HandleCancelAsync(ReservationConfirmationDto reservation)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Cancelar reserva",
+            "Esta acción cancela tu reserva y libera el asiento. No se puede deshacer. ¿Confirmás?",
+            yesText: "Cancelar reserva",
+            cancelText: "Volver");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        rowErrorsByReservationId.Remove(reservation.ReservationId);
+        cancellingReservationIds.Add(reservation.ReservationId);
+        try
+        {
+            var outcome = await PublicReservationsClient.CancelReservationAsync(reservation.ReservationId);
+
+            switch (outcome)
+            {
+                case CancelReservationOutcome.Success:
+                    var index = displayedReservations.FindIndex(r => r.ReservationId == reservation.ReservationId);
+                    if (index >= 0)
+                    {
+                        displayedReservations[index] = displayedReservations[index] with { Status = CanceladaStatus };
+                    }
+
+                    Snackbar.Add("Reserva cancelada.", Severity.Success);
+                    break;
+
+                case CancelReservationOutcome.NotCancellable notCancellable:
+                    // Row-specific, not a page-level alert: the reason ("ya abordó" / "faltan
+                    // menos de 24hs") is only meaningful next to the reservation it blocks.
+                    rowErrorsByReservationId[reservation.ReservationId] = notCancellable.Message;
+                    break;
+
+                case CancelReservationOutcome.NotFound:
+                    rowErrorsByReservationId[reservation.ReservationId] = "No encontramos esa reserva.";
+                    break;
+
+                case CancelReservationOutcome.TransportError transportError:
+                    rowErrorsByReservationId[reservation.ReservationId] = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            cancellingReservationIds.Remove(reservation.ReservationId);
         }
     }
 

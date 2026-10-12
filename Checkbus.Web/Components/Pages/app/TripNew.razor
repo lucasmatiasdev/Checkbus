@@ -1,6 +1,7 @@
 @page "/trips/new"
 @attribute [Authorize(Roles = "Planificador,Administrador")]
 @using System.ComponentModel.DataAnnotations
+@using Checkbus.Web.Components.Dialogs
 @using Checkbus.Web.Components.Maps
 @using Checkbus.Web.Features.Events.Contracts
 @using Checkbus.Web.Features.Events.Services
@@ -155,6 +156,9 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
+    [Inject]
+    private IDialogService DialogService { get; set; } = default!;
+
     private readonly TripFormModel model = new();
     private IReadOnlyList<EventResponse> events = [];
     private IReadOnlyList<VehicleResponse> vehicles = [];
@@ -197,11 +201,39 @@
         model.Stops = stops;
     }
 
+    private static string FormatVehicleLabel(VehicleResponse? vehicle) =>
+        vehicle is null ? "" : $"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})";
+
+    private static string FormatDriverName(UserListItemResponse? driver) =>
+        driver is null ? "" : $"{driver.Name} {driver.Surname}";
+
     private async Task HandleValidSubmit()
     {
         if (model.Stops.Count < 2)
         {
             errorMessage = "Agregá al menos un origen y un destino en el mapa.";
+            return;
+        }
+
+        // Review-before-create step: nothing is persisted until the user confirms the
+        // MudTimeline in TripReviewDialog. Added specifically because Departure/Arrival dates
+        // typed into the wrong field (e.g. a two-month "trip") previously went unnoticed until
+        // after creation — see odd/tasks/confirmacion-creacion-viaje notes.
+        var dialogParameters = new DialogParameters<TripReviewDialog>
+        {
+            { x => x.EventName, events.FirstOrDefault(e => e.Id == model.EventId)?.Name ?? "" },
+            { x => x.VehicleLabel, FormatVehicleLabel(vehicles.FirstOrDefault(v => v.Id == model.VehicleId)) },
+            { x => x.DriverName, FormatDriverName(drivers.FirstOrDefault(d => d.Id == model.DriverId)) },
+            { x => x.DepartureDateTime, model.DepartureDate!.Value.Date + model.DepartureTime!.Value },
+            { x => x.ArrivalDateTime, model.ArrivalDate!.Value.Date + model.ArrivalTime!.Value },
+            { x => x.Price, model.Price!.Value },
+            { x => x.Stops, model.Stops }
+        };
+
+        var dialogReference = await DialogService.ShowAsync<TripReviewDialog>("Revisá el viaje", dialogParameters);
+        var dialogResult = await dialogReference.Result;
+        if (dialogResult is null || dialogResult.Canceled)
+        {
             return;
         }
 

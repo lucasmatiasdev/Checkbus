@@ -1,7 +1,10 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Documents;
+using Checkbus.ApiService.Domain.Entities.Invoices;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
+using Checkbus.ApiService.Domain.Entities.Refunds;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Entities.Seats;
 using Checkbus.ApiService.Domain.Entities.Trips;
@@ -32,6 +35,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Passenger> Passengers => Set<Passenger>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
         public DbSet<BoardingRecord> BoardingRecords => Set<BoardingRecord>();
+        public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<Invoice> Invoices => Set<Invoice>();
+        public DbSet<Refund> Refunds => Set<Refund>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,6 +230,57 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.Property(x => x.Method).HasConversion<string>();
                 // True 1:1 with Reservation (odd/tasks/reservas-publicas.md Fase 3 / A1).
                 entity.HasIndex(x => x.ReservationId).IsUnique();
+                entity.HasOne<Reservation>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ReservationId);
+            });
+
+            modelBuilder.Entity<Payment>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Status).HasConversion<string>();
+                // Money is a value object, not its own table — mapped inline as an EF Core
+                // owned type (odd/tasks/pagos-mercadopago.md A4/A6). IsRequired() because
+                // Payment.TotalAmount is a non-nullable `required` property.
+                entity.OwnsOne(x => x.TotalAmount, money =>
+                {
+                    money.Property(m => m.Amount).HasColumnName("TotalAmount");
+                    money.Property(m => m.Currency).HasColumnName("TotalAmountCurrency");
+                });
+                entity.Navigation(x => x.TotalAmount).IsRequired();
+            });
+
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                // FK-only, no navigation properties, same pattern as every other entity here —
+                // Trip/Passenger/Payment are related tables but this entity never dereferences
+                // them in code (odd/tasks/pagos-mercadopago.md A3).
+                entity.HasOne<Trip>()
+                    .WithMany()
+                    .HasForeignKey(x => x.TripId);
+                entity.HasOne<Passenger>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PassengerId);
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
+            });
+
+            modelBuilder.Entity<Refund>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.OwnsOne(x => x.Amount, money =>
+                {
+                    money.Property(m => m.Amount).HasColumnName("Amount");
+                    money.Property(m => m.Currency).HasColumnName("AmountCurrency");
+                });
+                entity.Navigation(x => x.Amount).IsRequired();
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
+                // Deliberate: references the specific Reservation this refund covers, not just
+                // the Payment — see Refund's own doc comment for why (partial-refund traceability).
                 entity.HasOne<Reservation>()
                     .WithMany()
                     .HasForeignKey(x => x.ReservationId);

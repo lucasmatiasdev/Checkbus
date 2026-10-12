@@ -53,6 +53,11 @@
                 </MudNavLink>
             </AuthorizeView>
         </MudNavMenu>
+        <form method="post" action="/logout" data-enhance="false" class="mt-auto pa-4">
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Logout">
+                Cerrar sesión
+            </MudButton>
+        </form>
     </MudDrawer>
     <MudMainContent>
         @Body

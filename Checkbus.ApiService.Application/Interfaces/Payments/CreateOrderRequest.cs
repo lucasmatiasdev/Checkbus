@@ -8,6 +8,18 @@ namespace Checkbus.ApiService.Application.Interfaces.Payments
     /// resolve a notification back to the right <c>Payment</c>/<c>Reservation</c>s via
     /// <see cref="Checkbus.ApiService.Application.Interfaces.Repositories.IPaymentRepository.GetByExternalOrderIdAsync"/>.
     /// <see cref="PayerEmail"/> is optional — Mercado Pago does not require payer data to create
-    /// an order, Fase C may or may not have it on hand depending on the checkout flow.</summary>
-    public sealed record CreateOrderRequest(Money TotalAmount, string ExternalReference, string? PayerEmail = null);
+    /// an order, Fase C may or may not have it on hand depending on the checkout flow.
+    /// <see cref="SuccessUrl"/>/<see cref="FailureUrl"/>/<see cref="PendingUrl"/> (C5) are the
+    /// buyer-return back-URLs Mercado Pago's own hosted checkout page redirects to once the
+    /// buyer finishes paying there — nullable, not just optional, because
+    /// <c>PublicWebOptions.BaseUrl</c> can legitimately be blank (not provisioned yet), in which
+    /// case the caller must pass null for all three rather than build a broken relative URL.
+    /// </summary>
+    public sealed record CreateOrderRequest(
+        Money TotalAmount,
+        string ExternalReference,
+        string? PayerEmail = null,
+        string? SuccessUrl = null,
+        string? FailureUrl = null,
+        string? PendingUrl = null);
 }

@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Commands;
@@ -158,11 +159,17 @@ public class CreatePublicReservationCommandHandlerTests
         Trip? trip,
         IReadOnlyList<Seat> seats,
         FakeReservationRepository reservationRepository,
-        FakePaymentService? paymentService = null) => new(
+        FakePaymentService? paymentService = null,
+        PublicWebOptions? publicWebOptions = null) => new(
             new FakeTripRepository(trip),
             new FakeSeatRepository(seats),
             reservationRepository,
             paymentService ?? new FakePaymentService(),
+            // Blank BaseUrl by default — matches PublicWebOptions' own permissive/blank-until-
+            // provisioned default, and every pre-existing test in this file that doesn't care
+            // about back-URLs keeps working unchanged (CreatePublicReservationCommandHandler
+            // skips setting them entirely when BaseUrl is blank).
+            publicWebOptions ?? new PublicWebOptions(),
             NullLogger<CreatePublicReservationCommandHandler>.Instance);
 
     private static Trip CreateTrip(Guid vehicleId, TripStatus status = TripStatus.Publicado, decimal price = 15000m) => new()
@@ -516,5 +523,66 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Null(reservationRepository.SavedPayment);
         Assert.Null(reservationRepository.SavedPassengers);
         Assert.Null(reservationRepository.SavedReservations);
+    }
+
+    [Fact]
+    public async Task Handle_NonBlankBaseUrl_BuildsAllThreeBackUrlsFromBaseUrlAndReservationIds()
+    {
+        // C5: all three back-URLs point at the exact same confirmation route/format
+        // TripReservation.razor:268 already uses, keyed by THIS batch's reservation ids (not
+        // known until the handler generates them) — the real assertion is a round-trip against
+        // whatever ids actually got persisted.
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seats = new List<Seat>
+        {
+            new() { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 },
+            new() { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 2 }
+        };
+        var reservationRepository = new FakeReservationRepository([]);
+        var paymentService = new FakePaymentService();
+        var publicWebOptions = new PublicWebOptions { BaseUrl = "https://checkbus.test" };
+
+        var handler = CreateHandler(trip, seats, reservationRepository, paymentService, publicWebOptions);
+
+        await handler.Handle(
+            new CreatePublicReservationCommand
+            {
+                TripId = trip.Id,
+                Passengers = [CreateEntry(seats[0].Id, "1"), CreateEntry(seats[1].Id, "2")]
+            },
+            TestContext.Current.CancellationToken);
+
+        var expectedUrl =
+            $"https://checkbus.test/reservas/confirmacion/{string.Join(",", reservationRepository.SavedReservations!.Select(r => r.Id))}";
+
+        Assert.NotNull(paymentService.ReceivedRequest);
+        Assert.Equal(expectedUrl, paymentService.ReceivedRequest!.SuccessUrl);
+        Assert.Equal(expectedUrl, paymentService.ReceivedRequest!.FailureUrl);
+        Assert.Equal(expectedUrl, paymentService.ReceivedRequest!.PendingUrl);
+    }
+
+    [Fact]
+    public async Task Handle_BlankBaseUrl_SkipsBackUrlsEntirely()
+    {
+        // Defensive posture explicitly required by C5: a blank BaseUrl (not provisioned for
+        // this environment yet) must never produce a broken relative URL sent to Mercado Pago.
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var reservationRepository = new FakeReservationRepository([]);
+        var paymentService = new FakePaymentService();
+
+        var handler = CreateHandler(
+            trip, [seat], reservationRepository, paymentService, new PublicWebOptions { BaseUrl = "" });
+
+        await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(paymentService.ReceivedRequest);
+        Assert.Null(paymentService.ReceivedRequest!.SuccessUrl);
+        Assert.Null(paymentService.ReceivedRequest!.FailureUrl);
+        Assert.Null(paymentService.ReceivedRequest!.PendingUrl);
     }
 }

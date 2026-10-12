@@ -54,6 +54,53 @@ public class MercadoPagoOrderMapperTests
     }
 
     [Fact]
+    public void BuildCreateRequest_WithAllThreeBackUrls_MapsThemUnderConfigOnline()
+    {
+        // C5: back_urls for a type: "online" order live nested under config.online — confirmed
+        // against the installed mercadopago-sdk 2.12.1 assembly (MercadoPago.Client.Order.
+        // OrderOnlineConfigRequest: SuccessUrl/FailureUrl/PendingUrl are plain string props).
+        var request = new CreateOrderRequest(
+            new Money(1500m),
+            "ref",
+            SuccessUrl: "https://checkbus.test/reservas/confirmacion/r1",
+            FailureUrl: "https://checkbus.test/reservas/confirmacion/r1",
+            PendingUrl: "https://checkbus.test/reservas/confirmacion/r1");
+
+        var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
+
+        Assert.NotNull(sdkRequest.Config);
+        Assert.NotNull(sdkRequest.Config!.Online);
+        Assert.Equal("https://checkbus.test/reservas/confirmacion/r1", sdkRequest.Config.Online!.SuccessUrl);
+        Assert.Equal("https://checkbus.test/reservas/confirmacion/r1", sdkRequest.Config.Online.FailureUrl);
+        Assert.Equal("https://checkbus.test/reservas/confirmacion/r1", sdkRequest.Config.Online.PendingUrl);
+    }
+
+    [Fact]
+    public void BuildCreateRequest_WithNoBackUrls_LeavesConfigUnset()
+    {
+        // Never send Mercado Pago an empty-string URL: when none of the three are populated,
+        // Config itself is left null rather than an empty Config.Online shell.
+        var request = new CreateOrderRequest(new Money(1500m), "ref");
+
+        var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
+
+        Assert.Null(sdkRequest.Config);
+    }
+
+    [Fact]
+    public void BuildCreateRequest_WithOnlySuccessUrl_SetsOnlyThatFieldNeverEmptyStrings()
+    {
+        var request = new CreateOrderRequest(new Money(1500m), "ref", SuccessUrl: "https://checkbus.test/ok");
+
+        var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
+
+        Assert.NotNull(sdkRequest.Config?.Online);
+        Assert.Equal("https://checkbus.test/ok", sdkRequest.Config!.Online!.SuccessUrl);
+        Assert.Null(sdkRequest.Config.Online.FailureUrl);
+        Assert.Null(sdkRequest.Config.Online.PendingUrl);
+    }
+
+    [Fact]
     public void ToCreateOrderResult_MapsOrderId()
     {
         var order = new Order { Id = "mp-order-123" };

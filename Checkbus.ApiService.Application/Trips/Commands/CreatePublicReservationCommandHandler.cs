@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
@@ -52,7 +53,17 @@ namespace Checkbus.ApiService.Application.Trips.Commands
     // PendientePago hold has not been paid for yet, so confirming it by email here would be
     // actively wrong. Fase D's PaymentApprovedEvent handler now owns building and sending that
     // email once Mercado Pago's webhook actually confirms payment — this handler no longer
-    // depends on IEventRepository/IEmailService/PublicWebOptions at all.
+    // depends on IEventRepository/IEmailService at all.
+    //
+    // C5: PublicWebOptions IS still a dependency again, but only to build Mercado Pago's
+    // success/failure/pending back-URLs (config.online in the order-create request) — NOT to
+    // send an email. All three outcomes point at the same /reservas/confirmacion/{ids} route
+    // ReservationConfirmation.razor already renders sensibly for every ReservationStatus
+    // (including PendientePago), same route/format TripReservation.razor:268 already uses on
+    // its own synchronous-path redirect. Same defensive posture as every other permissive
+    // options class in this codebase (PublicWebOptions.BaseUrl is blank-by-default, never
+    // throw-if-missing): a blank BaseUrl means skip the back-URLs entirely rather than send
+    // Mercado Pago a broken relative URL.
     public class CreatePublicReservationCommandHandler
         : IRequestHandler<CreatePublicReservationCommand, CreatePublicReservationResultDto>
     {
@@ -60,6 +71,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly ISeatRepository _seatRepository;
         private readonly IReservationRepository _reservationRepository;
         private readonly IPaymentService _paymentService;
+        private readonly PublicWebOptions _publicWebOptions;
         private readonly ILogger<CreatePublicReservationCommandHandler> _logger;
 
         public CreatePublicReservationCommandHandler(
@@ -67,12 +79,14 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             ISeatRepository seatRepository,
             IReservationRepository reservationRepository,
             IPaymentService paymentService,
+            PublicWebOptions publicWebOptions,
             ILogger<CreatePublicReservationCommandHandler> logger)
         {
             _tripRepository = tripRepository;
             _seatRepository = seatRepository;
             _reservationRepository = reservationRepository;
             _paymentService = paymentService;
+            _publicWebOptions = publicWebOptions;
             _logger = logger;
         }
 
@@ -164,12 +178,35 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var paymentId = Guid.NewGuid();
             var totalAmount = new Money(reservations.Sum(r => r.Price));
 
+            // C5: all three outcomes (success/failure/pending) redirect the buyer back to the
+            // same confirmation page, keyed by this batch's reservation ids — same
+            // route/format TripReservation.razor:268 already uses. If BaseUrl is blank
+            // (not provisioned for this environment yet), skip the back-URLs entirely rather
+            // than build a broken relative URL.
+            string? successUrl = null;
+            string? failureUrl = null;
+            string? pendingUrl = null;
+            if (!string.IsNullOrWhiteSpace(_publicWebOptions.BaseUrl))
+            {
+                var reservationIds = string.Join(",", reservations.Select(r => r.Id));
+                var confirmationUrl = $"{_publicWebOptions.BaseUrl}/reservas/confirmacion/{reservationIds}";
+                successUrl = confirmationUrl;
+                failureUrl = confirmationUrl;
+                pendingUrl = confirmationUrl;
+            }
+
             // The whole point of this ordering: nothing is written to our DB until Mercado
             // Pago confirms it opened the order. A failed gateway call
             // (OrderCreationFailedException) propagates untouched — there is nothing to roll
             // back, so it must not be caught/swallowed here.
             var orderResult = await _paymentService.CreateOrderAsync(
-                new CreateOrderRequest(totalAmount, paymentId.ToString()), cancellationToken);
+                new CreateOrderRequest(
+                    totalAmount,
+                    paymentId.ToString(),
+                    SuccessUrl: successUrl,
+                    FailureUrl: failureUrl,
+                    PendingUrl: pendingUrl),
+                cancellationToken);
 
             if (orderResult.CheckoutUrl is null)
             {

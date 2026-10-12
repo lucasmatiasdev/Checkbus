@@ -42,7 +42,41 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
                         new() { Amount = amount }
                     }
                 },
-                Payer = request.PayerEmail is null ? null : new OrderPayerRequest { Email = request.PayerEmail }
+                Payer = request.PayerEmail is null ? null : new OrderPayerRequest { Email = request.PayerEmail },
+                Config = BuildConfig(request)
+            };
+        }
+
+        // C5: back_urls for the Orders API's type: "online" order live nested under
+        // config.online (confirmed against Mercado Pago's own docs). Reflected the installed
+        // mercadopago-sdk 2.12.1 assembly directly (MercadoPago.Client.Order.
+        // OrderOnlineConfigRequest in MercadoPago.dll) to get the exact shape instead of
+        // assuming it: SuccessUrl/FailureUrl/PendingUrl/CallbackUrl/AutoReturnUrl are all plain
+        // string properties — there is NO "AutoReturn" approved/all string switch in this SDK
+        // version, only AutoReturnUrl (itself a URL), so that field is intentionally left unset
+        // here. Never send Mercado Pago an empty-string URL: Config/Config.Online is left null
+        // entirely when none of the three back-URLs are set, and only the actually-populated
+        // ones are assigned when at least one is.
+        private static OrderConfigRequest? BuildConfig(CreateOrderRequest request)
+        {
+            var hasAnyBackUrl =
+                !string.IsNullOrEmpty(request.SuccessUrl) ||
+                !string.IsNullOrEmpty(request.FailureUrl) ||
+                !string.IsNullOrEmpty(request.PendingUrl);
+
+            if (!hasAnyBackUrl)
+            {
+                return null;
+            }
+
+            return new OrderConfigRequest
+            {
+                Online = new OrderOnlineConfigRequest
+                {
+                    SuccessUrl = string.IsNullOrEmpty(request.SuccessUrl) ? null : request.SuccessUrl,
+                    FailureUrl = string.IsNullOrEmpty(request.FailureUrl) ? null : request.FailureUrl,
+                    PendingUrl = string.IsNullOrEmpty(request.PendingUrl) ? null : request.PendingUrl
+                }
             };
         }
 

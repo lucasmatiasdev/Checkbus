@@ -40,10 +40,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<Refund> Refunds => Set<Refund>();
 
-        // Fase D (odd/tasks/pagos-mercadopago.md) — both Infrastructure-only EF-mapped classes
-        // with no Domain/business meaning, see their own doc comments for why.
+        // Fase D (odd/tasks/pagos-mercadopago.md) — Infrastructure-only EF-mapped class with no
+        // Domain/business meaning, see its own doc comment for why.
         public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
-        public DbSet<PaymentReservationLink> PaymentReservationLinks => Set<PaymentReservationLink>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -227,6 +226,12 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Passenger>()
                     .WithMany()
                     .HasForeignKey(x => x.PassengerId);
+                // D7 (odd/tasks/pagos-mercadopago.md): plain 1:N, one Reservation belongs to
+                // exactly one Payment — replaces the PaymentReservationLink join table. Nullable
+                // FK, no navigation property, same posture as TripId/SeatId/PassengerId above.
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
             });
 
             modelBuilder.Entity<BoardingRecord>(entity =>
@@ -298,20 +303,6 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 // The whole point of this table: a given Mercado Pago notification id is
                 // recorded at most once (Fase D3's dedupe guarantee).
                 entity.HasIndex(x => x.ExternalEventId).IsUnique();
-            });
-
-            modelBuilder.Entity<PaymentReservationLink>(entity =>
-            {
-                entity.HasKey(x => x.Id);
-                // One Reservation belongs to exactly one Payment (the inverse of Payment's 1:N
-                // with Reservation) — see PaymentReservationLink's own doc comment.
-                entity.HasIndex(x => x.ReservationId).IsUnique();
-                entity.HasOne<Payment>()
-                    .WithMany()
-                    .HasForeignKey(x => x.PaymentId);
-                entity.HasOne<Reservation>()
-                    .WithMany()
-                    .HasForeignKey(x => x.ReservationId);
             });
         }
     }

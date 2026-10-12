@@ -220,6 +220,9 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Single(reservationRepository.SavedReservations!);
         // The core Fase C behavior change: a hold, not an immediate confirmation.
         Assert.Equal(ReservationStatus.PendientePago, reservationRepository.SavedReservations![0].Status);
+        // D7: each persisted Reservation carries the batch's own Payment.Id.
+        Assert.NotNull(reservationRepository.SavedPayment);
+        Assert.Equal(reservationRepository.SavedPayment!.Id, reservationRepository.SavedReservations![0].PaymentId);
     }
 
     [Fact]
@@ -257,6 +260,8 @@ public class CreatePublicReservationCommandHandlerTests
         {
             Assert.Equal(trip.Price, r.Price);
             Assert.Equal(ReservationStatus.PendientePago, r.Status);
+            // D7: each persisted Reservation carries the batch's own Payment.Id.
+            Assert.Equal(reservationRepository.SavedPayment!.Id, r.PaymentId);
         });
     }
 

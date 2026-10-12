@@ -128,6 +128,12 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new SeatsNoLongerAvailableException();
             }
 
+            // Payment.Id is generated client-side, BEFORE any gateway or DB call, so it can be
+            // handed to Mercado Pago as external_reference up front (Fase C design decision —
+            // see class doc comment) and stamped onto each Reservation below (Fase D7). Fase D's
+            // webhook resolves a notification back to this Payment via that same value.
+            var paymentId = Guid.NewGuid();
+
             var passengers = new List<Passenger>(request.Passengers.Count);
             var reservations = new List<Reservation>(request.Passengers.Count);
             var created = new List<CreatedReservationDto>(request.Passengers.Count);
@@ -156,7 +162,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     Price = trip.Price,
                     // Fase C: a seat hold, not an immediate confirmation — flips to Confirmada
                     // only once Fase D's webhook sees the Mercado Pago order approved.
-                    Status = ReservationStatus.PendientePago
+                    Status = ReservationStatus.PendientePago,
+                    // Fase D7: links this Reservation back to the Payment covering it.
+                    PaymentId = paymentId
                 };
 
                 passengers.Add(passenger);
@@ -171,11 +179,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 });
             }
 
-            // Payment.Id is generated client-side, BEFORE any gateway or DB call, so it can be
-            // handed to Mercado Pago as external_reference up front (Fase C design decision —
-            // see class doc comment). Fase D's webhook resolves a notification back to this
-            // Payment via that same value.
-            var paymentId = Guid.NewGuid();
             var totalAmount = new Money(reservations.Sum(r => r.Price));
 
             // C5: all three outcomes (success/failure/pending) redirect the buyer back to the

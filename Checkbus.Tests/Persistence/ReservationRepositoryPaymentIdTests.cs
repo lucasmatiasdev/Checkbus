@@ -17,13 +17,14 @@ using Microsoft.EntityFrameworkCore;
 namespace Checkbus.Tests.Persistence;
 
 /// <summary>
-/// Proves <see cref="ReservationRepository"/>'s Fase D additions (odd/tasks/pagos-mercadopago.md):
-/// CreateBatchAsync stamps a PaymentReservationLink row per Reservation (the mechanism
-/// GetByPaymentIdAsync is built on, since Reservation itself carries no PaymentId FK — see
-/// PaymentReservationLink's own doc comment), GetByPaymentIdAsync resolves them back regardless
-/// of Status, and ConfirmAsync flips Status to Confirmada.
+/// Proves <see cref="ReservationRepository"/>'s Payment-related behavior
+/// (odd/tasks/pagos-mercadopago.md Fase D, reworked by D7 onto a direct
+/// <see cref="Reservation.PaymentId"/> FK): CreateBatchAsync persists the Reservation batch with
+/// whatever PaymentId each Reservation already carries (set by the caller, same as
+/// CreatePublicReservationCommandHandler does), GetByPaymentIdAsync resolves them back by that FK
+/// regardless of Status, and ConfirmAsync flips Status to Confirmada.
 /// </summary>
-public class ReservationRepositoryPaymentLinkTests
+public class ReservationRepositoryPaymentIdTests
 {
     private static SqliteConnection CreateOpenConnection()
     {
@@ -142,7 +143,7 @@ public class ReservationRepositoryPaymentLinkTests
     };
 
     [Fact]
-    public async Task CreateBatchAsync_StampsPaymentReservationLink_ForEveryReservationInTheBatch()
+    public async Task CreateBatchAsync_PersistsPaymentIdOnEveryReservationInTheBatch()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
@@ -152,12 +153,17 @@ public class ReservationRepositoryPaymentLinkTests
         var (trip, seat1, seat2) = await SeedTripWithTwoSeatsAsync(db, cancellationToken);
         var passenger1 = CreatePassenger();
         var passenger2 = CreatePassenger();
-        var reservation1 = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger1.Id, Price = trip.Price, Status = ReservationStatus.PendientePago };
-        var reservation2 = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat2.Id, PassengerId = passenger2.Id, Price = trip.Price, Status = ReservationStatus.PendientePago };
         var payment = new Payment { Id = Guid.NewGuid(), ExternalOrderId = "mp-order-link", TotalAmount = new Money(3000m), CreatedAt = DateTime.UtcNow };
+        var reservation1 = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger1.Id, Price = trip.Price, Status = ReservationStatus.PendientePago, PaymentId = payment.Id };
+        var reservation2 = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat2.Id, PassengerId = passenger2.Id, Price = trip.Price, Status = ReservationStatus.PendientePago, PaymentId = payment.Id };
 
         var repository = new ReservationRepository(db);
         await repository.CreateBatchAsync(payment, [passenger1, passenger2], [reservation1, reservation2], cancellationToken);
+
+        var reloaded1 = await repository.GetByIdAsync(reservation1.Id, cancellationToken);
+        var reloaded2 = await repository.GetByIdAsync(reservation2.Id, cancellationToken);
+        Assert.Equal(payment.Id, reloaded1!.PaymentId);
+        Assert.Equal(payment.Id, reloaded2!.PaymentId);
 
         var resolved = await repository.GetByPaymentIdAsync(payment.Id, cancellationToken);
         Assert.Equal(2, resolved.Count);
@@ -177,8 +183,8 @@ public class ReservationRepositoryPaymentLinkTests
 
         var (trip, seat1, _) = await SeedTripWithTwoSeatsAsync(db, cancellationToken);
         var passenger = CreatePassenger();
-        var reservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger.Id, Price = trip.Price, Status = ReservationStatus.Cancelada };
         var payment = new Payment { Id = Guid.NewGuid(), TotalAmount = new Money(1500m), CreatedAt = DateTime.UtcNow };
+        var reservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger.Id, Price = trip.Price, Status = ReservationStatus.Cancelada, PaymentId = payment.Id };
 
         var repository = new ReservationRepository(db);
         await repository.CreateBatchAsync(payment, [passenger], [reservation], cancellationToken);
@@ -186,6 +192,33 @@ public class ReservationRepositoryPaymentLinkTests
         var resolved = await repository.GetByPaymentIdAsync(payment.Id, cancellationToken);
         Assert.Single(resolved);
         Assert.Equal(ReservationStatus.Cancelada, resolved[0].Status);
+    }
+
+    [Fact]
+    public async Task GetByPaymentIdAsync_ExcludesReservationsWithNoPaymentIdOrADifferentPayment()
+    {
+        // Pre-existing Reservation rows from before this feature have PaymentId == null — they
+        // must never show up for any Payment. A Reservation belonging to a different Payment
+        // must not leak in either.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var (trip, seat1, seat2) = await SeedTripWithTwoSeatsAsync(db, cancellationToken);
+        var passenger1 = CreatePassenger();
+        var passenger2 = CreatePassenger();
+        var payment = new Payment { Id = Guid.NewGuid(), TotalAmount = new Money(1500m), CreatedAt = DateTime.UtcNow };
+        var otherPayment = new Payment { Id = Guid.NewGuid(), TotalAmount = new Money(1500m), CreatedAt = DateTime.UtcNow };
+        var noPaymentReservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger1.Id, Price = trip.Price, Status = ReservationStatus.Confirmada };
+        var otherPaymentReservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat2.Id, PassengerId = passenger2.Id, Price = trip.Price, Status = ReservationStatus.PendientePago, PaymentId = otherPayment.Id };
+
+        var repository = new ReservationRepository(db);
+        await repository.CreateBatchAsync(payment, [], [], cancellationToken);
+        await repository.CreateBatchAsync(otherPayment, [passenger1, passenger2], [noPaymentReservation, otherPaymentReservation], cancellationToken);
+
+        var resolved = await repository.GetByPaymentIdAsync(payment.Id, cancellationToken);
+        Assert.Empty(resolved);
     }
 
     [Fact]
@@ -198,8 +231,8 @@ public class ReservationRepositoryPaymentLinkTests
 
         var (trip, seat1, _) = await SeedTripWithTwoSeatsAsync(db, cancellationToken);
         var passenger = CreatePassenger();
-        var reservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger.Id, Price = trip.Price, Status = ReservationStatus.PendientePago };
         var payment = new Payment { Id = Guid.NewGuid(), TotalAmount = new Money(1500m), CreatedAt = DateTime.UtcNow };
+        var reservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = seat1.Id, PassengerId = passenger.Id, Price = trip.Price, Status = ReservationStatus.PendientePago, PaymentId = payment.Id };
 
         var repository = new ReservationRepository(db);
         await repository.CreateBatchAsync(payment, [passenger], [reservation], cancellationToken);

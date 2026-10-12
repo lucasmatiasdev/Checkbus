@@ -16,5 +16,11 @@ namespace Checkbus.ApiService.Domain.Entities.Reservations
         public required Guid PassengerId { get; set; }
         public required decimal Price { get; set; }
         public ReservationStatus Status { get; set; } = ReservationStatus.Confirmada;
+
+        // Fase D (odd/tasks/pagos-mercadopago.md) added Payment; nullable because every
+        // Reservation row that existed before this feature has none, and Reservation itself
+        // predates Payment in this codebase's history. FK-only, no navigation property, same
+        // posture as every other relationship on this entity.
+        public Guid? PaymentId { get; set; }
     }
 }

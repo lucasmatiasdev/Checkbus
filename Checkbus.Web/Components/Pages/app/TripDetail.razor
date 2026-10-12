@@ -39,6 +39,17 @@
             }
         </MudStack>
 
+        @if (trip.Status == WebTripStatus.Publicado)
+        {
+            <MudPaper Elevation="0" Class="pa-4 mb-6" Style="background-color: var(--mud-palette-background-grey);">
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Link público para compartir</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudTextField T="string" Value="@PublicReservationUrl" ReadOnly="true" Variant="Variant.Outlined" FullWidth="true" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Primary" OnClick="CopyPublicUrlToClipboard" />
+                </MudStack>
+            </MudPaper>
+        }
+
         @if (publishErrorMessage is not null)
         {
             <MudAlert Severity="Severity.Error" Class="mb-4">@publishErrorMessage</MudAlert>
@@ -111,7 +122,14 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = default!;
+
     private TripDetailResponse? trip;
+    private string PublicReservationUrl => NavigationManager.ToAbsoluteUri($"/reservar/{Id}").ToString();
     private bool isLoading = true;
     private string? errorMessage;
     private bool isPublishing;
@@ -145,6 +163,14 @@
         {
             isLoading = false;
         }
+    }
+
+    private async Task CopyPublicUrlToClipboard()
+    {
+        // navigator.clipboard is a built-in browser API — invoked directly via IJSRuntime
+        // rather than adding a new .js interop module for a single one-line call.
+        await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", PublicReservationUrl);
+        Snackbar.Add("Link copiado.", Severity.Success);
     }
 
     private async Task HandlePublish()

@@ -32,7 +32,7 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PublicReservationsController", "PublicTripsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
+        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PaymentsWebhookController", "PublicReservationsController", "PublicTripsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
     }
 
     [Fact]
@@ -46,6 +46,6 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController.Login", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap"], anonymousActions);
+        Assert.Equal(["AuthController.Login", "PaymentsWebhookController.Receive", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap"], anonymousActions);
     }
 }

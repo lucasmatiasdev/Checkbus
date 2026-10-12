@@ -4,6 +4,7 @@ using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
+using Checkbus.ApiService.Infrastructure.Implementations.Payments;
 using Checkbus.ApiService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -46,6 +47,20 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             _context.Payments.Add(payment);
             _context.Passengers.AddRange(passengers);
             _context.Reservations.AddRange(reservations);
+
+            // Fase D (odd/tasks/pagos-mercadopago.md) needs to resolve this batch's Reservations
+            // back from the Payment later (webhook processing) — Reservation itself carries no
+            // PaymentId FK. One link row per Reservation in the batch, saved in the same
+            // SaveChangesAsync call below so it is exactly as atomic as the rest of this batch.
+            // See PaymentReservationLink's own doc comment for why this link table exists.
+            _context.PaymentReservationLinks.AddRange(
+                reservations.Select(r => new PaymentReservationLink
+                {
+                    Id = Guid.NewGuid(),
+                    PaymentId = payment.Id,
+                    ReservationId = r.Id
+                }));
+
             await _context.SaveChangesAsync(cancellationToken);
         }
 
@@ -60,6 +75,28 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 ?? throw new ReservationNotFoundException();
 
             reservation.Status = ReservationStatus.Cancelada;
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Fase D: resolves every Reservation linked to this Payment via PaymentReservationLink
+        // (see that class's own doc comment), regardless of Status.
+        public async Task<IReadOnlyList<Reservation>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
+        {
+            return await _context.PaymentReservationLinks
+                .Where(l => l.PaymentId == paymentId)
+                .Join(_context.Reservations, l => l.ReservationId, r => r.Id, (l, r) => r)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Fase D's approved-webhook path — mirror image of CancelAsync above.
+        public async Task ConfirmAsync(Guid reservationId, CancellationToken cancellationToken)
+        {
+            var reservation = await _context.Reservations
+                .FirstOrDefaultAsync(r => r.Id == reservationId, cancellationToken)
+                ?? throw new ReservationNotFoundException();
+
+            reservation.Status = ReservationStatus.Confirmada;
 
             await _context.SaveChangesAsync(cancellationToken);
         }

@@ -55,5 +55,28 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // resolve — defensive, not a business rule: the handler already resolved it once
         // before calling this.
         Task CancelAsync(Guid reservationId, CancellationToken cancellationToken);
+
+        // Added for Fase D (odd/tasks/pagos-mercadopago.md): resolves every Reservation
+        // belonging to one Payment (1 Payment : N Reservation, batch purchase), regardless of
+        // Status — unlike GetByTripIdAsync, this does NOT exclude Cancelada, because the
+        // webhook handler needs to see a Cancelada row to detect the orphaned-approval case
+        // (the hold was already released before the approval notification arrived). Reservation
+        // itself carries no PaymentId FK (Fase A/B/C never needed that direction) — see
+        // PaymentReservationLink's own doc comment for why this is backed by a link table
+        // instead of a new column on Reservation/a change to CreatePublicReservationCommandHandler.
+        //
+        // Default body throws so the ~9 existing Fake IReservationRepository test doubles
+        // elsewhere in this codebase (none of which exercise Fase D) do not need to be touched
+        // just to add a method they never call — only ReservationRepository and this Fase's own
+        // new fakes override it. Relies on C# default interface implementations; callers must
+        // go through the interface type (every production caller already does, via DI).
+        Task<IReadOnlyList<Reservation>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("GetByPaymentIdAsync is not implemented by this IReservationRepository.");
+
+        // Added for Fase D's approved-webhook path: the mirror image of CancelAsync above,
+        // flips Status to Confirmada. Same thin-persistence, no-business-rule-checks posture;
+        // same default-body reasoning as GetByPaymentIdAsync above.
+        Task ConfirmAsync(Guid reservationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("ConfirmAsync is not implemented by this IReservationRepository.");
     }
 }

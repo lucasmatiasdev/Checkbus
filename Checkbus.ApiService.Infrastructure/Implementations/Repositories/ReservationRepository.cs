@@ -86,5 +86,30 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        // Fase E: lazy, idempotent release of unpaid holds — see IReservationRepository's doc
+        // comment. Same "check first, only write if something actually needs it" shape as
+        // SeatRepository.EnsureSeatsForVehicleAsync/BoardingRecordRepository.EnsureForTripAsync.
+        public async Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
+
+            var expiredHolds = await _context.Reservations
+                .Where(r => r.TripId == tripId && r.Status == ReservationStatus.PendientePago && r.CreatedAt < cutoff)
+                .ToListAsync(cancellationToken);
+
+            if (expiredHolds.Count == 0)
+            {
+                // Idempotent no-op read — nothing has expired for this Trip.
+                return;
+            }
+
+            foreach (var reservation in expiredHolds)
+            {
+                reservation.Status = ReservationStatus.Cancelada;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

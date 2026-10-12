@@ -83,7 +83,11 @@ public class CreatePublicReservationCommandHandlerTests
         public List<Reservation>? SavedReservations { get; private set; }
 
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<Reservation>>(existingReservations.Where(r => r.TripId == tripId).ToList());
+            // Excludes Cancelada, matching ReservationRepository's real contract — needed so a
+            // hold just released by ReleaseExpiredHoldsAsync below correctly stops blocking the
+            // pre-check in the same Handle() call.
+            => Task.FromResult<IReadOnlyList<Reservation>>(
+                existingReservations.Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada).ToList());
 
         public Task CreateBatchAsync(
             Payment payment,
@@ -112,6 +116,23 @@ public class CreatePublicReservationCommandHandlerTests
 
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        // Fase E: mirrors ReservationRepository.ReleaseExpiredHoldsAsync's real behavior
+        // in-memory against existingReservations — see
+        // GetPublicTripSeatMapQueryHandlerTests' identical fake for rationale. Lets this
+        // handler's own tests prove an expired hold is released before the
+        // "already reserved" pre-check runs, freeing the seat for a new attempt.
+        public Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
+            foreach (var reservation in existingReservations.Where(r =>
+                r.TripId == tripId && r.Status == ReservationStatus.PendientePago && r.CreatedAt < cutoff))
+            {
+                reservation.Status = ReservationStatus.Cancelada;
+            }
+
+            return Task.CompletedTask;
+        }
     }
 
     // Fake IPaymentService — same public-list-for-assertions, NotSupportedException-for-unused
@@ -362,6 +383,68 @@ public class CreatePublicReservationCommandHandlerTests
             handler.Handle(
                 new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
                 TestContext.Current.CancellationToken));
+    }
+
+    // Fase E (odd/tasks/pagos-mercadopago.md): an expired PendientePago hold on the requested
+    // seat must be released BEFORE the "already reserved" pre-check runs, so the new attempt
+    // succeeds instead of being wrongly rejected.
+    [Fact]
+    public async Task Handle_ExistingHoldExpired_ReleasesItAndSucceedsOnSameSeat()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var expiredHold = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = Guid.NewGuid(),
+            Price = trip.Price,
+            Status = ReservationStatus.PendientePago,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-20)
+        };
+        var reservationRepository = new FakeReservationRepository([expiredHold]);
+
+        var handler = CreateHandler(trip, [seat], reservationRepository);
+
+        var result = await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ReservationStatus.Cancelada, expiredHold.Status);
+        Assert.Single(result.Reservations);
+        Assert.NotNull(reservationRepository.SavedReservations);
+        Assert.Equal(ReservationStatus.PendientePago, reservationRepository.SavedReservations![0].Status);
+    }
+
+    // The mirror case: a hold still inside the window must keep blocking the seat, same as
+    // Handle_SeatAlreadyReserved_PreCheckThrowsSeatsNoLongerAvailable above but explicit about
+    // the age boundary.
+    [Fact]
+    public async Task Handle_ExistingHoldNotExpired_StillBlocksSeat()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var freshHold = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = Guid.NewGuid(),
+            Price = trip.Price,
+            Status = ReservationStatus.PendientePago,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+        };
+
+        var handler = CreateHandler(trip, [seat], new FakeReservationRepository([freshHold]));
+
+        await Assert.ThrowsAsync<SeatsNoLongerAvailableException>(() =>
+            handler.Handle(
+                new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+                TestContext.Current.CancellationToken));
+        Assert.Equal(ReservationStatus.PendientePago, freshHold.Status);
     }
 
     [Fact]

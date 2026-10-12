@@ -78,5 +78,29 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // same default-body reasoning as GetByPaymentIdAsync above.
         Task ConfirmAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("ConfirmAsync is not implemented by this IReservationRepository.");
+
+        // Added for Fase E (odd/tasks/pagos-mercadopago.md): the lazy, idempotent release of
+        // unpaid holds — same convention as ISeatRepository.EnsureSeatsForVehicleAsync /
+        // IBoardingRecordRepository.EnsureForTripAsync (backfill/clean up state the next time
+        // something reads it, no background job). Scoped by TripId, same as GetByTripIdAsync,
+        // because every call site (the two seat-map query handlers and
+        // CreatePublicReservationCommandHandler) only ever needs this for one Trip at a time.
+        // Flips every still-PendientePago Reservation on this Trip whose CreatedAt is older
+        // than holdExpirationMinutes to Cancelada, in one SaveChangesAsync call — a no-op read
+        // (no write at all) when nothing has actually expired, matching
+        // EnsureSeatsForVehicleAsync's exact "check first, only write if needed" shape.
+        // holdExpirationMinutes is supplied by the caller (CreatePublicReservationCommandHandler
+        // .HoldExpirationMinutes), not hardcoded here — this method stays thin persistence,
+        // the same "caller owns the policy number" split EnsureSeatsForVehicleAsync's own
+        // capacity parameter already uses. Deliberately does NOT touch Payment — releasing a
+        // hold only ever flips the Reservation's own Status; an approval arriving later for an
+        // already-released hold is Fase D's orphaned-payment auto-refund path, which this
+        // method does not need to know exists.
+        //
+        // Default body throws, same reasoning as GetByPaymentIdAsync/ConfirmAsync above: only
+        // ReservationRepository and the Fake test doubles that actually exercise this call
+        // path need to override it.
+        Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
+            => throw new NotSupportedException("ReleaseExpiredHoldsAsync is not implemented by this IReservationRepository.");
     }
 }

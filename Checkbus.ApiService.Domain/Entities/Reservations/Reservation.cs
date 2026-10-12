@@ -22,5 +22,13 @@ namespace Checkbus.ApiService.Domain.Entities.Reservations
         // predates Payment in this codebase's history. FK-only, no navigation property, same
         // posture as every other relationship on this entity.
         public Guid? PaymentId { get; set; }
+
+        // Fase E (odd/tasks/pagos-mercadopago.md) added this to compute hold age for lazy
+        // expiration of unpaid PendientePago rows — no such timestamp existed on this entity
+        // before. Defaulted (not required) so every pre-existing object-initializer call site
+        // across this codebase keeps compiling unchanged; the default evaluates at
+        // construction time, giving each new Reservation its real creation instant exactly
+        // like letting the DB default a CreatedAt column would.
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

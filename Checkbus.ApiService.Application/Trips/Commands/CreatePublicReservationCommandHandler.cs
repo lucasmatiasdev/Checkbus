@@ -67,6 +67,17 @@ namespace Checkbus.ApiService.Application.Trips.Commands
     public class CreatePublicReservationCommandHandler
         : IRequestHandler<CreatePublicReservationCommand, CreatePublicReservationResultDto>
     {
+        // Hardcoded, not external config — same reasoning
+        // CancelReservationCommandHandler.CancellationWindowHours already uses (Fase 1 R6's
+        // 20/min rate-limit number): no measured traffic/business data yet to justify making
+        // this configurable. 15 minutes is the de-facto industry default for "time to
+        // complete an external checkout redirect" (odd/tasks/pagos-mercadopago.md Fase E,
+        // user-confirmed no stronger preference). Lives here (not a new shared file) for the
+        // same reason CancellationWindowHours lives on the handler that most directly owns the
+        // policy — GetPublicTripSeatMapQueryHandler/GetTripSeatMapQueryHandler reference this
+        // same constant by name rather than duplicating the number.
+        public const int HoldExpirationMinutes = 15;
+
         private readonly ITripRepository _tripRepository;
         private readonly ISeatRepository _seatRepository;
         private readonly IReservationRepository _reservationRepository;
@@ -118,6 +129,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                         "One or more selected seats do not belong to this trip.");
                 }
             }
+
+            // Fase E: lazily release any PendientePago hold on this Trip that is older than
+            // HoldExpirationMinutes, before the pre-check below reads current reservations —
+            // same "clean up state the next time something reads it" convention as
+            // ISeatRepository.EnsureSeatsForVehicleAsync, applied so an abandoned checkout
+            // doesn't block a brand-new booking attempt on the same seat.
+            await _reservationRepository.ReleaseExpiredHoldsAsync(trip.Id, HoldExpirationMinutes, cancellationToken);
 
             // Fast pre-check (not the real guarantee, see class doc comment): reject early if
             // any requested seat already has a Reservation for this Trip.

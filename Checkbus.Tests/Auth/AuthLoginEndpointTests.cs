@@ -1,9 +1,12 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Aspire.Hosting;
+using Checkbus.Tests.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace Checkbus.Tests.Auth;
 
+[Collection(AspireE2ECollection.Name)]
 public class AuthLoginEndpointTests
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
@@ -13,7 +16,7 @@ public class AuthLoginEndpointTests
     private const string SeededEmail = "admin@checkbus.dev";
     private const string SeededPassword = "Admin123!";
 
-    private static async Task<HttpClient> CreateApiClientAsync(CancellationToken cancellationToken)
+    private static async Task<DistributedApplication> CreateApiHostAsync(CancellationToken cancellationToken)
     {
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Checkbus_AppHost>(cancellationToken);
         appHost.Services.AddLogging(logging =>
@@ -31,14 +34,15 @@ public class AuthLoginEndpointTests
         await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
         await app.ResourceNotifications.WaitForResourceHealthyAsync("apiservice", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
 
-        return app.CreateHttpClient("apiservice");
+        return app;
     }
 
     [Fact]
     public async Task Login_MalformedEmail_Returns400WithFieldError()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         var response = await httpClient.PostAsJsonAsync(
             "/api/auth/login",
@@ -55,7 +59,8 @@ public class AuthLoginEndpointTests
     public async Task Login_EmptyPassword_Returns400WithFieldError()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         var response = await httpClient.PostAsJsonAsync(
             "/api/auth/login",
@@ -76,7 +81,8 @@ public class AuthLoginEndpointTests
         // password now reaches IPasswordHasher.Verify and fails authentication
         // instead of being rejected by FluentValidation.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         var response = await httpClient.PostAsJsonAsync(
             "/api/auth/login",
@@ -90,7 +96,8 @@ public class AuthLoginEndpointTests
     public async Task Login_UnknownEmailAndWrongPassword_ReturnByteIdentical401()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         var unknownResponse = await httpClient.PostAsJsonAsync(
             "/api/auth/login",
@@ -113,7 +120,8 @@ public class AuthLoginEndpointTests
     public async Task Login_ValidCredentials_Returns200WithTokenAndUserFields()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         var response = await httpClient.PostAsJsonAsync(
             "/api/auth/login",

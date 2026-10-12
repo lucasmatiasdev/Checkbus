@@ -43,5 +43,16 @@ namespace Checkbus.ApiService.Controllers
             var result = await _mediator.Send(new GetTripQuery { Id = id }, cancellationToken);
             return Ok(result);
         }
+
+        // Not a full resource replace (PUT) — a narrow explicit status transition, same REST
+        // shape idea as MaintenanceRecordsController.Update but POST-with-204 since this isn't
+        // replacing the Trip's fields, only flipping its lifecycle status.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpPost("{id:guid}/publish")]
+        public async Task<IActionResult> Publish(Guid id, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(new PublishTripCommand { Id = id }, cancellationToken);
+            return NoContent();
+        }
     }
 }

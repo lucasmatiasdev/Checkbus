@@ -10,6 +10,11 @@ namespace Checkbus.ApiService.Application.Events.Queries
         public DateTime Date { get; set; }
         public required LocationDto Location { get; set; }
 
+        // Deliberately NOT the raw ImageKey — same reasoning as VehicleDocumentResponse never
+        // exposing FileKey: it's an opaque storage key, not meant to leave the server. A consumer
+        // that wants the image fetches GET api/Events/{id}/image directly when HasImage is true.
+        public bool HasImage { get; set; }
+
         // Nested rather than a flat set of Location* fields — same shape choice as
         // VehicleDiagnosticDto/ComponentDiagnosticDto's parent/child DTO nesting.
         public class LocationDto

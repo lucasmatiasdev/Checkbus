@@ -1,7 +1,9 @@
+using Checkbus.Tests.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace Checkbus.Tests;
 
+[Collection(AspireE2ECollection.Name)]
 public class WebTests
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);

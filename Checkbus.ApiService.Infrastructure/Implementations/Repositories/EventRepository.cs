@@ -25,9 +25,17 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             return _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
 
-        public async Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public async Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
         {
-            return await _context.Events.ToListAsync(cancellationToken);
+            return await _context.Events
+                .Where(e => e.OrganizationId == organizationId)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task UpdateAsync(Event @event, CancellationToken cancellationToken)
+        {
+            _context.Events.Update(@event);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

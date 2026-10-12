@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Events.Queries;
+using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using MediatR;
@@ -9,15 +10,25 @@ namespace Checkbus.ApiService.Application.Events.Commands
     {
         private readonly ILocationRepository _locationRepository;
         private readonly IEventRepository _eventRepository;
+        private readonly ICurrentUserService _currentUser;
 
-        public CreateEventCommandHandler(ILocationRepository locationRepository, IEventRepository eventRepository)
+        public CreateEventCommandHandler(
+            ILocationRepository locationRepository,
+            IEventRepository eventRepository,
+            ICurrentUserService currentUser)
         {
             _locationRepository = locationRepository;
             _eventRepository = eventRepository;
+            _currentUser = currentUser;
         }
 
         public async Task<EventDto> Handle(CreateEventCommand request, CancellationToken cancellationToken)
         {
+            // Tenant comes exclusively from the validated claim — the command has no
+            // OrganizationId field, so no request body value can ever influence it.
+            var organizationId = _currentUser.OrganizationId
+                ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
+
             // Dedupe by PlaceId first (shared Location catalog) — reuse the existing row when
             // the same real-world place was already picked for a previous Event/Trip, otherwise
             // create a new one. Event+Location is not an atomic aggregate (unlike Trip+Route+
@@ -53,6 +64,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 // meaning, so it's tagged Utc rather than converted.
                 Date = DateTime.SpecifyKind(request.Date, DateTimeKind.Utc),
                 LocationId = location.Id,
+                OrganizationId = organizationId,
                 CreatedAt = createdAt,
                 UpdatedAt = createdAt
             };
@@ -65,6 +77,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 Name = @event.Name,
                 Type = @event.Type,
                 Date = @event.Date,
+                HasImage = false, // a freshly created Event never has an image yet
                 Location = new EventDto.LocationDto
                 {
                     Name = location.Name,

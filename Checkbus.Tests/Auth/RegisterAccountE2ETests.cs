@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Aspire.Hosting;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.Tests.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace Checkbus.Tests.Auth;
@@ -17,6 +19,7 @@ namespace Checkbus.Tests.Auth;
 /// ordinary role-gated endpoint), the self-service change-password 204 happy path
 /// (deferred from <c>ChangePasswordTests</c>), and the flag clearing end to end.
 /// </summary>
+[Collection(AspireE2ECollection.Name)]
 public class RegisterAccountE2ETests
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
@@ -25,7 +28,7 @@ public class RegisterAccountE2ETests
     private const string SeededAdminEmail = "admin@checkbus.dev";
     private const string SeededAdminPassword = "Admin123!";
 
-    private static async Task<HttpClient> CreateApiClientAsync(CancellationToken cancellationToken)
+    private static async Task<DistributedApplication> CreateApiHostAsync(CancellationToken cancellationToken)
     {
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Checkbus_AppHost>(cancellationToken);
         appHost.Services.AddLogging(logging =>
@@ -43,7 +46,7 @@ public class RegisterAccountE2ETests
         await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
         await app.ResourceNotifications.WaitForResourceHealthyAsync("apiservice", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
 
-        return app.CreateHttpClient("apiservice");
+        return app;
     }
 
     private static async Task<(JsonElement Body, string Token)> LoginAsync(
@@ -66,7 +69,8 @@ public class RegisterAccountE2ETests
     public async Task RegisterLoginChangePassword_FullRoundTrip_Succeeds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var httpClient = await CreateApiClientAsync(cancellationToken);
+        await using var app = await CreateApiHostAsync(cancellationToken);
+        var httpClient = app.CreateHttpClient("apiservice");
 
         // 0. Regression guard, end to end: the seeded admin reports mustChangePassword:
         //    false (the CLR-default proven at the entity level in task 4.4; here as a

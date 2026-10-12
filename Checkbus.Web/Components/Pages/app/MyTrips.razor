@@ -1,0 +1,108 @@
+@page "/my-trips"
+@attribute [Authorize(Roles = "Chofer")]
+@using Checkbus.Web.Features.Boarding.Services
+@using Checkbus.Web.Features.Trips.Contracts
+
+<PageTitle>Checkbus - Mis Viajes</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Mis Viajes
+    </MudText>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else if (trips.Count == 0)
+        {
+            <MudText Typo="Typo.body1">No tenés viajes publicados asignados.</MudText>
+        }
+        else
+        {
+            <MudDataGrid T="TripResponse" Items="@trips" RowClick="@HandleRowClick">
+                <Columns>
+                    <TemplateColumn Title="Evento">
+                        <CellTemplate>
+                            @(context.Item.EventName ?? "-")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Vehículo">
+                        <CellTemplate>
+                            @(context.Item.VehiclePatent is null
+                                ? "-"
+                                : $"{context.Item.VehiclePatent} ({context.Item.VehicleBrand} {context.Item.VehicleModel})")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Salida">
+                        <CellTemplate>
+                            @context.Item.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Llegada">
+                        <CellTemplate>
+                            @context.Item.ArrivalDate.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/my-trips/{context.Item.Id}/boarding"))">
+                                Embarque
+                            </MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private BoardingClient BoardingClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private IReadOnlyList<TripResponse> trips = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var outcome = await BoardingClient.GetMyTripsAsync();
+
+            switch (outcome)
+            {
+                case DriverTripsOutcome.Success success:
+                    trips = success.Trips;
+                    errorMessage = null;
+                    break;
+
+                case DriverTripsOutcome.Forbidden:
+                case DriverTripsOutcome.TransportError:
+                    errorMessage = "No pudimos cargar tus viajes.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void HandleRowClick(DataGridRowClickEventArgs<TripResponse> args)
+    {
+        NavigationManager.NavigateTo($"/my-trips/{args.Item.Id}/boarding");
+    }
+}

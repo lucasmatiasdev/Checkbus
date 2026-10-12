@@ -1,6 +1,12 @@
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Enums;
-using Checkbus.Web.Contracts;
+using Checkbus.Web.Features.Boarding.Contracts;
+using Checkbus.Web.Features.DriverRequirements.Contracts;
+using Checkbus.Web.Features.Events.Contracts;
+using Checkbus.Web.Features.MaintenanceRecords.Contracts;
+using Checkbus.Web.Features.Trips.Contracts;
+using Checkbus.Web.Features.Users.Contracts;
+using Checkbus.Web.Features.VehicleDiagnostics.Contracts;
 
 namespace Checkbus.Tests.Users;
 
@@ -80,6 +86,18 @@ public class WebContractEnumParityTests
     public void WebStopType_StaysNumericallyInSyncWith_RealStopType()
     {
         AssertEnumParity<StopType, WebStopType>();
+    }
+
+    [Fact]
+    public void WebBoardingStatus_StaysNumericallyInSyncWith_RealBoardingStatus()
+    {
+        AssertEnumParity<BoardingStatus, WebBoardingStatus>();
+    }
+
+    [Fact]
+    public void WebValidationMethod_StaysNumericallyInSyncWith_RealValidationMethod()
+    {
+        AssertEnumParity<ValidationMethod, WebValidationMethod>();
     }
 
     private static void AssertEnumParity<TReal, TWeb>()

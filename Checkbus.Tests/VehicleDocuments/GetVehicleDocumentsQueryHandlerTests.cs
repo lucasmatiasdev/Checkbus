@@ -20,7 +20,7 @@ public class GetVehicleDocumentsQueryHandlerTests
         public Task<IReadOnlyList<Vehicle>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetVehicleDocumentsQueryHandler.");
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetVehicleDocumentsQueryHandler.");
     }
 

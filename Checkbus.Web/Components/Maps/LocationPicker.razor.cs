@@ -1,4 +1,4 @@
-using Checkbus.Web.Models;
+using Checkbus.Web.Shared.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

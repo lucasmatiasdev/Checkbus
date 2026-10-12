@@ -1,11 +1,13 @@
 using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
+using Checkbus.ApiService.Infrastructure.Implementations.Email;
 using Checkbus.ApiService.Infrastructure.Implementations.Maps;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
@@ -15,10 +17,12 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +52,22 @@ builder.Services.AddHttpClient<IDirectionsService, GoogleDirectionsService>(clie
     client.BaseAddress = new Uri("https://maps.googleapis.com/");
 });
 
+// Email binds permissively too: the real Brevo SMTP credentials have not been provisioned yet
+// (added later via dotnet user-secrets), so a missing section/values must not fail startup.
+var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
+    ?? new EmailOptions();
+
+builder.Services.AddSingleton(emailOptions);
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
+// The Web app's externally-reachable base URL, used to build links embedded in outgoing
+// emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
+// on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
+builder.Services.AddSingleton(new PublicWebOptions
+{
+    BaseUrl = builder.Configuration["PublicWebBaseUrl"] ?? string.Empty
+});
+
 builder.Services.AddScoped<IPasswordHasher, IdentityPasswordHasher>();
 builder.Services.AddScoped<IJwtGenerator, JwtGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -60,6 +80,10 @@ builder.Services.AddScoped<IVehicleDiagnosticRepository, VehicleDiagnosticReposi
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<ITripRepository, TripRepository>();
+builder.Services.AddScoped<ISeatRepository, SeatRepository>();
+builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
+builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
+builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {
@@ -91,6 +115,35 @@ builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// Rate limiting (odd/tasks/reservas-publicas.md R6). Scoped tightly to the project's public,
+// unauthenticated surface only (PublicTripsController/PublicReservationsController, via
+// [EnableRateLimiting] on those controllers) — deliberately NOT a global DefaultPolicy, the
+// same "not a blanket opt-out" principle R3-R5 applied to [AllowAnonymous]. Every authenticated
+// staff endpoint is unaffected: no policy is attached to it, so no limiter ever runs for it.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Partitioned per caller IP, sliding window. 20 requests/minute/IP: generous enough for a
+    // genuine family-of-3 visitor (a few seat-map loads/refreshes while picking seats, plus one
+    // batch submit, well under 20 in a minute) while still shutting down a seat-scraping or
+    // reservation-spam script long before it can meaningfully exhaust seats or data. Not a hard
+    // number from measured traffic (none exists yet for a brand-new public surface) — a
+    // deliberately conservative starting point, easy to retune later from real usage.
+    options.AddPolicy("public-reservations", httpContext =>
+    {
+        var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(remoteIp, _ => new SlidingWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 4,
+            PermitLimit = 20,
+            QueueLimit = 0,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+        });
+    });
+});
+
 builder.Services.AddControllers(options => options.Filters.Add(new AuthorizeFilter()));
 
 // Add services to the container.
@@ -102,6 +155,8 @@ builder.Services.AddExceptionHandler<VehicleExceptionHandler>();
 builder.Services.AddExceptionHandler<VehicleDocumentExceptionHandler>();
 builder.Services.AddExceptionHandler<MaintenanceRecordExceptionHandler>();
 builder.Services.AddExceptionHandler<TripExceptionHandler>();
+builder.Services.AddExceptionHandler<ReservationExceptionHandler>();
+builder.Services.AddExceptionHandler<BoardingExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -136,6 +191,7 @@ app.MapDefaultEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 

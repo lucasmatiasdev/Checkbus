@@ -1,8 +1,10 @@
 @page "/vehicles/new"
 @attribute [Authorize(Roles = "Administrador")]
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Models
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.Users.Services
+@using Checkbus.Web.Features.Vehicles.Contracts
+@using Checkbus.Web.Features.Vehicles.Models
+@using Checkbus.Web.Features.Vehicles.Services
 
 <PageTitle>Checkbus - Registrar vehículo</PageTitle>
 

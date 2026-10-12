@@ -35,6 +35,10 @@
                     <MudIcon Icon="@Icons.Material.Filled.FolderShared" />
                     Mis Documentos
                 </MudNavLink>
+                <MudNavLink Href="/my-trips" Match="NavLinkMatch.All">
+                    <MudIcon Icon="@Icons.Material.Filled.DirectionsBus" />
+                    Mis Viajes
+                </MudNavLink>
             </AuthorizeView>
             <AuthorizeView Roles="Mecanico,Administrador">
                 <MudNavLink Href="/maintenance" Match="NavLinkMatch.All">

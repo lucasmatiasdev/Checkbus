@@ -7,6 +7,6 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         Task<Vehicle?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
         Task AddAsync(Vehicle vehicle, CancellationToken cancellationToken);
         Task<IReadOnlyList<Vehicle>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
-        Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken);
+        Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken);
     }
 }

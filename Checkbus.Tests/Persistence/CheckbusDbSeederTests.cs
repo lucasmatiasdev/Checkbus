@@ -11,6 +11,8 @@ public class CheckbusDbSeederTests
 {
     private const string SeededAdminEmail = "admin@checkbus.dev";
     private const string DemoOrganizationSlug = "checkbus-demo";
+    private const string BrahmanAdminEmail = "admin@brahman.dev";
+    private const string BrahmanOrganizationSlug = "brahman";
 
     private static SqliteConnection CreateOpenConnection()
     {
@@ -54,6 +56,21 @@ public class CheckbusDbSeederTests
         // for any user not created through the registration flow, including the
         // seeded admin — no initializer on User.MustChangePassword relies on this.
         Assert.False(adminUser.MustChangePassword);
+    }
+
+    [Fact]
+    public void Seed_FreshDatabase_CreatesBrahmanOrganizationAndAdminUserWithAdministradorRole()
+    {
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        CheckbusDbSeeder.Seed(db, isPopulated: false);
+
+        var organization = db.Organizations.Single(o => o.Slug == BrahmanOrganizationSlug);
+        var adminUser = db.Users.Single(u => u.Email == BrahmanAdminEmail);
+        Assert.Equal(Role.Administrador, adminUser.Role);
+        Assert.Equal(organization.Id, adminUser.OrganizationId);
     }
 
     [Fact]

@@ -133,4 +133,30 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    // ---- Publish (POST {id}/publish) ----
+    // No request body/query parameters to craft a 400 shortcut with (unlike Create) — same
+    // established convention as GetAll/GetById, only 401/403 are proven here.
+
+    [Fact]
+    public async Task Publish_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsync($"{BasePath}/{Guid.NewGuid()}/publish", null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Mecanico)]
+    public async Task Publish_DisallowedRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+
+        var response = await client.PostAsync($"{BasePath}/{Guid.NewGuid()}/publish", null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

@@ -1,8 +1,18 @@
 using Checkbus.Web;
 using Checkbus.Web.Components;
 using Checkbus.Web.Extensions;
-using Checkbus.Web.Models;
-using Checkbus.Web.Services;
+using Checkbus.Web.Features.Boarding.Services;
+using Checkbus.Web.Features.DriverRequirements.Services;
+using Checkbus.Web.Features.Events.Services;
+using Checkbus.Web.Features.MaintenanceRecords.Services;
+using Checkbus.Web.Features.PublicReservations.Services;
+using Checkbus.Web.Features.Trips.Services;
+using Checkbus.Web.Features.Users.Services;
+using Checkbus.Web.Features.VehicleDiagnostics.Services;
+using Checkbus.Web.Features.VehicleDocuments.Services;
+using Checkbus.Web.Features.Vehicles.Services;
+using Checkbus.Web.Shared.Models;
+using Checkbus.Web.Shared.Services;
 using MudBlazor.Services;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -50,6 +60,9 @@ builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();
 builder.Services.AddScoped<TripsClient>();
+builder.Services.AddScoped<PublicTripsClient>();
+builder.Services.AddScoped<PublicReservationsClient>();
+builder.Services.AddScoped<BoardingClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
@@ -34,13 +35,24 @@ public class EventRepositoryTests
         Longitude = -58.4498
     };
 
-    private static Event CreateEvent(Guid locationId) => new()
+    private static Organization CreateOrganization(string slug) => new()
+    {
+        Id = Guid.NewGuid(),
+        CUIT = "20-12345678-9",
+        Name = "Checkbus Demo",
+        Slug = slug,
+        LogoUrl = "",
+        IsActive = true
+    };
+
+    private static Event CreateEvent(Guid organizationId, Guid locationId) => new()
     {
         Id = Guid.NewGuid(),
         Name = "River vs Boca",
         Type = EventType.Partido,
         Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
-        LocationId = locationId
+        LocationId = locationId,
+        OrganizationId = organizationId
     };
 
     [Fact]
@@ -51,12 +63,14 @@ public class EventRepositoryTests
         using var db = CreateContext(connection);
         db.Database.EnsureCreated();
 
+        var organization = CreateOrganization("checkbus-demo");
         var location = CreateLocation("ChIJ-@event");
+        db.Organizations.Add(organization);
         db.Locations.Add(location);
         await db.SaveChangesAsync(cancellationToken);
 
         var repository = new EventRepository(db);
-        var @event = CreateEvent(location.Id);
+        var @event = CreateEvent(organization.Id, location.Id);
 
         await repository.AddAsync(@event, cancellationToken);
         var result = await repository.GetByIdAsync(@event.Id, cancellationToken);
@@ -83,24 +97,29 @@ public class EventRepositoryTests
     }
 
     [Fact]
-    public async Task GetAllAsync_IsUnscoped_ReturnsEveryEvent()
+    public async Task GetAllByOrganizationAsync_ReturnsOnlyEventsFromThatOrganization()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
         db.Database.EnsureCreated();
 
+        var organizationA = CreateOrganization("checkbus-demo");
+        var organizationB = CreateOrganization("brahman");
         var locationA = CreateLocation("ChIJ-a");
         var locationB = CreateLocation("ChIJ-b");
+        db.Organizations.AddRange(organizationA, organizationB);
         db.Locations.AddRange(locationA, locationB);
         await db.SaveChangesAsync(cancellationToken);
 
         var repository = new EventRepository(db);
-        await repository.AddAsync(CreateEvent(locationA.Id), cancellationToken);
-        await repository.AddAsync(CreateEvent(locationB.Id), cancellationToken);
+        await repository.AddAsync(CreateEvent(organizationA.Id, locationA.Id), cancellationToken);
+        await repository.AddAsync(CreateEvent(organizationA.Id, locationB.Id), cancellationToken);
+        await repository.AddAsync(CreateEvent(organizationB.Id, locationB.Id), cancellationToken);
 
-        var result = await repository.GetAllAsync(cancellationToken);
+        var result = await repository.GetAllByOrganizationAsync(organizationA.Id, cancellationToken);
 
         Assert.Equal(2, result.Count);
+        Assert.All(result, e => Assert.Equal(organizationA.Id, e.OrganizationId));
     }
 }

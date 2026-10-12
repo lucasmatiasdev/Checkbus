@@ -29,6 +29,12 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             return _context.Trips.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
         }
 
+        public async Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
+        {
+            _context.Trips.Update(trip);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
         {
             return await _context.Trips

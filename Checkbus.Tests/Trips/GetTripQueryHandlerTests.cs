@@ -19,6 +19,9 @@ public class GetTripQueryHandlerTests
 
         public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(trip);
 
+        public Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
+
         public Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
 
@@ -43,7 +46,7 @@ public class GetTripQueryHandlerTests
         public Task<IReadOnlyList<Vehicle>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
     }
 
@@ -77,7 +80,10 @@ public class GetTripQueryHandlerTests
 
         public Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(@event);
 
-        public Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Event>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
+
+        public Task UpdateAsync(Event @event, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
     }
 

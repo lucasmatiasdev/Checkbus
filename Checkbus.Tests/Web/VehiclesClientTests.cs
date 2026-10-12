@@ -2,8 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Checkbus.Tests.Infrastructure;
-using Checkbus.Web.Contracts;
-using Checkbus.Web.Services;
+using Checkbus.Web.Features.Users.Services;
+using Checkbus.Web.Features.Vehicles.Contracts;
+using Checkbus.Web.Features.Vehicles.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

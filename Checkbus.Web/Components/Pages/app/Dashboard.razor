@@ -1,7 +1,9 @@
 @page "/dashboard"
 @attribute [Authorize]
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.DriverRequirements.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.VehicleDocuments.Services
+@using Checkbus.Web.Shared.Services
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
     <h3>Dashboard</h3>

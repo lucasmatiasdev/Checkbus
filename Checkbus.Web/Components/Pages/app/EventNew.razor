@@ -2,9 +2,10 @@
 @attribute [Authorize(Roles = "Planificador,Administrador")]
 @using System.ComponentModel.DataAnnotations
 @using Checkbus.Web.Components.Maps
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Models
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.Events.Contracts
+@using Checkbus.Web.Features.Events.Services
+@using Checkbus.Web.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>Checkbus - Nuevo evento</PageTitle>
 
@@ -48,6 +49,11 @@
                            For="@(() => model.Date)"
                            Class="mb-4" />
 
+            <MudTimePicker Label="Hora"
+                           @bind-Time="model.Time"
+                           For="@(() => model.Time)"
+                           Class="mb-4" />
+
             <MudText Typo="Typo.subtitle2" Class="mb-2">Ubicación</MudText>
             <LocationPicker Mode="LocationPickerMode.Single" OnLocationPicked="HandleLocationPicked" />
 
@@ -61,6 +67,19 @@
             {
                 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-4">
                     Seleccionado: @model.PickedLocation.Nombre (@model.PickedLocation.Direccion)
+                </MudText>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Imagen (opcional)</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                Spot publicitario o foto de la banda/equipo — se muestra a los pasajeros en la
+                página de reserva.
+            </MudText>
+            <InputFile OnChange="OnImageSelected" accept="image/jpeg,image/png,image/webp" />
+            @if (selectedImage is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-4">
+                    Seleccionada: @selectedImage.Name
                 </MudText>
             }
 
@@ -96,13 +115,23 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
+    // Comfortably above Blazor's 500KB default OpenReadStream buffer and matching the backend's
+    // 5MB cap, same convention as VehicleDocuments.razor/MyDocuments.razor.
+    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+
     private EventFormModel model = new();
+    private IBrowserFile? selectedImage;
     private bool isSubmitting;
     private string? errorMessage;
 
     private void HandleLocationPicked(PickedLocation location)
     {
         model.PickedLocation = location;
+    }
+
+    private void OnImageSelected(InputFileChangeEventArgs e)
+    {
+        selectedImage = e.File;
     }
 
     private async Task HandleValidSubmit()
@@ -120,8 +149,30 @@
 
             switch (outcome)
             {
-                case EventActionOutcome.Success:
+                case EventActionOutcome.Success success:
                     errorMessage = null;
+
+                    // The image upload is a second, separate request after the Event already
+                    // exists (same two-step shape as a Vehicle's documents) — a failure here does
+                    // NOT roll back the just-created Event, since there is no transactional link
+                    // between the two calls. Surface it clearly instead of silently swallowing it,
+                    // so the planificador knows to retry just the image from a future edit screen.
+                    if (selectedImage is not null)
+                    {
+                        await using var stream = selectedImage.OpenReadStream(maxAllowedSize: MaxUploadSizeBytes);
+                        var imageOutcome = await EventsClient.UploadImageAsync(
+                            success.Event.Id, stream, selectedImage.Name, selectedImage.ContentType);
+
+                        if (imageOutcome is not EventImageUploadOutcome.Success)
+                        {
+                            Snackbar.Add(
+                                "Evento registrado, pero no pudimos subir la imagen. Podés reintentarlo más tarde.",
+                                Severity.Warning);
+                            NavigationManager.NavigateTo("/events");
+                            break;
+                        }
+                    }
+
                     Snackbar.Add("Evento registrado.", Severity.Success);
                     NavigationManager.NavigateTo("/events");
                     break;
@@ -164,13 +215,16 @@
         [Required(ErrorMessage = "Ingresá la fecha del evento.")]
         public DateTime? Date { get; set; }
 
+        [Required(ErrorMessage = "Ingresá la hora del evento.")]
+        public TimeSpan? Time { get; set; }
+
         public PickedLocation? PickedLocation { get; set; }
 
         public CreateEventRequest ToRequest() => new()
         {
             Name = Name,
             Type = Type!.Value,
-            Date = Date!.Value,
+            Date = Date!.Value.Date + Time!.Value,
             LocationName = PickedLocation!.Nombre,
             Address = PickedLocation!.Direccion,
             PlaceId = PickedLocation!.PlaceId,

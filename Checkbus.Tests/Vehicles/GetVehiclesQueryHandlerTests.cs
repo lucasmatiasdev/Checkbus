@@ -25,7 +25,7 @@ public class GetVehiclesQueryHandlerTests
             return Task.FromResult(Vehicles);
         }
 
-        public Task<bool> PatentExistsAsync(string patent, CancellationToken cancellationToken)
+        public Task<bool> PatentExistsAsync(string patent, Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetVehiclesQueryHandler.");
     }
 

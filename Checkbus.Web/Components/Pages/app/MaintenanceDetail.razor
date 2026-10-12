@@ -1,8 +1,10 @@
 @page "/maintenance/{Id:guid}"
 @attribute [Authorize(Roles = "Mecanico,Administrador")]
 @using System.ComponentModel.DataAnnotations
-@using Checkbus.Web.Contracts
-@using Checkbus.Web.Services
+@using Checkbus.Web.Features.MaintenanceRecords.Contracts
+@using Checkbus.Web.Features.MaintenanceRecords.Services
+@using Checkbus.Web.Features.VehicleDiagnostics.Contracts
+@using Checkbus.Web.Features.VehicleDiagnostics.Services
 
 <PageTitle>Checkbus - Detalle de mantenimiento</PageTitle>
 

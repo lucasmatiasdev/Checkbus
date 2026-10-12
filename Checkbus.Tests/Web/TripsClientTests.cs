@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Checkbus.Tests.Infrastructure;
-using Checkbus.Web.Contracts;
-using Checkbus.Web.Services;
+using Checkbus.Web.Features.Trips.Contracts;
+using Checkbus.Web.Features.Trips.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -193,6 +193,102 @@ public class TripsClientTests
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
         Assert.Contains("Trips", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
+    // ----- PublishAsync -----
+
+    [Fact]
+    public async Task PublishAsync_WhenNoContent_ReturnsSuccess()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripPublishOutcome.Success>(outcome);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WhenBadRequest_ReturnsValidationFailedWithErrors()
+    {
+        var validationProblem = new ValidationProblemDetails(new Dictionary<string, string[]>
+        {
+            ["Habilitacion"] = ["El viaje no puede publicarse: solo un viaje en estado Programado puede publicarse."]
+        })
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Validation failed"
+        };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = JsonContent.Create(validationProblem)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        var validationFailed = Assert.IsType<TripPublishOutcome.ValidationFailed>(outcome);
+        var error = Assert.Single(validationFailed.Errors);
+        Assert.Equal("Habilitacion", error.Key);
+        Assert.Contains("no puede publicarse", error.Value[0]);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripPublishOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WhenUnauthorized_ReturnsForbidden()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var client = CreateClient(stub);
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripPublishOutcome.Forbidden>(outcome);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WhenForbidden_ReturnsForbidden()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var client = CreateClient(stub);
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripPublishOutcome.Forbidden>(outcome);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<TripPublishOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
+
+    [Fact]
+    public async Task PublishAsync_PostsToExpectedRoute()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        await client.PublishAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
+        Assert.Contains($"Trips/{TripId}/publish", stub.CapturedRequest.RequestUri!.ToString());
     }
 
     // ----- GetListAsync -----

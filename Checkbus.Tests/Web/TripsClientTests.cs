@@ -416,4 +416,170 @@ public class TripsClientTests
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"Trips/{TripId}", stub.CapturedRequest.RequestUri!.ToString());
     }
+
+    // ----- UpdateStopTimesAsync (Fase D3) -----
+
+    private static UpdateStopTimesRequest MakeStopTimesRequest() => new()
+    {
+        Stops =
+        [
+            new StopDepartureTimeRequest { StopId = Guid.NewGuid(), DepartureTime = new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc) }
+        ]
+    };
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_WhenNoContent_ReturnsSuccess()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        var outcome = await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripStopTimesUpdateOutcome.Success>(outcome);
+    }
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_WhenBadRequest_ReturnsValidationFailedWithErrors()
+    {
+        var validationProblem = new ValidationProblemDetails(new Dictionary<string, string[]>
+        {
+            ["Stops"] = ["At least one stop departure time is required."]
+        })
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Validation failed"
+        };
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = JsonContent.Create(validationProblem)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        var validationFailed = Assert.IsType<TripStopTimesUpdateOutcome.ValidationFailed>(outcome);
+        Assert.Single(validationFailed.Errors);
+    }
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripStopTimesUpdateOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_WhenForbidden_ReturnsForbidden()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var client = CreateClient(stub);
+
+        var outcome = await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripStopTimesUpdateOutcome.Forbidden>(outcome);
+    }
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<TripStopTimesUpdateOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+    }
+
+    [Fact]
+    public async Task UpdateStopTimesAsync_PutsToExpectedRoute()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(stub);
+
+        await client.UpdateStopTimesAsync(TripId, MakeStopTimesRequest(), TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Put, stub.CapturedRequest!.Method);
+        Assert.Contains($"Trips/{TripId}/stops/times", stub.CapturedRequest.RequestUri!.ToString());
+    }
+
+    // ----- GetSeatMapAsync (Fase E1) -----
+
+    private static TripSeatMapResponse MakeSeatMap() => new()
+    {
+        TripId = TripId,
+        Capacity = 45,
+        Price = 15000m,
+        OccupiedSeatNumbers = [2, 5]
+    };
+
+    [Fact]
+    public async Task GetSeatMapAsync_WhenOk_ReturnsSuccessWithDeserializedSeatMap()
+    {
+        var expected = MakeSeatMap();
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(expected)
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetSeatMapAsync(TripId, TestContext.Current.CancellationToken);
+
+        var success = Assert.IsType<TripSeatMapOutcome.Success>(outcome);
+        Assert.Equal(TripId, success.SeatMap.TripId);
+        Assert.Equal([2, 5], success.SeatMap.OccupiedSeatNumbers);
+    }
+
+    [Fact]
+    public async Task GetSeatMapAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetSeatMapAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripSeatMapOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task GetSeatMapAsync_WhenForbidden_ReturnsForbidden()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var client = CreateClient(stub);
+
+        var outcome = await client.GetSeatMapAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<TripSeatMapOutcome.Forbidden>(outcome);
+    }
+
+    [Fact]
+    public async Task GetSeatMapAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.GetSeatMapAsync(TripId, TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<TripSeatMapOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+    }
+
+    [Fact]
+    public async Task GetSeatMapAsync_SendsToExpectedRoute()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(MakeSeatMap())
+        });
+        var client = CreateClient(stub);
+
+        await client.GetSeatMapAsync(TripId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(stub.CapturedRequest);
+        Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
+        Assert.Contains($"Trips/{TripId}/seats", stub.CapturedRequest.RequestUri!.ToString());
+    }
 }

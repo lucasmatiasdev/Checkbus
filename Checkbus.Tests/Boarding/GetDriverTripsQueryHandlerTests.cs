@@ -43,6 +43,10 @@ public class GetDriverTripsQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(IReadOnlyList<Vehicle> vehicles) : IVehicleRepository

@@ -70,12 +70,15 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Maps
                     "The Google Directions API response did not include any route legs.");
             }
 
-            var totalSeconds = route.Legs.Sum(leg => leg.Duration?.Value ?? 0);
+            var legDurations = route.Legs
+                .Select(leg => TimeSpan.FromSeconds(leg.Duration?.Value ?? 0))
+                .ToList();
             var totalMeters = route.Legs.Sum(leg => leg.Distance?.Value ?? 0);
 
             return new DirectionsResult(
-                TimeSpan.FromSeconds(totalSeconds),
-                totalMeters / 1000m);
+                legDurations.Aggregate(TimeSpan.Zero, (a, b) => a + b),
+                totalMeters / 1000m,
+                legDurations);
         }
 
         private string BuildRequestUri(IReadOnlyList<(double Latitude, double Longitude)> points)

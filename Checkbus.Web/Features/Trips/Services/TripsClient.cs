@@ -218,4 +218,162 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
         }
     }
+
+    // ---- Fase D3 (odd/tasks/mejoras-detalle-viaje.md) ----
+
+    public async Task<TripStopTimesUpdateOutcome> UpdateStopTimesAsync(
+        Guid tripId,
+        UpdateStopTimesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PutAsJsonAsync($"Trips/{tripId}/stops/times", request, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new TripStopTimesUpdateOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.NoContent:
+                        return new TripStopTimesUpdateOutcome.Success();
+
+                    case HttpStatusCode.BadRequest:
+                        var validationProblem = await response.Content
+                            .ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                        IReadOnlyDictionary<string, string[]> errors = validationProblem is null
+                            ? new Dictionary<string, string[]>()
+                            : (IReadOnlyDictionary<string, string[]>)validationProblem.Errors;
+                        return new TripStopTimesUpdateOutcome.ValidationFailed(errors);
+
+                    case HttpStatusCode.NotFound:
+                        return new TripStopTimesUpdateOutcome.NotFound();
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new TripStopTimesUpdateOutcome.Forbidden();
+
+                    default:
+                        return new TripStopTimesUpdateOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new TripStopTimesUpdateOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
+    // ---- Fase E1 (odd/tasks/mejoras-detalle-viaje.md) ----
+
+    public async Task<TripSeatMapOutcome> GetSeatMapAsync(
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"Trips/{tripId}/seats", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new TripSeatMapOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var seatMap = await response.Content
+                            .ReadFromJsonAsync<TripSeatMapResponse>(cancellationToken);
+                        return new TripSeatMapOutcome.Success(seatMap!);
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new TripSeatMapOutcome.Forbidden();
+
+                    case HttpStatusCode.NotFound:
+                        return new TripSeatMapOutcome.NotFound();
+
+                    default:
+                        return new TripSeatMapOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new TripSeatMapOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Closed outcome of a <c>PUT api/Trips/{id}/stops/times</c> call
+/// (odd/tasks/mejoras-detalle-viaje.md Fase D3). Mirrors <see cref="TripPublishOutcome"/>'s
+/// no-body-success shape (204 No Content). The private constructor confines the hierarchy to
+/// the nested cases declared here.
+/// </summary>
+public abstract record TripStopTimesUpdateOutcome
+{
+    private TripStopTimesUpdateOutcome()
+    {
+    }
+
+    /// <summary>204 No Content — the stop times were updated successfully.</summary>
+    public sealed record Success : TripStopTimesUpdateOutcome;
+
+    /// <summary>400 Bad Request — FluentValidation failures keyed by property name.</summary>
+    public sealed record ValidationFailed(IReadOnlyDictionary<string, string[]> Errors) : TripStopTimesUpdateOutcome;
+
+    /// <summary>
+    /// 404 Not Found — the trip doesn't exist, is outside the caller's organization, or a
+    /// submitted StopId doesn't belong to this trip's route.
+    /// </summary>
+    public sealed record NotFound : TripStopTimesUpdateOutcome;
+
+    /// <summary>401 Unauthorized or 403 Forbidden — no reliable body to parse for either.</summary>
+    public sealed record Forbidden : TripStopTimesUpdateOutcome;
+
+    /// <summary>Any transport-level failure, short and user-presentable.</summary>
+    public sealed record TransportError(string Message) : TripStopTimesUpdateOutcome;
+}
+
+/// <summary>
+/// Closed outcome of a <c>GET api/Trips/{id}/seats</c> call
+/// (odd/tasks/mejoras-detalle-viaje.md Fase E1). Mirrors <see cref="TripOutcome"/>'s shape.
+/// The private constructor confines the hierarchy to the nested cases declared here.
+/// </summary>
+public abstract record TripSeatMapOutcome
+{
+    private TripSeatMapOutcome()
+    {
+    }
+
+    /// <summary>200 OK — the seat map was loaded successfully.</summary>
+    public sealed record Success(TripSeatMapResponse SeatMap) : TripSeatMapOutcome;
+
+    /// <summary>404 Not Found — the trip doesn't exist or is outside the caller's organization.</summary>
+    public sealed record NotFound : TripSeatMapOutcome;
+
+    /// <summary>401 Unauthorized or 403 Forbidden — no reliable body to parse for either.</summary>
+    public sealed record Forbidden : TripSeatMapOutcome;
+
+    /// <summary>Any transport-level failure, short and user-presentable.</summary>
+    public sealed record TransportError(string Message) : TripSeatMapOutcome;
 }

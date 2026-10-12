@@ -40,6 +40,10 @@ public class CloseBoardingCommandHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CloseBoardingCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CloseBoardingCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository : IBoardingRecordRepository

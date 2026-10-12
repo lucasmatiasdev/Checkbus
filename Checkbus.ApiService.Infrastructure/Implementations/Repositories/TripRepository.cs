@@ -77,5 +77,30 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .OrderBy(s => s.Order)
                 .ToListAsync(cancellationToken);
         }
+
+        // Loads exactly the given Stop rows and sets their DepartureTime, one SaveChangesAsync
+        // for the whole batch — same atomicity convention as every other batch write in this
+        // codebase.
+        public async Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+        {
+            if (departureTimesByStopId.Count == 0)
+            {
+                return;
+            }
+
+            var stopIds = departureTimesByStopId.Keys.ToList();
+            var stops = await _context.Stops
+                .Where(s => stopIds.Contains(s.Id))
+                .ToListAsync(cancellationToken);
+
+            foreach (var stop in stops)
+            {
+                stop.DepartureTime = departureTimesByStopId[stop.Id];
+                stop.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

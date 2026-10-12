@@ -36,12 +36,21 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
         public class StopDto
         {
+            // Needed by UpdateStopTimesCommand so the Planificador's edit dialog can submit a
+            // real StopId per row — the public StopDto deliberately has no edit affordance and
+            // so doesn't need this.
+            public Guid Id { get; set; }
+
             public int Order { get; set; }
             public StopType Type { get; set; }
             public required string Name { get; set; }
             public required string Address { get; set; }
             public double Latitude { get; set; }
             public double Longitude { get; set; }
+
+            // Nullable for backward compatibility with pre-existing Stop rows — see
+            // Stop.DepartureTime's doc comment.
+            public DateTime? DepartureTime { get; set; }
         }
     }
 }

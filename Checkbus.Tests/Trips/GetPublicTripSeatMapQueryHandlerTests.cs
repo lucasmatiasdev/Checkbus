@@ -42,6 +42,10 @@ public class GetPublicTripSeatMapQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository

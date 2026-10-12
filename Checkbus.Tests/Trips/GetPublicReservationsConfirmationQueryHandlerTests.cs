@@ -75,6 +75,10 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
     }
 
     private sealed class FakeEventRepository(IReadOnlyList<Event> events) : IEventRepository

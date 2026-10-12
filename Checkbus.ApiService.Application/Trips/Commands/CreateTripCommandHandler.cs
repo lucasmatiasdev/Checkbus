@@ -148,7 +148,15 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 UpdatedAt = createdAt
             };
 
+            // Placeholder per-stop DepartureTime (odd/tasks/mejoras-detalle-viaje.md Fase D):
+            // origin = departureDate, then cumulative sum of leg durations from
+            // directionsResult.LegDurations — every Stop gets a value (origin and destino
+            // included, no special-casing), editable later via UpdateStopTimesCommandHandler.
+            // The destino's placeholder is NOT forced equal to arrivalDate — that field is
+            // independently user-entered and may not exactly match Directions' own total,
+            // which is expected and fine for a placeholder.
             var stops = new List<Stop>(resolvedLocations.Count);
+            var cumulativeDepartureTime = departureDate;
             for (var i = 0; i < resolvedLocations.Count; i++)
             {
                 var type = i == 0
@@ -157,6 +165,11 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                         ? StopType.Destino
                         : StopType.Intermedia;
 
+                if (i > 0)
+                {
+                    cumulativeDepartureTime += directionsResult.LegDurations[i - 1];
+                }
+
                 stops.Add(new Stop
                 {
                     Id = Guid.NewGuid(),
@@ -164,6 +177,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     LocationId = resolvedLocations[i].Id,
                     Order = i,
                     Type = type,
+                    DepartureTime = cumulativeDepartureTime,
                     CreatedAt = createdAt,
                     UpdatedAt = createdAt
                 });

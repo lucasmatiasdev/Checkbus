@@ -22,7 +22,14 @@ namespace Checkbus.ApiService.Application.Interfaces.Maps
     /// <summary>
     /// Result of a Directions lookup. Field names intentionally mirror <c>Route</c>'s own fields
     /// (<c>EstimatedDuration</c>, <c>DistanceKm</c>) so callers can persist it directly with no
-    /// renaming/mapping.
+    /// renaming/mapping. <c>LegDurations</c> is ordered one entry per leg (i.e. <c>points.Count
+    /// - 1</c> entries), <c>LegDurations[i]</c> being the travel time from <c>points[i]</c> to
+    /// <c>points[i+1]</c> — reliable 1:1 with <c>Stop.Order</c> since no <c>optimizeWaypoints</c>
+    /// is requested, so Google never reorders the given points. Used by
+    /// <c>CreateTripCommandHandler</c> to compute a per-stop placeholder <c>DepartureTime</c>.
     /// </summary>
-    public record DirectionsResult(TimeSpan EstimatedDuration, decimal DistanceKm);
+    public record DirectionsResult(
+        TimeSpan EstimatedDuration,
+        decimal DistanceKm,
+        IReadOnlyList<TimeSpan> LegDurations);
 }

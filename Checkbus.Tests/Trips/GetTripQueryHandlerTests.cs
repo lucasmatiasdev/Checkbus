@@ -34,6 +34,10 @@ public class GetTripQueryHandlerTests
         public Task<Route?> GetRouteByTripIdAsync(Guid tripId, CancellationToken cancellationToken) => Task.FromResult(route);
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken) => Task.FromResult(stops);
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository
@@ -147,10 +151,12 @@ public class GetTripQueryHandlerTests
         var route = new Route { Id = Guid.NewGuid(), TripId = trip.Id, EstimatedDuration = TimeSpan.FromHours(8), DistanceKm = 700m };
         var locationOrigin = new Location { Id = Guid.NewGuid(), Name = "Terminal Retiro", Address = "Dir 1", PlaceId = "place-1", Latitude = -34.5, Longitude = -58.3 };
         var locationDestination = new Location { Id = Guid.NewGuid(), Name = "Estadio Kempes", Address = "Dir 2", PlaceId = "place-2", Latitude = -31.3, Longitude = -64.2 };
+        var originDepartureTime = trip.DepartureDate;
+        var destinationDepartureTime = trip.DepartureDate.AddHours(8);
         var stops = new List<Stop>
         {
-            new() { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = locationOrigin.Id, Order = 0, Type = StopType.Origen },
-            new() { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = locationDestination.Id, Order = 1, Type = StopType.Destino }
+            new() { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = locationOrigin.Id, Order = 0, Type = StopType.Origen, DepartureTime = originDepartureTime },
+            new() { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = locationDestination.Id, Order = 1, Type = StopType.Destino, DepartureTime = destinationDepartureTime }
         };
 
         var handler = BuildHandler(
@@ -165,8 +171,12 @@ public class GetTripQueryHandlerTests
         Assert.Equal(2, result.Route.Stops.Count);
         Assert.Equal("Terminal Retiro", result.Route.Stops[0].Name);
         Assert.Equal(StopType.Origen, result.Route.Stops[0].Type);
+        Assert.Equal(stops[0].Id, result.Route.Stops[0].Id);
+        Assert.Equal(originDepartureTime, result.Route.Stops[0].DepartureTime);
         Assert.Equal("Estadio Kempes", result.Route.Stops[1].Name);
         Assert.Equal(StopType.Destino, result.Route.Stops[1].Type);
+        Assert.Equal(stops[1].Id, result.Route.Stops[1].Id);
+        Assert.Equal(destinationDepartureTime, result.Route.Stops[1].DepartureTime);
     }
 
     [Fact]

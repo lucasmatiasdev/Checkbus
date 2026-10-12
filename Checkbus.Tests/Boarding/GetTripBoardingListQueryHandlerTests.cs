@@ -44,6 +44,10 @@ public class GetTripBoardingListQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository(List<BoardingRecord> records) : IBoardingRecordRepository

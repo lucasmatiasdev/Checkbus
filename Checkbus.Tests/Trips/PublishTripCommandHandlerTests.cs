@@ -51,6 +51,10 @@ public class PublishTripCommandHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by PublishTripCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by PublishTripCommandHandler.");
     }
 
     private static Trip CreateTrip(TripStatus status = TripStatus.Programado, Guid? organizationId = null) => new()

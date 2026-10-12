@@ -38,6 +38,11 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             public required string Address { get; set; }
             public double Latitude { get; set; }
             public double Longitude { get; set; }
+
+            // Nullable for backward compatibility with pre-existing Stop rows — see
+            // Stop.DepartureTime's doc comment. Passengers need this too ("a qué hora
+            // juntarse") — read-only here, no edit affordance on the public page.
+            public DateTime? DepartureTime { get; set; }
         }
     }
 }

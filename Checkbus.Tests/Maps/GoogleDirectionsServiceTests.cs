@@ -79,6 +79,7 @@ public class GoogleDirectionsServiceTests
 
         Assert.Equal(TimeSpan.FromSeconds(1800), result.EstimatedDuration);
         Assert.Equal(15m, result.DistanceKm);
+        Assert.Equal([TimeSpan.FromSeconds(1800)], result.LegDurations);
         Assert.NotNull(handler.CapturedRequest);
     }
 
@@ -91,6 +92,20 @@ public class GoogleDirectionsServiceTests
 
         Assert.Equal(TimeSpan.FromSeconds(1500), result.EstimatedDuration);
         Assert.Equal(12.5m, result.DistanceKm);
+    }
+
+    [Fact]
+    public async Task GetDirectionsAsync_WhenMultiLegOk_PopulatesLegDurationsOrderedPerLeg()
+    {
+        // The whole point of D1: the per-leg breakdown must survive, ordered, instead of being
+        // collapsed straight into the sum — legDurations[i] corresponds to points[i]->points[i+1].
+        var (service, _) = CreateService(MakeJsonResponse(MultiLegSuccessJson));
+
+        var result = await service.GetDirectionsAsync(ThreePoints, CancellationToken.None);
+
+        Assert.Equal(2, result.LegDurations.Count);
+        Assert.Equal(TimeSpan.FromSeconds(600), result.LegDurations[0]);
+        Assert.Equal(TimeSpan.FromSeconds(900), result.LegDurations[1]);
     }
 
     [Fact]

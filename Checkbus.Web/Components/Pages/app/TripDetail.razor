@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Planificador,Administrador")]
 @using Checkbus.Web.Features.Trips.Contracts
 @using Checkbus.Web.Features.Trips.Services
+@using Checkbus.Web.Shared
 
 <PageTitle>Checkbus - Detalle de viaje</PageTitle>
 
@@ -93,8 +94,13 @@
             </MudGrid>
         </MudPaper>
 
-        <MudPaper Elevation="2" Class="pa-6">
-            <MudText Typo="Typo.h6" Class="mb-2">Ruta</MudText>
+        <MudPaper Elevation="2" Class="pa-6 mb-6">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                <MudText Typo="Typo.h6">Ruta</MudText>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenEditStopTimesDialog">
+                    Editar horarios
+                </MudButton>
+            </MudStack>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
                 @trip.Route.DistanceKm.ToString("0.#") km · @trip.Route.EstimatedDuration.ToString(@"hh\:mm")
             </MudText>
@@ -103,14 +109,108 @@
                 @foreach (var stop in trip.Route.Stops.OrderBy(s => s.Order))
                 {
                     <MudListItem T="StopResponse">
-                        <MudText Typo="Typo.body1">@(stop.Order + 1). @GetStopTypeLabel(stop.Type) — @stop.Name</MudText>
+                        <MudText Typo="Typo.body1">
+                            @(stop.Order + 1). @GetStopTypeLabel(stop.Type) — @stop.Name
+                            @if (stop.DepartureTime is { } departureTime)
+                            {
+                                <span> — @departureTime.ToString("HH:mm")</span>
+                            }
+                        </MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@stop.Address</MudText>
                     </MudListItem>
                 }
             </MudList>
         </MudPaper>
+
+        @if (stopTimesErrorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@stopTimesErrorMessage</MudAlert>
+        }
+
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h6" Class="mb-2">Mapa de asientos</MudText>
+
+            @if (isLoadingSeatMap)
+            {
+                <MudProgressCircular Indeterminate="true" Class="my-4" />
+            }
+            else if (seatMapErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error">@seatMapErrorMessage</MudAlert>
+            }
+            else if (seatMap is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    @seatMap.OccupiedSeatNumbers.Count / @seatMap.Capacity asientos ocupados — vista de solo lectura, sin datos de pasajeros.
+                </MudText>
+
+                @foreach (var row in seatRows)
+                {
+                    <MudStack Row="true" Justify="Justify.Center" Spacing="2" Class="mb-2">
+                        @foreach (var slot in row)
+                        {
+                            @if (slot is null)
+                            {
+                                <div style="width: 48px;"></div>
+                            }
+                            else
+                            {
+                                var seatNumber = slot.Value;
+                                var occupied = seatMap.OccupiedSeatNumbers.Contains(seatNumber);
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="@(occupied ? Color.Default : Color.Secondary)"
+                                           Disabled="true"
+                                           Style="min-width: 48px;">
+                                    @seatNumber
+                                </MudButton>
+                            }
+                        }
+                    </MudStack>
+                }
+            }
+        </MudPaper>
     }
 </MudContainer>
+
+@if (isEditStopTimesDialogOpen && trip is not null)
+{
+    <MudDialog Visible="true" Options="@(new DialogOptions { CloseOnEscapeKey = true })">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Editar horarios de paradas</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (stopTimesSubmitErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@stopTimesSubmitErrorMessage</MudAlert>
+            }
+            @foreach (var stopEdit in stopTimeEdits)
+            {
+                <MudStack Row="true" Spacing="2" Class="mb-3" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.body1" Style="min-width: 220px;">
+                        @(stopEdit.Order + 1). @stopEdit.Name
+                    </MudText>
+                    <MudDatePicker Label="Fecha" @bind-Date="stopEdit.Date" />
+                    <MudTimePicker Label="Hora" @bind-Time="stopEdit.Time" />
+                </MudStack>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseEditStopTimesDialog">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSavingStopTimes" OnClick="SaveStopTimesAsync">
+                @if (isSavingStopTimes)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
 
 @code {
     [Parameter]
@@ -134,6 +234,19 @@
     private string? errorMessage;
     private bool isPublishing;
     private string? publishErrorMessage;
+
+    // Fase E — seat-map panel (odd/tasks/mejoras-detalle-viaje.md).
+    private bool isLoadingSeatMap;
+    private string? seatMapErrorMessage;
+    private TripSeatMapResponse? seatMap;
+    private List<int?[]> seatRows = [];
+
+    // Fase D — stop times edit dialog (odd/tasks/mejoras-detalle-viaje.md).
+    private bool isEditStopTimesDialogOpen;
+    private bool isSavingStopTimes;
+    private string? stopTimesErrorMessage;
+    private string? stopTimesSubmitErrorMessage;
+    private List<StopTimeEditModel> stopTimeEdits = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,6 +276,145 @@
         {
             isLoading = false;
         }
+
+        if (trip is not null)
+        {
+            await LoadSeatMapAsync();
+        }
+    }
+
+    private async Task LoadSeatMapAsync()
+    {
+        isLoadingSeatMap = true;
+        try
+        {
+            var outcome = await TripsClient.GetSeatMapAsync(Id);
+
+            switch (outcome)
+            {
+                case TripSeatMapOutcome.Success success:
+                    seatMap = success.SeatMap;
+                    seatMapErrorMessage = null;
+                    seatRows = SeatGridLayout.BuildSeatRows(success.SeatMap.Capacity);
+                    break;
+
+                case TripSeatMapOutcome.NotFound:
+                    seatMapErrorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripSeatMapOutcome.Forbidden:
+                    seatMapErrorMessage = "No tenés permiso para ver el mapa de asientos de este viaje.";
+                    break;
+
+                case TripSeatMapOutcome.TransportError transportError:
+                    seatMapErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isLoadingSeatMap = false;
+        }
+    }
+
+    private void OpenEditStopTimesDialog()
+    {
+        if (trip is null)
+        {
+            return;
+        }
+
+        stopTimesSubmitErrorMessage = null;
+        stopTimeEdits = trip.Route.Stops
+            .OrderBy(s => s.Order)
+            .Select(s => new StopTimeEditModel
+            {
+                StopId = s.Id,
+                Order = s.Order,
+                Name = s.Name,
+                Date = s.DepartureTime?.Date,
+                Time = s.DepartureTime?.TimeOfDay
+            })
+            .ToList();
+
+        isEditStopTimesDialogOpen = true;
+    }
+
+    private void CloseEditStopTimesDialog()
+    {
+        isEditStopTimesDialogOpen = false;
+    }
+
+    private async Task SaveStopTimesAsync()
+    {
+        stopTimesSubmitErrorMessage = null;
+
+        if (stopTimeEdits.Any(s => s.Date is null || s.Time is null))
+        {
+            stopTimesSubmitErrorMessage = "Completá la fecha y la hora de cada parada.";
+            return;
+        }
+
+        isSavingStopTimes = true;
+        try
+        {
+            var request = new UpdateStopTimesRequest
+            {
+                Stops = stopTimeEdits
+                    .Select(s => new StopDepartureTimeRequest
+                    {
+                        StopId = s.StopId,
+                        DepartureTime = s.Date!.Value.Date + s.Time!.Value
+                    })
+                    .ToList()
+            };
+
+            var outcome = await TripsClient.UpdateStopTimesAsync(Id, request);
+
+            switch (outcome)
+            {
+                case TripStopTimesUpdateOutcome.Success:
+                    isEditStopTimesDialogOpen = false;
+                    stopTimesErrorMessage = null;
+                    Snackbar.Add("Horarios actualizados correctamente.", Severity.Success);
+                    // Re-fetch so the Paradas list reflects the saved values.
+                    var refreshed = await TripsClient.GetByIdAsync(Id);
+                    if (refreshed is TripOutcome.Success refreshedSuccess)
+                    {
+                        trip = refreshedSuccess.Trip;
+                    }
+                    break;
+
+                case TripStopTimesUpdateOutcome.ValidationFailed validationFailed:
+                    stopTimesSubmitErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripStopTimesUpdateOutcome.NotFound:
+                    stopTimesSubmitErrorMessage = "No encontramos ese viaje o alguna de sus paradas.";
+                    break;
+
+                case TripStopTimesUpdateOutcome.Forbidden:
+                    stopTimesSubmitErrorMessage = "No tenés permiso para editar los horarios de este viaje.";
+                    break;
+
+                case TripStopTimesUpdateOutcome.TransportError transportError:
+                    stopTimesSubmitErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSavingStopTimes = false;
+        }
+    }
+
+    private sealed class StopTimeEditModel
+    {
+        public Guid StopId { get; set; }
+        public int Order { get; set; }
+        public required string Name { get; set; }
+        public DateTime? Date { get; set; }
+        public TimeSpan? Time { get; set; }
     }
 
     private async Task CopyPublicUrlToClipboard()

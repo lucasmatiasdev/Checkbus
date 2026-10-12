@@ -159,6 +159,10 @@ public class CreateTripCommandHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
     }
 
     private sealed class FakeDirectionsService(DirectionsResult result) : IDirectionsService
@@ -271,7 +275,8 @@ public class CreateTripCommandHandlerTests
         public FakeEventRepository EventRepository { get; set; } = new(null);
         public FakeLocationRepository LocationRepository { get; set; } = new();
         public FakeTripRepository TripRepository { get; set; } = new();
-        public FakeDirectionsService DirectionsService { get; set; } = new(new DirectionsResult(TimeSpan.FromHours(8), 700m));
+        public FakeDirectionsService DirectionsService { get; set; } =
+            new(new DirectionsResult(TimeSpan.FromHours(8), 700m, [TimeSpan.FromHours(8)]));
         public Guid? OrganizationId { get; set; } = CreateTripCommandHandlerTests.OrganizationId;
 
         public CreateTripCommandHandler BuildHandler() => new(
@@ -530,5 +535,47 @@ public class CreateTripCommandHandlerTests
         Assert.Equal(trip.Id, result.Id);
         Assert.Equal(42, result.Capacity);
         Assert.Equal(@event.Name, result.EventName);
+    }
+
+    [Fact]
+    public async Task Handle_MultiStopTrip_ComputesCumulativeDepartureTimePerStop()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var @event = CreateEvent();
+        var command = new CreateTripCommand
+        {
+            VehicleId = vehicle.Id,
+            DriverId = driver.Id,
+            EventId = @event.Id,
+            DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
+            ArrivalDate = new DateTime(2026, 5, 1, 20, 0, 0, DateTimeKind.Utc),
+            Price = 15000m,
+            Stops =
+            [
+                new CreateTripStopCommand { Name = "Origen", Address = "Dir 1", PlaceId = "p1", Latitude = -34.6, Longitude = -58.4 },
+                new CreateTripStopCommand { Name = "Parada intermedia", Address = "Dir 2", PlaceId = "p2", Latitude = -33.0, Longitude = -60.0 },
+                new CreateTripStopCommand { Name = "Destino", Address = "Dir 3", PlaceId = "p3", Latitude = -31.3, Longitude = -64.2 }
+            ]
+        };
+
+        // Two legs: 0->1 takes 2 hours, 1->2 takes 3 hours.
+        var legDurations = new List<TimeSpan> { TimeSpan.FromHours(2), TimeSpan.FromHours(3) };
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(@event),
+            DirectionsService = new FakeDirectionsService(
+                new DirectionsResult(TimeSpan.FromHours(5), 500m, legDurations))
+        };
+
+        await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
+
+        var stops = harness.TripRepository.AddedStops.OrderBy(s => s.Order).ToList();
+        Assert.Equal(3, stops.Count);
+        Assert.Equal(command.DepartureDate, stops[0].DepartureTime);
+        Assert.Equal(command.DepartureDate + legDurations[0], stops[1].DepartureTime);
+        Assert.Equal(command.DepartureDate + legDurations[0] + legDurations[1], stops[2].DepartureTime);
     }
 }

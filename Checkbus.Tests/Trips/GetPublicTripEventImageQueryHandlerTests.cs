@@ -38,6 +38,10 @@ public class GetPublicTripEventImageQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository

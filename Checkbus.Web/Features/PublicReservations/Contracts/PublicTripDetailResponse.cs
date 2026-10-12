@@ -41,4 +41,8 @@ public sealed record PublicTripStop
     public required string Address { get; init; }
     public double Latitude { get; init; }
     public double Longitude { get; init; }
+
+    // Nullable for backward compatibility with pre-existing Stop rows — see the API-side
+    // Stop.DepartureTime doc comment. Read-only here, no edit affordance on the public page.
+    public DateTime? DepartureTime { get; init; }
 }

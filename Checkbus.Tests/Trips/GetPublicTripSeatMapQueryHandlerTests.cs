@@ -91,6 +91,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
             => Task.FromResult<IReadOnlyList<Reservation>>(reservations.Where(r => r.TripId == tripId).ToList());
 
         public Task CreateBatchAsync(
+            Checkbus.ApiService.Domain.Entities.Payments.Payment payment,
             IReadOnlyCollection<Checkbus.ApiService.Domain.Entities.Passengers.Passenger> passengers,
             IReadOnlyCollection<Reservation> newReservations,
             CancellationToken cancellationToken)

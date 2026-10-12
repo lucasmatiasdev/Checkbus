@@ -241,6 +241,9 @@
     [Inject]
     private PublicTripsClient PublicTripsClient { get; set; } = default!;
 
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
     // Step 1 (detail) state.
     private PublicTripDetailResponse? detail;
     private string? eventImageDataUri;
@@ -406,9 +409,25 @@
             switch (outcome)
             {
                 case CreateReservationOutcome.Success success:
-                    confirmation = success.Result;
-                    selectedSeatNumbers.Clear();
-                    passengerForms.Clear();
+                    // Fase C (odd/tasks/pagos-mercadopago.md): the batch is now a
+                    // payment-pending hold, not a confirmed booking — redirect the browser to
+                    // Mercado Pago to actually pay instead of showing the inline "confirmed"
+                    // view. forceLoad: true because this is a full external navigation away
+                    // from the Blazor app, same as any other off-site redirect.
+                    if (!string.IsNullOrWhiteSpace(success.Result.CheckoutUrl))
+                    {
+                        NavigationManager.NavigateTo(success.Result.CheckoutUrl, forceLoad: true);
+                    }
+                    else
+                    {
+                        // Documented-rare fallback (CreateReservationResponse.CheckoutUrl's own
+                        // doc comment): the hold was still created, there is just no redirect
+                        // target — fall back to the inline view so the buyer isn't stranded
+                        // with no feedback at all.
+                        confirmation = success.Result;
+                        selectedSeatNumbers.Clear();
+                        passengerForms.Clear();
+                    }
                     break;
 
                 case CreateReservationOutcome.Conflict:

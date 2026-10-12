@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 
 namespace Checkbus.ApiService.Application.Interfaces.Repositories
@@ -25,16 +26,22 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // error.
         Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-        // Persists one whole reservation batch (one Passenger + one Reservation per booked
-        // Seat, e.g. a family of 3) in a SINGLE SaveChangesAsync call — same atomicity
-        // convention as ITripRepository.AddAsync (Trip+Route+Stops in one call), so EF's
-        // implicit transaction rolls back the entire batch if anything fails, including a
-        // unique-constraint violation on Reservation(TripId, SeatId) (the real double-booking
-        // guard — see CheckbusDbContext.OnModelCreating). Thin persistence only: the caller
-        // (CreatePublicReservationCommandHandler) is responsible for catching the resulting
+        // Persists one whole reservation batch (one Payment covering the checkout, one
+        // Passenger + one Reservation per booked Seat, e.g. a family of 3) in a SINGLE
+        // SaveChangesAsync call — same atomicity convention as ITripRepository.AddAsync
+        // (Trip+Route+Stops in one call), so EF's implicit transaction rolls back the entire
+        // batch if anything fails, including a unique-constraint violation on
+        // Reservation(TripId, SeatId) (the real double-booking guard — see
+        // CheckbusDbContext.OnModelCreating). Payment joined the batch in
+        // odd/tasks/pagos-mercadopago.md Fase C: CreatePublicReservationCommandHandler calls
+        // IPaymentService.CreateOrderAsync BEFORE this method runs, so by the time this is
+        // called the Mercado Pago order already exists — nothing here can fail "after" the
+        // gateway call in a way that leaves an orphaned local row needing its own rollback.
+        // Thin persistence only: the caller is responsible for catching the resulting
         // DbUpdateException and translating it into a domain-level failure — this repository
         // never catches it itself, matching every other repository in this codebase.
         Task CreateBatchAsync(
+            Payment payment,
             IReadOnlyCollection<Passenger> passengers,
             IReadOnlyCollection<Reservation> reservations,
             CancellationToken cancellationToken);

@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
@@ -30,16 +31,19 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             return await _context.Reservations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         }
 
-        // Passenger + Reservation rows for the whole batch are added to the same ChangeTracker
-        // and saved in one SaveChangesAsync call, so they are persisted atomically as a single
-        // aggregate — same convention as TripRepository.AddAsync. Deliberately does NOT catch
-        // DbUpdateException here: that translation into a domain-level failure belongs to the
-        // handler, keeping this repository a thin persistence layer.
+        // Payment + Passenger + Reservation rows for the whole batch are added to the same
+        // ChangeTracker and saved in one SaveChangesAsync call, so they are persisted
+        // atomically as a single aggregate — same convention as TripRepository.AddAsync.
+        // Deliberately does NOT catch DbUpdateException here: that translation into a
+        // domain-level failure belongs to the handler, keeping this repository a thin
+        // persistence layer.
         public async Task CreateBatchAsync(
+            Payment payment,
             IReadOnlyCollection<Passenger> passengers,
             IReadOnlyCollection<Reservation> reservations,
             CancellationToken cancellationToken)
         {
+            _context.Payments.Add(payment);
             _context.Passengers.AddRange(passengers);
             _context.Reservations.AddRange(reservations);
             await _context.SaveChangesAsync(cancellationToken);

@@ -1,59 +1,78 @@
-using Checkbus.ApiService.Application.Interfaces.Email;
+using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
-using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
+using Checkbus.ApiService.Domain.ValueObjects;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4). Same
-    // rationale as GetPublicTripSeatMapQueryHandler: NO ICurrentUserService, no org scoping —
-    // there is no authenticated caller on this public surface, the only gate is
-    // Trip.Status == Publicado.
+    // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4), reworked in
+    // odd/tasks/pagos-mercadopago.md Fase C into a payment-gated seat hold: the batch is now
+    // persisted as PendientePago (not Confirmada), covered by one Mercado Pago order (one
+    // Payment row), and the caller is redirected to that order's checkout_url instead of
+    // getting an immediate "reserva confirmada" response. Same posture as
+    // GetPublicTripSeatMapQueryHandler: NO ICurrentUserService, no org scoping — there is no
+    // authenticated caller on this public surface, the only gate is Trip.Status == Publicado.
     //
     // Double-booking is prevented on two layers, deliberately:
     //   1. A fast pre-check against existing Reservations for the requested SeatIds — gives the
     //      common (non-racing) case a clear, cheap rejection without touching the DB's
     //      constraint machinery.
     //   2. The REAL guarantee: a unique index on Reservation(TripId, SeatId)
-    //      (CheckbusDbContext.OnModelCreating). If another visitor's submit wins the race
-    //      between this handler's pre-check and its SaveChangesAsync, the insert throws
-    //      DbUpdateException, caught here and translated into the same domain-level failure.
-    //      IReservationRepository.CreateBatchAsync persists the whole Passenger+Reservation
-    //      batch in ONE SaveChangesAsync call, so a failed save rolls back everything —
-    //      nothing partial, matching this feature's explicit all-or-nothing design.
+    //      (CheckbusDbContext.OnModelCreating), which already excludes only Cancelada rows —
+    //      a PendientePago row blocks the seat for everyone else exactly like Confirmada did,
+    //      confirmed in Fase A. If another visitor's submit wins the race between this
+    //      handler's pre-check and its SaveChangesAsync, the insert throws DbUpdateException,
+    //      caught here and translated into the same domain-level failure.
+    //      IReservationRepository.CreateBatchAsync persists the whole Payment+Passenger+
+    //      Reservation batch in ONE SaveChangesAsync call, so a failed save rolls back
+    //      everything — nothing partial, matching this feature's explicit all-or-nothing
+    //      design.
+    //
+    // Ordering that avoids needing a rollback (Fase C design decision): Payment.Id is
+    // generated client-side, and IPaymentService.CreateOrderAsync is called BEFORE anything is
+    // persisted. Only once that gateway call succeeds does the handler write the Payment +
+    // Passengers + PendientePago Reservations in the single batch above. If CreateOrderAsync
+    // throws OrderCreationFailedException, nothing has been persisted yet, so there is nothing
+    // to roll back — the exception simply propagates to the controller like any other failure.
+    // The inverse (rare) failure — the gateway call succeeds but the subsequent DB write then
+    // fails for an unrelated reason — leaves a real Mercado Pago order with no matching local
+    // Payment/Reservation state; this is the exact "orphaned payment" case Fase D's webhook
+    // handler is designed to auto-refund once a notification eventually arrives for it, so no
+    // extra handling is added here for that rare path.
+    //
+    // Sending the "reserva confirmada" ticket email moved out of this handler entirely: a
+    // PendientePago hold has not been paid for yet, so confirming it by email here would be
+    // actively wrong. Fase D's PaymentApprovedEvent handler now owns building and sending that
+    // email once Mercado Pago's webhook actually confirms payment — this handler no longer
+    // depends on IEventRepository/IEmailService/PublicWebOptions at all.
     public class CreatePublicReservationCommandHandler
         : IRequestHandler<CreatePublicReservationCommand, CreatePublicReservationResultDto>
     {
         private readonly ITripRepository _tripRepository;
         private readonly ISeatRepository _seatRepository;
         private readonly IReservationRepository _reservationRepository;
-        private readonly IEventRepository _eventRepository;
-        private readonly IEmailService _emailService;
-        private readonly PublicWebOptions _publicWebOptions;
+        private readonly IPaymentService _paymentService;
         private readonly ILogger<CreatePublicReservationCommandHandler> _logger;
 
         public CreatePublicReservationCommandHandler(
             ITripRepository tripRepository,
             ISeatRepository seatRepository,
             IReservationRepository reservationRepository,
-            IEventRepository eventRepository,
-            IEmailService emailService,
-            PublicWebOptions publicWebOptions,
+            IPaymentService paymentService,
             ILogger<CreatePublicReservationCommandHandler> logger)
         {
             _tripRepository = tripRepository;
             _seatRepository = seatRepository;
             _reservationRepository = reservationRepository;
-            _eventRepository = eventRepository;
-            _emailService = emailService;
-            _publicWebOptions = publicWebOptions;
+            _paymentService = paymentService;
             _logger = logger;
         }
 
@@ -121,7 +140,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     SeatId = entry.SeatId,
                     PassengerId = passenger.Id,
                     Price = trip.Price,
-                    Status = ReservationStatus.Confirmada
+                    // Fase C: a seat hold, not an immediate confirmation — flips to Confirmada
+                    // only once Fase D's webhook sees the Mercado Pago order approved.
+                    Status = ReservationStatus.PendientePago
                 };
 
                 passengers.Add(passenger);
@@ -136,74 +157,64 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 });
             }
 
+            // Payment.Id is generated client-side, BEFORE any gateway or DB call, so it can be
+            // handed to Mercado Pago as external_reference up front (Fase C design decision —
+            // see class doc comment). Fase D's webhook resolves a notification back to this
+            // Payment via that same value.
+            var paymentId = Guid.NewGuid();
+            var totalAmount = new Money(reservations.Sum(r => r.Price));
+
+            // The whole point of this ordering: nothing is written to our DB until Mercado
+            // Pago confirms it opened the order. A failed gateway call
+            // (OrderCreationFailedException) propagates untouched — there is nothing to roll
+            // back, so it must not be caught/swallowed here.
+            var orderResult = await _paymentService.CreateOrderAsync(
+                new CreateOrderRequest(totalAmount, paymentId.ToString()), cancellationToken);
+
+            if (orderResult.CheckoutUrl is null)
+            {
+                // Documented-rare case (odd/tasks/pagos-mercadopago.md Fase B/C): Mercado
+                // Pago's own docs say a type: "online" order's response always carries a
+                // top-level checkout_url, so a null value here means this particular response
+                // diverged from that contract. Log it and still proceed — the order and the
+                // hold it is meant to cover are both real either way, and blocking the whole
+                // flow over a missing redirect URL would strand a paid-for order with no seat
+                // hold to show for it.
+                _logger.LogWarning(
+                    "Mercado Pago order {ExternalOrderId} for Payment {PaymentId} returned a null CheckoutUrl.",
+                    orderResult.OrderId, paymentId);
+            }
+
+            var payment = new Payment
+            {
+                Id = paymentId,
+                ExternalOrderId = orderResult.OrderId,
+                TotalAmount = totalAmount,
+                Status = PaymentStatus.Pendiente,
+                CreatedAt = DateTime.UtcNow
+            };
+
             try
             {
-                await _reservationRepository.CreateBatchAsync(passengers, reservations, cancellationToken);
+                await _reservationRepository.CreateBatchAsync(payment, passengers, reservations, cancellationToken);
             }
             catch (DbUpdateException)
             {
                 // The race path: another visitor's submit took one of these seats between our
                 // pre-check above and this SaveChangesAsync, caught here as a unique-constraint
                 // violation on Reservation(TripId, SeatId). The failed SaveChangesAsync already
-                // guarantees nothing from this batch was persisted — no partial cleanup needed.
+                // guarantees nothing from this batch was persisted locally — the Mercado Pago
+                // order itself was already created at this point and is left exactly as the
+                // class doc comment describes: an orphaned payment for Fase D's webhook to
+                // discover and auto-refund once its notification arrives.
                 throw new SeatsNoLongerAvailableException();
             }
 
-            // Event.Name is the only piece of ticket content not already in memory — one extra
-            // lookup, not persisted, scoped to the email body only.
-            var @event = await _eventRepository.GetByIdAsync(trip.EventId, cancellationToken);
-
-            // Sending happens after the batch is durably persisted: the reservation is already
-            // real at this point, so a flaky SMTP relay must never turn into a failed response
-            // for the passenger (same posture as EventNew.razor's "created but image upload
-            // failed" warning). One email per Passenger/Reservation row — a family of 3 may
-            // enter 3 different addresses on their own mini-form, and each gets their own ticket.
-            for (var i = 0; i < passengers.Count; i++)
+            return new CreatePublicReservationResultDto
             {
-                var passenger = passengers[i];
-                var reservation = reservations[i];
-
-                if (string.IsNullOrWhiteSpace(passenger.Email))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var message = BuildTicketEmail(@event?.Name, trip, passenger, reservation, created[i].SeatNumber);
-                    await _emailService.SendAsync(message, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(
-                        ex,
-                        "Failed to send reservation confirmation email for ReservationId {ReservationId}",
-                        reservation.Id);
-                }
-            }
-
-            return new CreatePublicReservationResultDto { Reservations = created };
-        }
-
-        private EmailMessage BuildTicketEmail(
-            string? eventName, Trip trip, Passenger passenger, Reservation reservation, int seatNumber)
-        {
-            var confirmationLink = $"{_publicWebOptions.BaseUrl}/reservas/confirmacion/{reservation.Id}";
-            var subject = $"Tu reserva para {eventName ?? "tu viaje"} está confirmada";
-            var body = $"""
-                <h2>¡Reserva confirmada!</h2>
-                <p>Hola {passenger.Name} {passenger.Surname},</p>
-                <p>Tu lugar para <strong>{eventName ?? "el evento"}</strong> quedó confirmado.</p>
-                <ul>
-                    <li>Fecha de salida: {trip.DepartureDate:dd/MM/yyyy HH:mm}</li>
-                    <li>Asiento: {seatNumber}</li>
-                    <li>Precio: {reservation.Price:C}</li>
-                </ul>
-                <p>Podés ver el detalle de tu reserva en el siguiente enlace:</p>
-                <p><a href="{confirmationLink}">{confirmationLink}</a></p>
-                """;
-
-            return new EmailMessage(passenger.Email, subject, body);
+                Reservations = created,
+                CheckoutUrl = orderResult.CheckoutUrl
+            };
         }
     }
 }

@@ -33,7 +33,7 @@ public class CancelReservationCommandHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(reservation);
 
-        public Task CreateBatchAsync(IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
+        public Task CreateBatchAsync(Checkbus.ApiService.Domain.Entities.Payments.Payment payment, IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
 
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)

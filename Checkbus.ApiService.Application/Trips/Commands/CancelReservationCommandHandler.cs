@@ -1,7 +1,12 @@
 using Checkbus.ApiService.Application.Interfaces.Email;
+using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Refunds;
+using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Domain.Exceptions.Payments;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
+using Checkbus.ApiService.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -33,6 +38,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly IPassengerRepository _passengerRepository;
         private readonly ISeatRepository _seatRepository;
         private readonly IEmailService _emailService;
+        private readonly IPaymentRepository _paymentRepository;
+        private readonly IPaymentService _paymentService;
+        private readonly IRefundRepository _refundRepository;
         private readonly ILogger<CancelReservationCommandHandler> _logger;
 
         public CancelReservationCommandHandler(
@@ -42,6 +50,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             IPassengerRepository passengerRepository,
             ISeatRepository seatRepository,
             IEmailService emailService,
+            IPaymentRepository paymentRepository,
+            IPaymentService paymentService,
+            IRefundRepository refundRepository,
             ILogger<CancelReservationCommandHandler> logger)
         {
             _reservationRepository = reservationRepository;
@@ -50,6 +61,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _passengerRepository = passengerRepository;
             _seatRepository = seatRepository;
             _emailService = emailService;
+            _paymentRepository = paymentRepository;
+            _paymentService = paymentService;
+            _refundRepository = refundRepository;
             _logger = logger;
         }
 
@@ -84,6 +98,30 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             await _reservationRepository.CancelAsync(reservation.Id, cancellationToken);
 
+            // Fase F (odd/tasks/pagos-mercadopago.md): the seat is now durably freed. Give the
+            // money back via Mercado Pago if there was ever a charge for it — a Reservation
+            // created before this feature shipped (or any edge case where it's unset) has
+            // PaymentId == null, meaning no Mercado Pago order was ever created for it, so
+            // there is nothing to refund; skip straight to the existing email step below.
+            // Wrapped in its own try/catch, separate from the email's: the Reservation is
+            // already durably cancelled at this point, so a flaky downstream Mercado Pago call
+            // must never turn into a failed cancellation response for the passenger — same
+            // posture this handler already takes with the confirmation email.
+            if (reservation.PaymentId is not null)
+            {
+                try
+                {
+                    await ProcessRefundAsync(reservation, reservation.PaymentId.Value, trip.Price, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to process Mercado Pago refund for ReservationId {ReservationId}",
+                        reservation.Id);
+                }
+            }
+
             // Sending happens after the cancellation is durably persisted: it is already real
             // at this point, so a flaky SMTP relay must never turn into a failed response for
             // the passenger (same posture M2's CreatePublicReservationCommandHandler uses for
@@ -108,6 +146,62 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     "Failed to send reservation cancellation email for ReservationId {ReservationId}",
                     reservation.Id);
             }
+        }
+
+        // Fase F1: partial if this Payment still covers other active seats, full if this was
+        // the last one. "Active" means still PendientePago or Confirmada — Cancelada siblings
+        // (including this one, already flipped by CancelAsync above) don't count. Refund amount
+        // comes from Trip.Price (the handler already loaded Trip for the 24h-window check
+        // above, reused here rather than re-fetching or reading Reservation.Price — both are
+        // the same value at creation time, see Reservation's own doc comment, but Trip.Price is
+        // the source of truth this Fase was asked to use).
+        private async Task ProcessRefundAsync(
+            Reservation reservation, Guid paymentId, decimal tripPrice, CancellationToken cancellationToken)
+        {
+            var payment = await _paymentRepository.GetByIdAsync(paymentId, cancellationToken)
+                ?? throw new PaymentNotFoundException();
+
+            // Defensive, not a business rule the passenger can trigger: a Payment reachable from
+            // a Reservation's own PaymentId FK should always be Aprobado/ParcialmenteReembolsado
+            // by the time someone cancels a Confirmada seat. Guards against attempting a refund
+            // on a Payment that was never actually charged (Pendiente) or has nothing left to
+            // give back (already fully Reembolsado) — PaymentNotRefundableException exists
+            // specifically for this (see its own doc comment).
+            if (payment.Status is PaymentStatus.Pendiente or PaymentStatus.Reembolsado)
+            {
+                throw new PaymentNotRefundableException();
+            }
+
+            var externalOrderId = payment.ExternalOrderId
+                ?? throw new PaymentNotRefundableException("Payment has no ExternalOrderId to refund.");
+
+            var siblings = await _reservationRepository.GetByPaymentIdAsync(paymentId, cancellationToken);
+            var hasActiveSiblings = siblings.Any(sibling =>
+                sibling.Id != reservation.Id
+                && (sibling.Status == ReservationStatus.PendientePago || sibling.Status == ReservationStatus.Confirmada));
+
+            var refundAmount = new Money(tripPrice);
+
+            // IPaymentService.RefundAsync returns Task (void) — Fase B's port has no return
+            // value to carry a gateway-issued refund id back, so Refund.ExternalRefundId stays
+            // null here (see Refund's own doc comment: the field is nullable for exactly this).
+            await _paymentService.RefundAsync(
+                externalOrderId, hasActiveSiblings ? refundAmount : null, cancellationToken);
+
+            await _refundRepository.AddAsync(new Refund
+            {
+                Id = Guid.NewGuid(),
+                PaymentId = payment.Id,
+                ReservationId = reservation.Id,
+                Amount = refundAmount,
+                ExternalRefundId = null,
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+            payment.Status = hasActiveSiblings
+                ? PaymentStatus.ParcialmenteReembolsado
+                : PaymentStatus.Reembolsado;
+            await _paymentRepository.UpdateAsync(payment, cancellationToken);
         }
 
         private static EmailMessage BuildCancellationEmail(

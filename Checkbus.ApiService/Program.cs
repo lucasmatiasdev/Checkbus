@@ -3,12 +3,14 @@ using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
+using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Email;
 using Checkbus.ApiService.Infrastructure.Implementations.Maps;
+using Checkbus.ApiService.Infrastructure.Implementations.Payments;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
 using Checkbus.ApiService.Infrastructure.Persistence;
@@ -60,6 +62,15 @@ var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
+// Mercado Pago binds permissively too, same reason as Email above: real sandbox credentials
+// have not been provisioned yet (G1, odd/tasks/pagos-mercadopago.md) so a missing section/
+// values must not fail startup.
+var mercadoPagoOptions = builder.Configuration.GetSection("MercadoPago").Get<MercadoPagoOptions>()
+    ?? new MercadoPagoOptions();
+
+builder.Services.AddSingleton(mercadoPagoOptions);
+builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
+
 // The Web app's externally-reachable base URL, used to build links embedded in outgoing
 // emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
 // on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
@@ -84,6 +95,9 @@ builder.Services.AddScoped<ISeatRepository, SeatRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
 builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {

@@ -76,7 +76,8 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                         Name = location?.Name ?? string.Empty,
                         Address = location?.Address ?? string.Empty,
                         Latitude = location?.Latitude ?? 0,
-                        Longitude = location?.Longitude ?? 0
+                        Longitude = location?.Longitude ?? 0,
+                        DepartureTime = stop.DepartureTime
                     });
                 }
             }

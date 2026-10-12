@@ -58,6 +58,10 @@ public class ValidateBoardingCommandHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by ValidateBoardingCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ValidateBoardingCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository(bool throwAlreadyValidated = false) : IBoardingRecordRepository

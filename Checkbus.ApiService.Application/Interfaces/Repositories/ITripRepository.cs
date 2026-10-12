@@ -27,5 +27,14 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // needed to persist the aggregate, never to read Route/Stops back.
         Task<Route?> GetRouteByTripIdAsync(Guid tripId, CancellationToken cancellationToken);
         Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken);
+
+        // Added for UpdateStopTimesCommandHandler (odd/tasks/mejoras-detalle-viaje.md Fase D) —
+        // the first standalone Stop write (every prior Stop write only ever happened as part of
+        // AddAsync's Trip/Route/Stops aggregate save). Stops are owned by the Trip aggregate, so
+        // this stays on ITripRepository rather than a new IStopRepository. One SaveChangesAsync
+        // call for the whole batch, same atomicity convention as every other batch write in this
+        // codebase (e.g. IReservationRepository.CreateBatchAsync).
+        Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken);
     }
 }

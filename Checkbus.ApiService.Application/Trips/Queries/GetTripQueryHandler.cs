@@ -60,12 +60,14 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
                     stopDtos.Add(new TripDetailDto.StopDto
                     {
+                        Id = stop.Id,
                         Order = stop.Order,
                         Type = stop.Type,
                         Name = location?.Name ?? string.Empty,
                         Address = location?.Address ?? string.Empty,
                         Latitude = location?.Latitude ?? 0,
-                        Longitude = location?.Longitude ?? 0
+                        Longitude = location?.Longitude ?? 0,
+                        DepartureTime = stop.DepartureTime
                     });
                 }
             }

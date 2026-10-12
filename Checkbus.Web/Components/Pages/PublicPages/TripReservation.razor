@@ -5,6 +5,7 @@
 @using Checkbus.Web.Features.PublicReservations.Services
 @using Checkbus.Web.Features.Trips.Contracts
 @using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Shared
 
 <PageTitle>Checkbus - Reservar</PageTitle>
 
@@ -86,7 +87,13 @@
                 @foreach (var stop in detail.Stops.OrderBy(s => s.Order))
                 {
                     <MudListItem T="PublicTripStop">
-                        <MudText Typo="Typo.body1">@(stop.Order + 1). @GetStopTypeLabel(stop.Type) — @stop.Name</MudText>
+                        <MudText Typo="Typo.body1">
+                            @(stop.Order + 1). @GetStopTypeLabel(stop.Type) — @stop.Name
+                            @if (stop.DepartureTime is { } departureTime)
+                            {
+                                <span> — @departureTime.ToString("HH:mm")</span>
+                            }
+                        </MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@stop.Address</MudText>
                     </MudListItem>
                 }
@@ -329,7 +336,7 @@
                     {
                         occupiedSeatNumbers.Add(number);
                     }
-                    SeatRows = BuildSeatRows(success.SeatMap.Capacity);
+                    SeatRows = SeatGridLayout.BuildSeatRows(success.SeatMap.Capacity);
                     break;
 
                 case PublicTripSeatMapOutcome.NotFound:
@@ -345,24 +352,6 @@
         {
             isLoadingSeatMap = false;
         }
-    }
-
-    private static List<int?[]> BuildSeatRows(int capacity)
-    {
-        var rows = new List<int?[]>();
-        var seatNumber = 1;
-
-        while (seatNumber <= capacity)
-        {
-            var row = new int?[5];
-            for (var slot = 0; slot < 5 && seatNumber <= capacity; slot++)
-            {
-                row[slot] = slot == 2 ? null : seatNumber++;
-            }
-            rows.Add(row);
-        }
-
-        return rows;
     }
 
     private void ToggleSeat(int seatNumber)

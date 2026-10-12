@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Application.Trips.Queries;
+using Checkbus.ApiService.Contracts;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -53,6 +54,38 @@ namespace Checkbus.ApiService.Controllers
         {
             await _mediator.Send(new PublishTripCommand { Id = id }, cancellationToken);
             return NoContent();
+        }
+
+        // Narrow update of the Route's Stops, not the whole Trip resource — same PUT-with-204
+        // shape idea the project doesn't have a prior precedent for on this controller, but
+        // matches a plain partial-update convention. TripId comes exclusively from the route
+        // ({id}), never trusted from the body (odd/tasks/mejoras-detalle-viaje.md Fase D3).
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpPut("{id:guid}/stops/times")]
+        public async Task<IActionResult> UpdateStopTimes(
+            Guid id, [FromBody] UpdateStopTimesRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdateStopTimesCommand
+            {
+                TripId = id,
+                Stops = request.Stops
+                    .Select(s => new StopDepartureTimeUpdate { StopId = s.StopId, DepartureTime = s.DepartureTime })
+                    .ToList()
+            };
+
+            await _mediator.Send(command, cancellationToken);
+            return NoContent();
+        }
+
+        // New authenticated, org-scoped seat-map surface for the Planificador
+        // (odd/tasks/mejoras-detalle-viaje.md Fase E1) — same occupancy computation as the
+        // public GetPublicTripSeatMapQuery, no Trip.Status == Publicado gate.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpGet("{id:guid}/seats")]
+        public async Task<IActionResult> GetSeatMap(Guid id, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetTripSeatMapQuery { TripId = id }, cancellationToken);
+            return Ok(result);
         }
     }
 }

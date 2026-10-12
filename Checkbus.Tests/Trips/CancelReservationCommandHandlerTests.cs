@@ -72,6 +72,10 @@ public class CancelReservationCommandHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository(BoardingRecord? record) : IBoardingRecordRepository

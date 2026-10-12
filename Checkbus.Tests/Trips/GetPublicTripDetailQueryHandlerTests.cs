@@ -40,6 +40,10 @@ public class GetPublicTripDetailQueryHandlerTests
 
         public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
             => Task.FromResult(stops ?? []);
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository
@@ -171,7 +175,7 @@ public class GetPublicTripDetailQueryHandlerTests
         };
         var route = new Route { Id = Guid.NewGuid(), TripId = trip.Id, EstimatedDuration = TimeSpan.FromHours(2), DistanceKm = 50m };
         var location = new Location { Id = Guid.NewGuid(), Name = "Terminal", Address = "Av. Siempre Viva 123", PlaceId = "place-1", Latitude = -34.6, Longitude = -58.4 };
-        var stop = new Stop { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = location.Id, Order = 0, Type = StopType.Origen };
+        var stop = new Stop { Id = Guid.NewGuid(), RouteId = route.Id, LocationId = location.Id, Order = 0, Type = StopType.Origen, DepartureTime = trip.DepartureDate };
         var reservation = new Reservation { Id = Guid.NewGuid(), TripId = trip.Id, SeatId = Guid.NewGuid(), PassengerId = Guid.NewGuid(), Price = trip.Price };
 
         var handler = CreateHandler(
@@ -199,6 +203,7 @@ public class GetPublicTripDetailQueryHandlerTests
         Assert.Single(result.Stops);
         Assert.Equal("Terminal", result.Stops[0].Name);
         Assert.Equal(StopType.Origen, result.Stops[0].Type);
+        Assert.Equal(trip.DepartureDate, result.Stops[0].DepartureTime);
     }
 
     [Fact]

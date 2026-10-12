@@ -1,0 +1,73 @@
+@using Checkbus.Web.Shared.Models
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Revisá el viaje antes de publicarlo</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="1" Class="mb-4">
+            <MudText Typo="Typo.body1"><strong>Evento:</strong> @EventName</MudText>
+            <MudText Typo="Typo.body1"><strong>Vehículo:</strong> @VehicleLabel</MudText>
+            <MudText Typo="Typo.body1"><strong>Chofer:</strong> @DriverName</MudText>
+            <MudText Typo="Typo.body1"><strong>Precio:</strong> @Price.ToString("C")</MudText>
+        </MudStack>
+
+        <MudTimeline TimelinePosition="TimelinePosition.Left">
+            <MudTimelineItem Color="Color.Primary">
+                <MudText Typo="Typo.subtitle2">Salida — @DepartureDateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
+                <MudText Typo="Typo.body2">@Stops[0].Nombre (@Stops[0].Direccion)</MudText>
+            </MudTimelineItem>
+
+            @foreach (var stop in Stops.Skip(1).Take(Stops.Count - 2))
+            {
+                <MudTimelineItem Color="Color.Default">
+                    <MudText Typo="Typo.subtitle2">Parada</MudText>
+                    <MudText Typo="Typo.body2">@stop.Nombre (@stop.Direccion)</MudText>
+                </MudTimelineItem>
+            }
+
+            <MudTimelineItem Color="Color.Secondary">
+                <MudText Typo="Typo.subtitle2">Llegada — @ArrivalDateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
+                <MudText Typo="Typo.body2">@Stops[^1].Nombre (@Stops[^1].Direccion)</MudText>
+            </MudTimelineItem>
+        </MudTimeline>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Volver a editar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Confirm">Confirmar y publicar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Shown by TripNew.razor's HandleValidSubmit BEFORE the actual CreateAsync call — nothing
+    // is persisted until the user confirms here. The timeline exists specifically so a
+    // Departure/Arrival date mix-up (entered in the wrong field) is visually obvious before
+    // submission, rather than only discoverable afterward.
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public required string EventName { get; set; }
+
+    [Parameter]
+    public required string VehicleLabel { get; set; }
+
+    [Parameter]
+    public required string DriverName { get; set; }
+
+    [Parameter]
+    public required DateTime DepartureDateTime { get; set; }
+
+    [Parameter]
+    public required DateTime ArrivalDateTime { get; set; }
+
+    [Parameter]
+    public required decimal Price { get; set; }
+
+    [Parameter]
+    public required IReadOnlyList<PickedLocation> Stops { get; set; }
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+}

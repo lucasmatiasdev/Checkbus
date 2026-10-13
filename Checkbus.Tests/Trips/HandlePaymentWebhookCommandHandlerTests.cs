@@ -70,13 +70,13 @@ public class HandlePaymentWebhookCommandHandlerTests
         public int RefundCallCount { get; private set; }
         public Money? LastRefundAmount { get; private set; }
 
-        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken)
+        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
 
-        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken)
+        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken, string sellerAccessToken = "")
             => Task.FromResult(new OrderStatusResult(externalOrderId, status));
 
-        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken)
+        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
             RefundCallCount++;
             LastRefundAmount = amount;

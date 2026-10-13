@@ -86,13 +86,13 @@ public class CancelReservationCommandHandlerTests
         public string? LastExternalOrderId { get; private set; }
         public Money? LastRefundAmount { get; private set; }
 
-        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken)
+        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
 
-        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken)
+        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
 
-        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken)
+        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
             if (throwOnRefund)
             {

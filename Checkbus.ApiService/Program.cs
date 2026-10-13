@@ -5,6 +5,7 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Application.Payments;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
@@ -70,6 +71,16 @@ var mercadoPagoOptions = builder.Configuration.GetSection("MercadoPago").Get<Mer
 
 builder.Services.AddSingleton(mercadoPagoOptions);
 builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
+
+// Fase I (odd/tasks/pagos-mercadopago.md, Marketplace/Split Payments): encrypts/decrypts
+// MercadoPagoConnection.AccessToken/RefreshToken at rest (OrganizationMercadoPagoConnectionRepository).
+// AddDataProtection() registers IDataProtectionProvider explicitly rather than relying on it
+// being pulled in incidentally by some other ASP.NET Core feature (Antiforgery/cookie auth)
+// that might not always be present.
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<IMercadoPagoOAuthService, MercadoPagoOAuthService>();
+builder.Services.AddScoped<IOrganizationMercadoPagoConnectionRepository, OrganizationMercadoPagoConnectionRepository>();
+builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
 
 // The Web app's externally-reachable base URL, used to build links embedded in outgoing
 // emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address

@@ -18,5 +18,9 @@ public class MercadoPagoOptionsTests
 
         Assert.Equal(string.Empty, options.AccessToken);
         Assert.Equal(string.Empty, options.WebhookSecret);
+        // Fase I (odd/tasks/pagos-mercadopago.md): Checkbus's own platform-app OAuth credentials.
+        Assert.Equal(string.Empty, options.ClientId);
+        Assert.Equal(string.Empty, options.ClientSecret);
+        Assert.Equal(string.Empty, options.RedirectUri);
     }
 }

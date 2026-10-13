@@ -220,6 +220,41 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.ToTable("Passengers");
                 });
 
+            modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Payments.MercadoPagoConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RefreshToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SellerUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique();
+
+                    b.ToTable("MercadoPagoConnections");
+                });
+
             modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Payments.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -857,6 +892,15 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.HasOne("Checkbus.ApiService.Domain.Entities.Trips.Trip", null)
                         .WithMany()
                         .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Payments.MercadoPagoConnection", b =>
+                {
+                    b.HasOne("Checkbus.ApiService.Domain.Entities.Tenancy.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

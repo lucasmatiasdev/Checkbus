@@ -40,6 +40,10 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<Refund> Refunds => Set<Refund>();
 
+        // Fase I (odd/tasks/pagos-mercadopago.md) — Marketplace/Split Payments: one connected
+        // Mercado Pago seller account per Organization.
+        public DbSet<MercadoPagoConnection> MercadoPagoConnections => Set<MercadoPagoConnection>();
+
         // Fase D (odd/tasks/pagos-mercadopago.md) — Infrastructure-only EF-mapped class with no
         // Domain/business meaning, see its own doc comment for why.
         public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
@@ -303,6 +307,18 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 // The whole point of this table: a given Mercado Pago notification id is
                 // recorded at most once (Fase D3's dedupe guarantee).
                 entity.HasIndex(x => x.ExternalEventId).IsUnique();
+            });
+
+            modelBuilder.Entity<MercadoPagoConnection>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                // At most one connection per Organization (odd/tasks/pagos-mercadopago.md Fase I,
+                // I1) — the DB itself enforces this, not just the repository's own
+                // find-then-insert-or-update UpsertAsync logic.
+                entity.HasIndex(x => x.OrganizationId).IsUnique();
+                entity.HasOne<Organization>()
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId);
             });
         }
     }

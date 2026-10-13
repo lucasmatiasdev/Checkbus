@@ -146,7 +146,7 @@ public class CreatePublicReservationCommandHandlerTests
     {
         public CreateOrderRequest? ReceivedRequest { get; private set; }
 
-        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken)
+        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
             ReceivedRequest = request;
 
@@ -159,10 +159,10 @@ public class CreatePublicReservationCommandHandlerTests
                 createOrderResult ?? new CreateOrderResult("mp-order-default", "https://mercadopago.test/checkout/default"));
         }
 
-        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken)
+        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
 
-        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken)
+        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 

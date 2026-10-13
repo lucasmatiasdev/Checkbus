@@ -10,6 +10,7 @@ using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Entities.Seats;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Domain.Exceptions.Payments;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -85,6 +86,7 @@ public class CancelReservationCommandHandlerTests
         public int RefundCallCount { get; private set; }
         public string? LastExternalOrderId { get; private set; }
         public Money? LastRefundAmount { get; private set; }
+        public string? LastSellerAccessToken { get; private set; }
 
         public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
@@ -102,7 +104,29 @@ public class CancelReservationCommandHandlerTests
             RefundCallCount++;
             LastExternalOrderId = externalOrderId;
             LastRefundAmount = amount;
+            LastSellerAccessToken = sellerAccessToken;
             return Task.CompletedTask;
+        }
+    }
+
+    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — same fake style as every other port fake in
+    // this file. Defaults to a successful resolution so every pre-existing test keeps working
+    // unchanged.
+    private sealed class FakeMercadoPagoSellerTokenResolver(
+        string token = "seller-access-token", Exception? exception = null) : IMercadoPagoSellerTokenResolver
+    {
+        public Guid? ReceivedOrganizationId { get; private set; }
+
+        public Task<string> ResolveAccessTokenAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            ReceivedOrganizationId = organizationId;
+
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult(token);
         }
     }
 
@@ -255,7 +279,8 @@ public class CancelReservationCommandHandlerTests
         FakeEmailService? emailService = null,
         FakePaymentRepository? paymentRepository = null,
         FakePaymentService? paymentService = null,
-        FakeRefundRepository? refundRepository = null)
+        FakeRefundRepository? refundRepository = null,
+        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null)
     {
         return new CancelReservationCommandHandler(
             reservationRepository,
@@ -266,6 +291,7 @@ public class CancelReservationCommandHandlerTests
             emailService ?? new FakeEmailService(),
             paymentRepository ?? new FakePaymentRepository(null),
             paymentService ?? new FakePaymentService(),
+            sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
             refundRepository ?? new FakeRefundRepository(),
             NullLogger<CancelReservationCommandHandler>.Instance);
     }
@@ -548,6 +574,69 @@ public class CancelReservationCommandHandlerTests
         Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
 
         // The failed call never got to persist anything downstream of it.
+        Assert.Empty(refundRepository.AddedRefunds);
+        Assert.Equal(0, paymentRepository.UpdateCallCount);
+    }
+
+    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
+
+    [Fact]
+    public async Task Handle_ResolvesSellerToken_AndPassesItThroughToRefundAsync()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(token: "org-specific-token");
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository,
+            sellerTokenResolver: sellerTokenResolver);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(trip.OrganizationId, sellerTokenResolver.ReceivedOrganizationId);
+        Assert.Equal("org-specific-token", paymentService.LastSellerAccessToken);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotConnected_ReservationStillCancelled()
+    {
+        // No global fallback token exists any more (Fase I's whole point) — the resolver's
+        // OrganizationNotConnectedToMercadoPagoException is caught by the SAME try/catch that
+        // already wraps ProcessRefundAsync (same posture as a flaky RefundAsync call itself):
+        // the already-persisted cancellation must never be undone by a downstream refund
+        // failure.
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(
+            exception: new OrganizationNotConnectedToMercadoPagoException());
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository,
+            sellerTokenResolver: sellerTokenResolver);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(reservation.Id, reservationRepository.CancelledReservationId);
+        Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
+
+        // The failed resolution never got to persist anything downstream of it.
+        Assert.Equal(0, paymentService.RefundCallCount);
         Assert.Empty(refundRepository.AddedRefunds);
         Assert.Equal(0, paymentRepository.UpdateCallCount);
     }

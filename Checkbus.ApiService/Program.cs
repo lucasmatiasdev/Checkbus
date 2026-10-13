@@ -81,6 +81,10 @@ builder.Services.AddDataProtection();
 builder.Services.AddScoped<IMercadoPagoOAuthService, MercadoPagoOAuthService>();
 builder.Services.AddScoped<IOrganizationMercadoPagoConnectionRepository, OrganizationMercadoPagoConnectionRepository>();
 builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
+// I7's own CSRF/account-linking state token — see IMercadoPagoConnectionStateService's own doc
+// comment for why this is a separate Data Protection purpose from
+// OrganizationMercadoPagoConnectionRepository's token encryption.
+builder.Services.AddScoped<IMercadoPagoConnectionStateService, MercadoPagoConnectionStateService>();
 
 // The Web app's externally-reachable base URL, used to build links embedded in outgoing
 // emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address

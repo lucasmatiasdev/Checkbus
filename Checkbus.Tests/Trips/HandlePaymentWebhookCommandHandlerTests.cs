@@ -7,7 +7,9 @@ using Checkbus.ApiService.Domain.Entities.Invoices;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Domain.Exceptions.Payments;
 using Checkbus.ApiService.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -69,18 +71,75 @@ public class HandlePaymentWebhookCommandHandlerTests
     {
         public int RefundCallCount { get; private set; }
         public Money? LastRefundAmount { get; private set; }
+        public string? LastGetOrderSellerAccessToken { get; private set; }
+        public string? LastRefundSellerAccessToken { get; private set; }
 
         public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
             => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
 
         public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken, string sellerAccessToken = "")
-            => Task.FromResult(new OrderStatusResult(externalOrderId, status));
+        {
+            LastGetOrderSellerAccessToken = sellerAccessToken;
+            return Task.FromResult(new OrderStatusResult(externalOrderId, status));
+        }
 
         public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
             RefundCallCount++;
             LastRefundAmount = amount;
+            LastRefundSellerAccessToken = sellerAccessToken;
             return Task.CompletedTask;
+        }
+    }
+
+    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — same fake-repository style as every other
+    // fake in this file; only GetByIdAsync is ever exercised by this handler.
+    private sealed class FakeTripRepository(Trip? trip) : ITripRepository
+    {
+        public Task AddAsync(Trip trip, Route route, IEnumerable<Stop> stops, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+            => Task.FromResult(trip is not null && trip.Id == id ? trip : null);
+
+        public Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetOverlappingByVehicleIdAsync(Guid vehicleId, DateTime departureDate, DateTime arrivalDate, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetOverlappingByDriverIdAsync(Guid driverId, DateTime departureDate, DateTime arrivalDate, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<Route?> GetRouteByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<IReadOnlyList<Stop>> GetStopsByRouteIdAsync(Guid routeId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task UpdateStopDepartureTimesAsync(
+            IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+    }
+
+    private sealed class FakeMercadoPagoSellerTokenResolver(
+        string token = "seller-access-token", Exception? exception = null) : IMercadoPagoSellerTokenResolver
+    {
+        public Guid? ReceivedOrganizationId { get; private set; }
+
+        public Task<string> ResolveAccessTokenAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            ReceivedOrganizationId = organizationId;
+
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult(token);
         }
     }
 
@@ -200,6 +259,23 @@ public class HandlePaymentWebhookCommandHandlerTests
         CreatedAt = DateTime.UtcNow
     };
 
+    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — minimal valid Trip for a given id, used
+    // only so FakeTripRepository can resolve the Organization behind a test's Reservation(s).
+    private static Trip CreateTrip(Guid id) => new()
+    {
+        Id = id,
+        OrganizationId = Guid.NewGuid(),
+        DriverId = Guid.NewGuid(),
+        VehicleId = Guid.NewGuid(),
+        EventId = Guid.NewGuid(),
+        DepartureDate = DateTime.UtcNow.AddDays(10),
+        ArrivalDate = DateTime.UtcNow.AddDays(10).AddHours(4),
+        Capacity = 45,
+        AvailableSeats = 45,
+        Price = 1500m,
+        Status = TripStatus.Publicado
+    };
+
     [Fact]
     public async Task Handle_DuplicateEventId_IsANoOp()
     {
@@ -239,11 +315,16 @@ public class HandlePaymentWebhookCommandHandlerTests
         var invoiceRepository = new FakeInvoiceRepository();
         var publisher = new FakePublisher();
         var paymentRepository = new FakePaymentRepository(payment);
+        // Fase I: only reservations[0] (reservation1)'s TripId is ever looked up to resolve the
+        // Organization behind this Payment — same "any one Reservation" posture the handler's
+        // own doc comment describes.
+        var tripRepository = new FakeTripRepository(CreateTrip(reservation1.TripId));
 
         var handler = CreateHandler(
             new FakeProcessedWebhookEventRepository(), paymentRepository,
             new FakePaymentService(MercadoPagoOrderStatus.Approved), reservationRepository, invoiceRepository,
-            new FakePassengerRepository([passenger1, passenger2]), new FakeEmailService(), publisher);
+            new FakePassengerRepository([passenger1, passenger2]), new FakeEmailService(), publisher,
+            tripRepository);
 
         await handler.Handle(
             new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
@@ -272,11 +353,13 @@ public class HandlePaymentWebhookCommandHandlerTests
 
         var reservationRepository = new FakeReservationRepository([reservation]);
         var publisher = new FakePublisher();
+        var tripRepository = new FakeTripRepository(CreateTrip(reservation.TripId));
 
         var handler = CreateHandler(
             new FakeProcessedWebhookEventRepository(), new FakePaymentRepository(payment),
             new FakePaymentService(MercadoPagoOrderStatus.Rejected), reservationRepository, new FakeInvoiceRepository(),
-            new FakePassengerRepository([passenger]), new FakeEmailService(), publisher);
+            new FakePassengerRepository([passenger]), new FakeEmailService(), publisher,
+            tripRepository);
 
         await handler.Handle(
             new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
@@ -302,11 +385,13 @@ public class HandlePaymentWebhookCommandHandlerTests
         var publisher = new FakePublisher();
         var paymentService = new FakePaymentService(MercadoPagoOrderStatus.Approved);
         var emailService = new FakeEmailService();
+        var tripRepository = new FakeTripRepository(CreateTrip(reservation.TripId));
 
         var handler = CreateHandler(
             new FakeProcessedWebhookEventRepository(), new FakePaymentRepository(payment),
             paymentService, reservationRepository, invoiceRepository,
-            new FakePassengerRepository([passenger]), emailService, publisher);
+            new FakePassengerRepository([passenger]), emailService, publisher,
+            tripRepository);
 
         await handler.Handle(
             new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
@@ -346,6 +431,87 @@ public class HandlePaymentWebhookCommandHandlerTests
         Assert.Equal(1, processedEvents.RecordCallCount);
     }
 
+    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
+
+    [Fact]
+    public async Task Handle_Approved_ResolvesSellerToken_AndPassesItThroughToGetOrderAsync()
+    {
+        var passenger = CreatePassenger();
+        var reservation = CreateReservation(passenger.Id);
+        var payment = CreatePayment();
+        var trip = CreateTrip(reservation.TripId);
+
+        var reservationRepository = new FakeReservationRepository([reservation]);
+        var paymentService = new FakePaymentService(MercadoPagoOrderStatus.Approved);
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(token: "org-specific-token");
+
+        var handler = CreateHandler(
+            new FakeProcessedWebhookEventRepository(), new FakePaymentRepository(payment),
+            paymentService, reservationRepository, new FakeInvoiceRepository(),
+            new FakePassengerRepository([passenger]), new FakeEmailService(), new FakePublisher(),
+            new FakeTripRepository(trip), sellerTokenResolver);
+
+        await handler.Handle(
+            new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(trip.OrganizationId, sellerTokenResolver.ReceivedOrganizationId);
+        Assert.Equal("org-specific-token", paymentService.LastGetOrderSellerAccessToken);
+    }
+
+    [Fact]
+    public async Task Handle_OrphanedApproval_PassesSellerTokenThroughToRefundAsync()
+    {
+        var passenger = CreatePassenger();
+        var reservation = CreateReservation(passenger.Id, status: ReservationStatus.Cancelada);
+        var payment = CreatePayment();
+        var trip = CreateTrip(reservation.TripId);
+
+        var reservationRepository = new FakeReservationRepository([reservation]);
+        var paymentService = new FakePaymentService(MercadoPagoOrderStatus.Approved);
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(token: "org-specific-token");
+
+        var handler = CreateHandler(
+            new FakeProcessedWebhookEventRepository(), new FakePaymentRepository(payment),
+            paymentService, reservationRepository, new FakeInvoiceRepository(),
+            new FakePassengerRepository([passenger]), new FakeEmailService(), new FakePublisher(),
+            new FakeTripRepository(trip), sellerTokenResolver);
+
+        await handler.Handle(
+            new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("org-specific-token", paymentService.LastRefundSellerAccessToken);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotConnected_PropagatesWithoutUpdatingPayment()
+    {
+        var passenger = CreatePassenger();
+        var reservation = CreateReservation(passenger.Id);
+        var payment = CreatePayment();
+        var trip = CreateTrip(reservation.TripId);
+
+        var reservationRepository = new FakeReservationRepository([reservation]);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(
+            exception: new OrganizationNotConnectedToMercadoPagoException());
+
+        var handler = CreateHandler(
+            new FakeProcessedWebhookEventRepository(), paymentRepository,
+            new FakePaymentService(MercadoPagoOrderStatus.Approved), reservationRepository, new FakeInvoiceRepository(),
+            new FakePassengerRepository([passenger]), new FakeEmailService(), new FakePublisher(),
+            new FakeTripRepository(trip), sellerTokenResolver);
+
+        await Assert.ThrowsAsync<OrganizationNotConnectedToMercadoPagoException>(() =>
+            handler.Handle(
+                new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
+                TestContext.Current.CancellationToken));
+
+        // GetOrderAsync/UpdateAsync never ran — the exception propagated before either.
+        Assert.Equal(0, paymentRepository.UpdateCallCount);
+    }
+
     private static HandlePaymentWebhookCommandHandler CreateHandler(
         FakeProcessedWebhookEventRepository processedEvents,
         FakePaymentRepository paymentRepository,
@@ -354,13 +520,17 @@ public class HandlePaymentWebhookCommandHandlerTests
         FakeInvoiceRepository invoiceRepository,
         FakePassengerRepository passengerRepository,
         FakeEmailService emailService,
-        FakePublisher publisher)
+        FakePublisher publisher,
+        FakeTripRepository? tripRepository = null,
+        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null)
     {
         return new HandlePaymentWebhookCommandHandler(
             processedEvents,
             paymentRepository,
             paymentService,
             reservationRepository,
+            tripRepository ?? new FakeTripRepository(null),
+            sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
             invoiceRepository,
             passengerRepository,
             emailService,

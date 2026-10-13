@@ -82,6 +82,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly ISeatRepository _seatRepository;
         private readonly IReservationRepository _reservationRepository;
         private readonly IPaymentService _paymentService;
+        private readonly IMercadoPagoSellerTokenResolver _sellerTokenResolver;
         private readonly PublicWebOptions _publicWebOptions;
         private readonly ILogger<CreatePublicReservationCommandHandler> _logger;
 
@@ -90,6 +91,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             ISeatRepository seatRepository,
             IReservationRepository reservationRepository,
             IPaymentService paymentService,
+            IMercadoPagoSellerTokenResolver sellerTokenResolver,
             PublicWebOptions publicWebOptions,
             ILogger<CreatePublicReservationCommandHandler> logger)
         {
@@ -97,6 +99,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _seatRepository = seatRepository;
             _reservationRepository = reservationRepository;
             _paymentService = paymentService;
+            _sellerTokenResolver = sellerTokenResolver;
             _publicWebOptions = publicWebOptions;
             _logger = logger;
         }
@@ -216,6 +219,15 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 pendingUrl = confirmationUrl;
             }
 
+            // Fase I (Marketplace/Split Payments): real money must land in THIS trip's own
+            // Organization's Mercado Pago account, not Checkbus's. No global fallback token
+            // exists any more — an Organization that never connected its own seller account
+            // throws OrganizationNotConnectedToMercadoPagoException here, propagated unhandled
+            // exactly like OrderCreationFailedException below (nothing persisted yet at this
+            // point in the handler, so there is nothing to roll back).
+            var sellerAccessToken = await _sellerTokenResolver.ResolveAccessTokenAsync(
+                trip.OrganizationId, cancellationToken);
+
             // The whole point of this ordering: nothing is written to our DB until Mercado
             // Pago confirms it opened the order. A failed gateway call
             // (OrderCreationFailedException) propagates untouched — there is nothing to roll
@@ -227,7 +239,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     SuccessUrl: successUrl,
                     FailureUrl: failureUrl,
                     PendingUrl: pendingUrl),
-                cancellationToken);
+                cancellationToken,
+                sellerAccessToken);
 
             if (orderResult.CheckoutUrl is null)
             {

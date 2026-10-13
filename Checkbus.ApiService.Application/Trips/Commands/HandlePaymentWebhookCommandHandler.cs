@@ -44,6 +44,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly IPaymentRepository _paymentRepository;
         private readonly IPaymentService _paymentService;
         private readonly IReservationRepository _reservationRepository;
+        private readonly ITripRepository _tripRepository;
+        private readonly IMercadoPagoSellerTokenResolver _sellerTokenResolver;
         private readonly IInvoiceRepository _invoiceRepository;
         private readonly IPassengerRepository _passengerRepository;
         private readonly IEmailService _emailService;
@@ -55,6 +57,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             IPaymentRepository paymentRepository,
             IPaymentService paymentService,
             IReservationRepository reservationRepository,
+            ITripRepository tripRepository,
+            IMercadoPagoSellerTokenResolver sellerTokenResolver,
             IInvoiceRepository invoiceRepository,
             IPassengerRepository passengerRepository,
             IEmailService emailService,
@@ -65,6 +69,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _paymentRepository = paymentRepository;
             _paymentService = paymentService;
             _reservationRepository = reservationRepository;
+            _tripRepository = tripRepository;
+            _sellerTokenResolver = sellerTokenResolver;
             _invoiceRepository = invoiceRepository;
             _passengerRepository = passengerRepository;
             _emailService = emailService;
@@ -92,9 +98,38 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 return;
             }
 
+            // Fase I (Marketplace/Split Payments): resolve which Organization's own Mercado
+            // Pago seller token covers this Payment — via any one of its linked Reservations'
+            // Trip (the only entity in this module carrying OrganizationId) — BEFORE the
+            // authoritative GetOrderAsync call below, since that call now needs it too. If
+            // either hop can't be resolved (should not normally happen, FK integrity), log and
+            // skip rather than crash the webhook — same defensive posture as the "unknown
+            // ExternalOrderId" case just above. OrganizationNotConnectedToMercadoPagoException
+            // itself is NOT caught here and propagates normally for the resolvable case, per
+            // this Fase's own instruction.
+            var reservationsForToken = await _reservationRepository.GetByPaymentIdAsync(payment.Id, cancellationToken);
+            if (reservationsForToken.Count == 0)
+            {
+                _logger.LogWarning(
+                    "No Reservations linked to Payment {PaymentId}; cannot resolve an Organization for its Mercado Pago seller token.",
+                    payment.Id);
+                return;
+            }
+
+            var trip = await _tripRepository.GetByIdAsync(reservationsForToken[0].TripId, cancellationToken);
+            if (trip is null)
+            {
+                _logger.LogWarning(
+                    "Trip {TripId} referenced by Payment {PaymentId}'s Reservations was not found; cannot resolve its Organization's Mercado Pago seller token.",
+                    reservationsForToken[0].TripId, payment.Id);
+                return;
+            }
+
+            var sellerAccessToken = await _sellerTokenResolver.ResolveAccessTokenAsync(trip.OrganizationId, cancellationToken);
+
             // Authoritative status, never the webhook body's own status field (this Fase's own
             // rule — see class doc comment).
-            var orderStatus = await _paymentService.GetOrderAsync(request.ExternalOrderId, cancellationToken);
+            var orderStatus = await _paymentService.GetOrderAsync(request.ExternalOrderId, cancellationToken, sellerAccessToken);
             var mappedStatus = MapStatus(orderStatus.Status);
             if (mappedStatus is null)
             {
@@ -110,7 +145,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             switch (mappedStatus.Value)
             {
                 case PaymentStatus.Aprobado:
-                    await HandleApprovedAsync(payment, request.ExternalOrderId, cancellationToken);
+                    await HandleApprovedAsync(payment, request.ExternalOrderId, sellerAccessToken, cancellationToken);
                     break;
 
                 case PaymentStatus.Rechazado:
@@ -125,7 +160,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             }
         }
 
-        private async Task HandleApprovedAsync(Payment payment, string externalOrderId, CancellationToken cancellationToken)
+        private async Task HandleApprovedAsync(
+            Payment payment, string externalOrderId, string sellerAccessToken, CancellationToken cancellationToken)
         {
             var reservations = await _reservationRepository.GetByPaymentIdAsync(payment.Id, cancellationToken);
 
@@ -139,7 +175,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             if (!allStillHeld)
             {
-                await HandleOrphanedApprovalAsync(payment, externalOrderId, reservations, cancellationToken);
+                await HandleOrphanedApprovalAsync(payment, externalOrderId, reservations, sellerAccessToken, cancellationToken);
                 return;
             }
 
@@ -170,9 +206,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         // was genuinely paid, but the hold it was meant to cover is gone — refund
         // unconditionally rather than queue for manual review, since real money was charged.
         private async Task HandleOrphanedApprovalAsync(
-            Payment payment, string externalOrderId, IReadOnlyList<Reservation> reservations, CancellationToken cancellationToken)
+            Payment payment, string externalOrderId, IReadOnlyList<Reservation> reservations,
+            string sellerAccessToken, CancellationToken cancellationToken)
         {
-            await _paymentService.RefundAsync(externalOrderId, amount: null, cancellationToken);
+            await _paymentService.RefundAsync(externalOrderId, amount: null, cancellationToken, sellerAccessToken);
 
             payment.Status = PaymentStatus.Reembolsado;
             await _paymentRepository.UpdateAsync(payment, cancellationToken);

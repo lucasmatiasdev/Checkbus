@@ -145,10 +145,12 @@ public class CreatePublicReservationCommandHandlerTests
         Exception? createOrderException = null) : IPaymentService
     {
         public CreateOrderRequest? ReceivedRequest { get; private set; }
+        public string? ReceivedSellerAccessToken { get; private set; }
 
         public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
             ReceivedRequest = request;
+            ReceivedSellerAccessToken = sellerAccessToken;
 
             if (createOrderException is not null)
             {
@@ -166,6 +168,28 @@ public class CreatePublicReservationCommandHandlerTests
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
+    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — fake IMercadoPagoSellerTokenResolver, same
+    // NotSupportedException-for-unused/public-list-for-assertions style as every other fake in
+    // this file. Defaults to a successful resolution so every pre-existing test that doesn't
+    // care about the resolver at all keeps working unchanged.
+    private sealed class FakeMercadoPagoSellerTokenResolver(
+        string token = "seller-access-token", Exception? exception = null) : IMercadoPagoSellerTokenResolver
+    {
+        public Guid? ReceivedOrganizationId { get; private set; }
+
+        public Task<string> ResolveAccessTokenAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            ReceivedOrganizationId = organizationId;
+
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult(token);
+        }
+    }
+
     private static Event CreateEvent(string name = "Cosquin Rock") => new()
     {
         Id = Guid.NewGuid(),
@@ -181,11 +205,13 @@ public class CreatePublicReservationCommandHandlerTests
         IReadOnlyList<Seat> seats,
         FakeReservationRepository reservationRepository,
         FakePaymentService? paymentService = null,
-        PublicWebOptions? publicWebOptions = null) => new(
+        PublicWebOptions? publicWebOptions = null,
+        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null) => new(
             new FakeTripRepository(trip),
             new FakeSeatRepository(seats),
             reservationRepository,
             paymentService ?? new FakePaymentService(),
+            sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
             // Blank BaseUrl by default — matches PublicWebOptions' own permissive/blank-until-
             // provisioned default, and every pre-existing test in this file that doesn't care
             // about back-URLs keeps working unchanged (CreatePublicReservationCommandHandler
@@ -672,5 +698,54 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Null(paymentService.ReceivedRequest!.SuccessUrl);
         Assert.Null(paymentService.ReceivedRequest!.FailureUrl);
         Assert.Null(paymentService.ReceivedRequest!.PendingUrl);
+    }
+
+    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
+
+    [Fact]
+    public async Task Handle_ResolvesSellerToken_AndPassesItThroughToCreateOrderAsync()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var reservationRepository = new FakeReservationRepository([]);
+        var paymentService = new FakePaymentService();
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(token: "org-specific-token");
+
+        var handler = CreateHandler(
+            trip, [seat], reservationRepository, paymentService, sellerTokenResolver: sellerTokenResolver);
+
+        await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(trip.OrganizationId, sellerTokenResolver.ReceivedOrganizationId);
+        Assert.Equal("org-specific-token", paymentService.ReceivedSellerAccessToken);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotConnected_PropagatesWithoutPersistingAnything()
+    {
+        // No global fallback token exists any more (Fase I's whole point) — an unconnected
+        // Organization's attempt to charge a seat hold must fail loudly, same "propagate
+        // unhandled, nothing to roll back" posture as OrderCreationFailedException above.
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var reservationRepository = new FakeReservationRepository([]);
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(
+            exception: new OrganizationNotConnectedToMercadoPagoException());
+
+        var handler = CreateHandler(
+            trip, [seat], reservationRepository, sellerTokenResolver: sellerTokenResolver);
+
+        await Assert.ThrowsAsync<OrganizationNotConnectedToMercadoPagoException>(() =>
+            handler.Handle(
+                new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+                TestContext.Current.CancellationToken));
+
+        Assert.Null(reservationRepository.SavedPayment);
+        Assert.Null(reservationRepository.SavedPassengers);
+        Assert.Null(reservationRepository.SavedReservations);
     }
 }

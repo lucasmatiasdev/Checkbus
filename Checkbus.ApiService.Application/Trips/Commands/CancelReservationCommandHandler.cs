@@ -40,6 +40,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly IEmailService _emailService;
         private readonly IPaymentRepository _paymentRepository;
         private readonly IPaymentService _paymentService;
+        private readonly IMercadoPagoSellerTokenResolver _sellerTokenResolver;
         private readonly IRefundRepository _refundRepository;
         private readonly ILogger<CancelReservationCommandHandler> _logger;
 
@@ -52,6 +53,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             IEmailService emailService,
             IPaymentRepository paymentRepository,
             IPaymentService paymentService,
+            IMercadoPagoSellerTokenResolver sellerTokenResolver,
             IRefundRepository refundRepository,
             ILogger<CancelReservationCommandHandler> logger)
         {
@@ -63,6 +65,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _emailService = emailService;
             _paymentRepository = paymentRepository;
             _paymentService = paymentService;
+            _sellerTokenResolver = sellerTokenResolver;
             _refundRepository = refundRepository;
             _logger = logger;
         }
@@ -111,7 +114,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             {
                 try
                 {
-                    await ProcessRefundAsync(reservation, reservation.PaymentId.Value, trip.Price, cancellationToken);
+                    await ProcessRefundAsync(
+                        reservation, reservation.PaymentId.Value, trip.Price, trip.OrganizationId, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -156,7 +160,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         // the same value at creation time, see Reservation's own doc comment, but Trip.Price is
         // the source of truth this Fase was asked to use).
         private async Task ProcessRefundAsync(
-            Reservation reservation, Guid paymentId, decimal tripPrice, CancellationToken cancellationToken)
+            Reservation reservation, Guid paymentId, decimal tripPrice, Guid organizationId, CancellationToken cancellationToken)
         {
             var payment = await _paymentRepository.GetByIdAsync(paymentId, cancellationToken)
                 ?? throw new PaymentNotFoundException();
@@ -182,11 +186,19 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             var refundAmount = new Money(tripPrice);
 
+            // Fase I (Marketplace/Split Payments): resolve THIS Trip's own Organization's
+            // Mercado Pago seller token before refunding — real money must be given back from
+            // that Organization's own account, not Checkbus's. Resolving/throwing here is
+            // covered by this method's own caller's try/catch (Handle() above): a flaky/failed
+            // resolution must never turn into a failed cancellation response for the passenger,
+            // same posture as a flaky RefundAsync call itself.
+            var sellerAccessToken = await _sellerTokenResolver.ResolveAccessTokenAsync(organizationId, cancellationToken);
+
             // IPaymentService.RefundAsync returns Task (void) — Fase B's port has no return
             // value to carry a gateway-issued refund id back, so Refund.ExternalRefundId stays
             // null here (see Refund's own doc comment: the field is nullable for exactly this).
             await _paymentService.RefundAsync(
-                externalOrderId, hasActiveSiblings ? refundAmount : null, cancellationToken);
+                externalOrderId, hasActiveSiblings ? refundAmount : null, cancellationToken, sellerAccessToken);
 
             await _refundRepository.AddAsync(new Refund
             {

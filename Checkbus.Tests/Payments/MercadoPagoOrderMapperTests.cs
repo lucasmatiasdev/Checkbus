@@ -27,18 +27,22 @@ public class MercadoPagoOrderMapperTests
     }
 
     [Fact]
-    public void BuildCreateRequest_MapsTypeOnline_TotalAmount_ExternalReference_AndOnePaymentTransaction()
+    public void BuildCreateRequest_MapsTypeOnline_ProcessingModeManual_TotalAmount_AndExternalReference()
     {
+        // Corrected after a live sandbox 400 (see MercadoPagoOrderMapper.BuildCreateRequest's own
+        // doc comment): a Checkout Pro type: "online" order uses processing_mode: "manual" with
+        // NO transactions.payments entry at all — that shape belongs to a different (automatic)
+        // processing flow. This test was updated to match, replacing the old assertion that a
+        // Transactions/Payments entry existed.
         var request = new CreateOrderRequest(new Money(4500m, "ARS"), "payment-external-ref-123");
 
         var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
 
         Assert.Equal("online", sdkRequest.Type);
+        Assert.Equal("manual", sdkRequest.ProcessingMode);
         Assert.Equal("4500.00", sdkRequest.TotalAmount);
         Assert.Equal("payment-external-ref-123", sdkRequest.ExternalReference);
-        Assert.NotNull(sdkRequest.Transactions);
-        Assert.Single(sdkRequest.Transactions!.Payments);
-        Assert.Equal("4500.00", sdkRequest.Transactions.Payments[0].Amount);
+        Assert.Null(sdkRequest.Transactions);
         Assert.Null(sdkRequest.Payer);
     }
 

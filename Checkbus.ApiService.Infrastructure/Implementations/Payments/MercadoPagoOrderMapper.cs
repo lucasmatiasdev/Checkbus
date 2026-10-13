@@ -22,10 +22,14 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
         // OrderRefundTransactionRequest.Amount, which are all typed string.
         public static string FormatAmount(decimal amount) => amount.ToString("F2", CultureInfo.InvariantCulture);
 
-        // Builds a type: "online" order with exactly one payment transaction covering the whole
-        // TotalAmount — this Fase does not yet collect a specific payment method/token (that is
-        // a Checkout Bricks concern for whichever later Fase wires up the actual payment UI);
-        // it only opens the order.
+        // Builds a type: "online" order for Checkout Pro. Corrected after a live sandbox 400
+        // ("$.transactions.payments[0]' - missing properties: 'payment_method'"): a
+        // `transactions.payments[...]` entry is NOT part of Checkout Pro's order-creation
+        // schema at all — that shape belongs to a different (automatic) processing flow where
+        // the payment method is specified upfront. Checkout Pro uses `processing_mode: "manual"`
+        // with no `transactions` object; the buyer picks everything on Mercado Pago's own
+        // hosted page after redirect, confirmed against the official "Create order" API
+        // reference (checkout-pro-orders/create-order).
         public static OrderCreateRequest BuildCreateRequest(CreateOrderRequest request)
         {
             var amount = FormatAmount(request.TotalAmount.Amount);
@@ -33,15 +37,9 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             return new OrderCreateRequest
             {
                 Type = "online",
+                ProcessingMode = "manual",
                 TotalAmount = amount,
                 ExternalReference = request.ExternalReference,
-                Transactions = new OrderTransactionRequest
-                {
-                    Payments = new List<OrderPaymentRequest>
-                    {
-                        new() { Amount = amount }
-                    }
-                },
                 Payer = request.PayerEmail is null ? null : new OrderPayerRequest { Email = request.PayerEmail },
                 Config = BuildConfig(request)
             };

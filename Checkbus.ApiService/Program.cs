@@ -189,7 +189,10 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<CheckbusDbContext>();
     var strategy = dbContext.Database.CreateExecutionStrategy();
-    await strategy.ExecuteAsync(() => dbContext.Database.EnsureCreatedAsync());
+    // Any future entity/schema change needs its own `dotnet ef migrations add <Name>
+    // --project Checkbus.ApiService.Infrastructure --startup-project Checkbus.ApiService` —
+    // MigrateAsync() only applies migrations that already exist as files, it does not infer them.
+    await strategy.ExecuteAsync(() => dbContext.Database.MigrateAsync());
 }
 
 // Configure the HTTP request pipeline.

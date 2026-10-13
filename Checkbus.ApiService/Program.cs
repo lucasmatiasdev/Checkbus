@@ -70,7 +70,36 @@ var mercadoPagoOptions = builder.Configuration.GetSection("MercadoPago").Get<Mer
     ?? new MercadoPagoOptions();
 
 builder.Services.AddSingleton(mercadoPagoOptions);
-builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
+
+// Fase J (odd/tasks/pagos-mercadopago.md) — the I10 KYC-blocker workaround: SimulatedPaymentOptions
+// binds permissively too, same reason as MercadoPago/Email above.
+var simulatedPaymentOptions = builder.Configuration.GetSection("Simulation").Get<SimulatedPaymentOptions>()
+    ?? new SimulatedPaymentOptions();
+
+builder.Services.AddSingleton(simulatedPaymentOptions);
+
+// J3's named HttpClient for SimulatedCheckoutController's self-POST to this same app's own
+// webhook endpoint (built per-request from Request.Scheme/Host, never a hardcoded base address
+// here — same AddHttpClient<...> registration mechanism as GoogleDirectionsService above, just
+// as a named client since the target is a controller, not a service class).
+builder.Services.AddHttpClient("SimulatedWebhook");
+
+if (mercadoPagoOptions.Simulated)
+{
+    // Deliberate lifetime change from the MercadoPagoPaymentService registration below:
+    // SimulatedPaymentService's in-memory order dictionary must survive across the separate HTTP
+    // requests the simulated flow spans (order creation, checkout-page GET, approve/reject POST,
+    // webhook POST) — a scoped/per-request instance would lose every order immediately. Both
+    // IPaymentService and the narrower ISimulatedOrderStore (SimulatedCheckoutController's own
+    // dependency, J1/J2) resolve to the SAME singleton instance.
+    builder.Services.AddSingleton<SimulatedPaymentService>();
+    builder.Services.AddSingleton<IPaymentService>(sp => sp.GetRequiredService<SimulatedPaymentService>());
+    builder.Services.AddSingleton<ISimulatedOrderStore>(sp => sp.GetRequiredService<SimulatedPaymentService>());
+}
+else
+{
+    builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
+}
 
 // Fase I (odd/tasks/pagos-mercadopago.md, Marketplace/Split Payments): encrypts/decrypts
 // MercadoPagoConnection.AccessToken/RefreshToken at rest (OrganizationMercadoPagoConnectionRepository).
@@ -80,7 +109,19 @@ builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<IMercadoPagoOAuthService, MercadoPagoOAuthService>();
 builder.Services.AddScoped<IOrganizationMercadoPagoConnectionRepository, OrganizationMercadoPagoConnectionRepository>();
-builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
+
+// Fase J: the real resolver throws OrganizationNotConnectedToMercadoPagoException for every
+// Organization while I10's OAuth connect stays blocked — swap in a dummy resolver alongside the
+// simulated payment service so CreateOrderAsync is actually reached. SimulatedPaymentService
+// ignores sellerAccessToken entirely, so the dummy value is never acted on.
+if (mercadoPagoOptions.Simulated)
+{
+    builder.Services.AddSingleton<IMercadoPagoSellerTokenResolver, SimulatedMercadoPagoSellerTokenResolver>();
+}
+else
+{
+    builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
+}
 // I7's own CSRF/account-linking state token — see IMercadoPagoConnectionStateService's own doc
 // comment for why this is a separate Data Protection purpose from
 // OrganizationMercadoPagoConnectionRepository's token encryption.

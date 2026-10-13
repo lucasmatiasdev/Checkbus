@@ -38,5 +38,13 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
         // The URL Mercado Pago redirects back to after an Organization approves the connection
         // (must match whatever redirect URL is configured on the Marketplace app itself).
         public string RedirectUri { get; set; } = string.Empty;
+
+        // Fase J (odd/tasks/pagos-mercadopago.md) — the I10 KYC-blocker workaround: when true,
+        // Program.cs registers SimulatedPaymentService instead of MercadoPagoPaymentService as
+        // IPaymentService. Defaults to false (same "safe when unconfigured" posture as every
+        // other field here) — only an explicit "MercadoPago:Simulated": true in
+        // appsettings.Development.json/user-secrets turns the demo path on; it must never be
+        // true by default in appsettings.json.
+        public bool Simulated { get; set; } = false;
     }
 }

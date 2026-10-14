@@ -5,20 +5,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
     /// <c>EmailOptions</c>/<c>GoogleMapsOptions</c>: real sandbox credentials have not been
     /// provisioned yet (G1, a later Fase of odd/tasks/pagos-mercadopago.md) so a missing
     /// "MercadoPago" config section or blank values must not fail startup — only actually
-    /// calling <c>MercadoPagoPaymentService</c> with no usable <see cref="AccessToken"/> fails,
-    /// at call time, the same way an unconfigured <c>SmtpEmailService</c> only fails when it
-    /// tries to connect.
+    /// calling <c>MercadoPagoPaymentService</c> with no usable seller token fails, at call time,
+    /// the same way an unconfigured <c>SmtpEmailService</c> only fails when it tries to connect.
     /// </summary>
     public class MercadoPagoOptions
     {
-        // Fase I (Marketplace/Split Payments) makes this field unused for real order
-        // creation/refund — every real IPaymentService call now needs a specific Organization's
-        // own seller AccessToken (resolved via IMercadoPagoSellerTokenResolver), not one global
-        // token. Left in place deliberately rather than deleted: this Fase is additive, and a
-        // later cleanup pass can decide whether anything still legitimately needs a
-        // Checkbus-wide fallback token (e.g. a non-tenant-scoped admin tool).
-        public string AccessToken { get; set; } = string.Empty;
-
         // Validates the "x-signature"/"x-request-id" HMAC on incoming webhook notifications
         // (Fase D2) — not used by this Fase's outbound-only adapter, but bound here so both
         // live under one config section/options class.

@@ -120,11 +120,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             return MercadoPagoOrderMapper.BuildPartialRefundRequest(paymentId, amount.Amount);
         }
 
-        // Fase I (Marketplace/Split Payments): the access token used per call is now the
-        // specific Organization's own connected seller token passed in by the caller, not
-        // MercadoPagoOptions.AccessToken (that field is now unused here — see its own updated
-        // doc comment). A blank sellerAccessToken (the three existing callers not yet wired to
-        // IMercadoPagoSellerTokenResolver, per I6) results in RequestOptions.AccessToken = ""
+        // Fase I (Marketplace/Split Payments): the access token used per call is the specific
+        // Organization's own connected seller token passed in by the caller — there is no global
+        // fallback token (MercadoPagoOptions.AccessToken was removed as dead code once this
+        // became the only path). A blank sellerAccessToken (the three existing callers not yet
+        // wired to IMercadoPagoSellerTokenResolver, per I6) results in RequestOptions.AccessToken = ""
         // exactly as before this Fase existed for those call sites — a real Mercado Pago call
         // with a blank token fails at the gateway (401), not silently, which is the correct
         // "not wired up yet" behavior until a later Fase does wire it in.

@@ -60,6 +60,12 @@
                     Soporte
                 </MudNavLink>
             </AuthorizeView>
+            <AuthorizeView Roles="CheckbusSoporte">
+                <MudNavLink Href="/admin/support-tickets" Match="NavLinkMatch.All">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+                    Panel Checkbus
+                </MudNavLink>
+            </AuthorizeView>
         </MudNavMenu>
         <form method="post" action="/logout" data-enhance="false" class="mt-auto pa-4">
             <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Logout">

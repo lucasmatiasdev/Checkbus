@@ -58,6 +58,7 @@ builder.Services.AddScoped<DriverRequirementsClient>();
 builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
 builder.Services.AddScoped<SupportTicketsClient>();
+builder.Services.AddScoped<SupportTicketsAdminClient>();
 builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();

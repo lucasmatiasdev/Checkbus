@@ -16,7 +16,6 @@ namespace Checkbus.ApiService.Domain.Entities.Support
         public required SupportTicketCategory Category { get; set; }
         public required string Subject { get; set; }
         public required string Description { get; set; }
-        public required SupportTicketPriority Priority { get; set; }
         public SupportTicketStatus Status { get; set; }
 
         // Opaque storage key for an optional single attachment, same FileKey/FileContentType

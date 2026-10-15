@@ -75,7 +75,6 @@ public class UpdateSupportTicketStatusCommandHandlerTests
         Category = SupportTicketCategory.ConsultaGeneral,
         Subject = "Ticket de prueba",
         Description = "Descripcion de prueba",
-        Priority = SupportTicketPriority.Media,
         Status = SupportTicketStatus.Abierto,
         CreatedAt = DateTime.UtcNow.AddDays(-1)
     };

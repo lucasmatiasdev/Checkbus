@@ -20,8 +20,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 .NotEmpty().WithMessage("Description is required.")
                 .MinimumLength(20).WithMessage("Description must be at least 20 characters long.");
 
-            RuleFor(x => x.Priority).IsInEnum();
-
             // A stream with no name/content-type (or vice versa) is not a usable attachment -
             // same "all-or-nothing" shape UploadVehicleDocumentCommand's required trio enforces,
             // but conditional here since AttachmentStream itself is optional.

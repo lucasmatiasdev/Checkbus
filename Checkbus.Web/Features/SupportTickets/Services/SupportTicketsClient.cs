@@ -75,7 +75,6 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
         WebSupportTicketCategory category,
         string subject,
         string description,
-        WebSupportTicketPriority priority,
         Stream? attachmentStream,
         string? attachmentFileName,
         string? attachmentContentType,
@@ -85,8 +84,7 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
         {
             { new StringContent(category.ToString()), "Category" },
             { new StringContent(subject), "Subject" },
-            { new StringContent(description), "Description" },
-            { new StringContent(priority.ToString()), "Priority" }
+            { new StringContent(description), "Description" }
         };
 
         // The attachment is optional — only attach a file part when the caller actually picked

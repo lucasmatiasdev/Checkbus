@@ -15,7 +15,6 @@ public sealed record SupportTicketResponse
     public required WebSupportTicketCategory Category { get; init; }
     public required string Subject { get; init; }
     public required string Description { get; init; }
-    public required WebSupportTicketPriority Priority { get; init; }
     public required WebSupportTicketStatus Status { get; init; }
     public string? AttachmentFileName { get; init; }
     public required DateTime CreatedAt { get; init; }

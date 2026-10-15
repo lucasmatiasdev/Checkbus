@@ -12,8 +12,7 @@ public class CreateSupportTicketCommandValidatorTests
     {
         Category = SupportTicketCategory.ProblemaTecnico,
         Subject = "No puedo ver mis reservas",
-        Description = "El listado de reservas no carga desde ayer.",
-        Priority = SupportTicketPriority.Alta
+        Description = "El listado de reservas no carga desde ayer."
     };
 
     [Fact]
@@ -33,17 +32,6 @@ public class CreateSupportTicketCommandValidatorTests
         var result = _validator.TestValidate(command);
 
         result.ShouldHaveValidationErrorFor(c => c.Category);
-    }
-
-    [Fact]
-    public void Priority_InvalidEnumValue_IsRejected()
-    {
-        var command = ValidCommand();
-        command.Priority = (SupportTicketPriority)999;
-
-        var result = _validator.TestValidate(command);
-
-        result.ShouldHaveValidationErrorFor(c => c.Priority);
     }
 
     [Fact]

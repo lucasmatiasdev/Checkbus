@@ -13,7 +13,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
         public required SupportTicketCategory Category { get; set; }
         public required string Subject { get; set; }
         public required string Description { get; set; }
-        public required SupportTicketPriority Priority { get; set; }
 
         // Optional single attachment - same FileStream/ContentType/OriginalFileName shape as
         // UploadVehicleDocumentCommand, but nullable here because a ticket may have no

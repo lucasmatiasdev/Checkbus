@@ -88,7 +88,6 @@ public class CreateSupportTicketCommandHandlerTests
         Category = SupportTicketCategory.ProblemaTecnico,
         Subject = "No puedo ver mis reservas",
         Description = "El listado de reservas no carga desde ayer.",
-        Priority = SupportTicketPriority.Alta,
         AttachmentStream = attachmentStream,
         AttachmentFileName = attachmentFileName,
         AttachmentContentType = attachmentContentType

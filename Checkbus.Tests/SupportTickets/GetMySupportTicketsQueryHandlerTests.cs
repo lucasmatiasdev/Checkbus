@@ -43,7 +43,6 @@ public class GetMySupportTicketsQueryHandlerTests
         Category = SupportTicketCategory.ConsultaGeneral,
         Subject = subject,
         Description = "Descripcion de prueba",
-        Priority = SupportTicketPriority.Media,
         Status = SupportTicketStatus.Abierto,
         CreatedAt = createdAt
     };

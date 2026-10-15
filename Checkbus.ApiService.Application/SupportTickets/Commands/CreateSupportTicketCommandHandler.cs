@@ -53,7 +53,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 Category = request.Category,
                 Subject = request.Subject,
                 Description = request.Description,
-                Priority = request.Priority,
                 Status = SupportTicketStatus.Abierto,
                 CreatedAt = DateTime.UtcNow
             };
@@ -120,7 +119,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 <p>Te vamos a contactar a la brevedad. Estos son los datos que registramos:</p>
                 <ul>
                     <li>Categoria: {ticket.Category}</li>
-                    <li>Prioridad: {ticket.Priority}</li>
                     <li>Asunto: {ticket.Subject}</li>
                     <li>Descripcion: {ticket.Description}</li>
                     <li>TicketId: {ticket.Id}</li>
@@ -137,7 +135,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 <h2>Nuevo ticket de soporte</h2>
                 <ul>
                     <li>Categoria: {ticket.Category}</li>
-                    <li>Prioridad: {ticket.Priority}</li>
                     <li>Asunto: {ticket.Subject}</li>
                     <li>Descripcion: {ticket.Description}</li>
                     <li>OrganizationId: {organizationId}</li>
@@ -156,7 +153,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 Category = ticket.Category,
                 Subject = ticket.Subject,
                 Description = ticket.Description,
-                Priority = ticket.Priority,
                 Status = ticket.Status,
                 AttachmentFileName = ticket.AttachmentFileName,
                 CreatedAt = ticket.CreatedAt

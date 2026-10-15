@@ -41,7 +41,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Queries
                 Category = ticket.Category,
                 Subject = ticket.Subject,
                 Description = ticket.Description,
-                Priority = ticket.Priority,
                 Status = ticket.Status,
                 AttachmentFileName = ticket.AttachmentFileName,
                 CreatedAt = ticket.CreatedAt

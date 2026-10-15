@@ -262,7 +262,6 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Category).HasConversion<string>();
-                entity.Property(x => x.Priority).HasConversion<string>();
                 entity.Property(x => x.Status).HasConversion<string>();
                 entity.Property(x => x.Subject).HasMaxLength(200);
                 entity.HasOne<Organization>()

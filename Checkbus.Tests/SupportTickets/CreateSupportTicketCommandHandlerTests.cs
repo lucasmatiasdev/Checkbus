@@ -178,6 +178,23 @@ public class CreateSupportTicketCommandHandlerTests
         Assert.Contains(emailService.SentMessages, m => m.To == "planificador@checkbus-demo.com");
     }
 
+    [Fact]
+    public async Task Handle_WithNotificationEmailConfigured_EmailBodiesShowShortDisplayId()
+    {
+        var ticketRepository = new FakeSupportTicketRepository();
+        var emailService = new FakeEmailService();
+        var handler = CreateHandler(
+            ticketRepository, new FakeFileStorageService(), emailService,
+            new SupportOptions { NotificationEmail = "soporte@checkbus.com" }, Guid.NewGuid(), Guid.NewGuid());
+
+        await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        var persisted = Assert.Single(ticketRepository.AddedTickets);
+        var expectedDisplayId = $"#TK-{persisted.Id.ToString("N")[..8].ToUpperInvariant()}";
+        Assert.All(emailService.SentMessages, m => Assert.Contains(expectedDisplayId, m.HtmlBody));
+        Assert.All(emailService.SentMessages, m => Assert.DoesNotContain(persisted.Id.ToString(), m.HtmlBody));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

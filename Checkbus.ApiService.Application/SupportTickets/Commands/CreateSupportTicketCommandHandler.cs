@@ -121,7 +121,7 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                     <li>Categoria: {ticket.Category}</li>
                     <li>Asunto: {ticket.Subject}</li>
                     <li>Descripcion: {ticket.Description}</li>
-                    <li>TicketId: {ticket.Id}</li>
+                    <li>TicketId: {FormatDisplayId(ticket.Id)}</li>
                 </ul>
                 """;
 
@@ -138,12 +138,17 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                     <li>Asunto: {ticket.Subject}</li>
                     <li>Descripcion: {ticket.Description}</li>
                     <li>OrganizationId: {organizationId}</li>
-                    <li>TicketId: {ticket.Id}</li>
+                    <li>TicketId: {FormatDisplayId(ticket.Id)}</li>
                 </ul>
                 """;
 
             return new EmailMessage(notificationEmail, subject, body);
         }
+
+        // Display-only label, never stored or used as a lookup key - truncating to 8 hex chars
+        // (32 bits) trades a small, accepted collision risk (~50% past ~65k tickets) for a
+        // human-readable reference. The real Guid in ticket.Id remains the sole source of truth.
+        private static string FormatDisplayId(Guid id) => $"#TK-{id.ToString("N")[..8].ToUpperInvariant()}";
 
         private static SupportTicketDto MapToDto(SupportTicket ticket)
         {

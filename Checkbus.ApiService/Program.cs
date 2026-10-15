@@ -165,6 +165,7 @@ builder.Services.AddExceptionHandler<MaintenanceRecordExceptionHandler>();
 builder.Services.AddExceptionHandler<TripExceptionHandler>();
 builder.Services.AddExceptionHandler<ReservationExceptionHandler>();
 builder.Services.AddExceptionHandler<BoardingExceptionHandler>();
+builder.Services.AddExceptionHandler<SupportTicketExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

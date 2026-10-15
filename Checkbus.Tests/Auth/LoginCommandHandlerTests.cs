@@ -40,6 +40,8 @@ public class LoginCommandHandlerTests
 
     private sealed class FakeUserRepository(User? user) : IUserRepository
     {
+        public List<User> UpdatedUsers { get; } = [];
+
         public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
             => Task.FromResult(user);
 
@@ -56,7 +58,10 @@ public class LoginCommandHandlerTests
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
 
         public Task UpdateAsync(User user, CancellationToken cancellationToken)
-            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+        {
+            UpdatedUsers.Add(user);
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
@@ -232,6 +237,95 @@ public class LoginCommandHandlerTests
         Assert.Equal(user.OrganizationId, result.OrganizationId);
         Assert.Equal("Chofer", result.Role);
         Assert.Equal(user.Email, result.Email);
+    }
+
+    [Fact]
+    public async Task Handle_ValidCredentials_SetsLastLoginAtAndPersists()
+    {
+        var user = CreateUser();
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+        var beforeLogin = DateTime.UtcNow;
+
+        await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Same(user, updated);
+        Assert.NotNull(updated.LastLoginAt);
+        Assert.True(updated.LastLoginAt >= beforeLogin);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownEmail_DoesNotUpdateAnyUser()
+    {
+        var userRepository = new FakeUserRepository(user: null);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser());
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_InactiveUser_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser(isActive: false));
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_InactiveOrganization_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser(organization: CreateOrganization(isActive: false)));
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
     }
 
     [Fact]

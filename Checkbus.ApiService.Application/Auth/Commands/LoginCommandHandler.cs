@@ -60,6 +60,9 @@ namespace Checkbus.ApiService.Application.Auth.Commands
 
             var token = _jwtGenerator.GenerateToken(user);
 
+            user.LastLoginAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user, cancellationToken);
+
             _logger.LogInformation(
                 "LoginSucceeded for UserId {UserId} in OrganizationId {OrganizationId} with Role {Role}",
                 user.Id, user.OrganizationId, user.Role.ToString());

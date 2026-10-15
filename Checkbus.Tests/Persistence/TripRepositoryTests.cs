@@ -309,4 +309,57 @@ public class TripRepositoryTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task GetOverlappingByVehicleIdAsync_CanceladoTrip_IsExcluded()
+    {
+        // CU-05: a Cancelado trip must free its vehicle for a new trip in the same window —
+        // DriverId/VehicleId are required, non-nullable FKs, so this exclusion IS the release
+        // mechanism (there is no separate "unassign" step).
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var cancelledTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc));
+        cancelledTrip.Status = TripStatus.Cancelado;
+        await repository.AddAsync(cancelledTrip, CreateRoute(cancelledTrip.Id), [], cancellationToken);
+
+        var result = await repository.GetOverlappingByVehicleIdAsync(
+            vehicle.Id,
+            new DateTime(2026, 11, 1, 11, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 13, 0, 0, DateTimeKind.Utc),
+            cancellationToken);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetOverlappingByDriverIdAsync_CanceladoTrip_IsExcluded()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var cancelledTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc));
+        cancelledTrip.Status = TripStatus.Cancelado;
+        await repository.AddAsync(cancelledTrip, CreateRoute(cancelledTrip.Id), [], cancellationToken);
+
+        var result = await repository.GetOverlappingByDriverIdAsync(
+            driver.Id,
+            new DateTime(2026, 11, 1, 11, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 13, 0, 0, DateTimeKind.Utc),
+            cancellationToken);
+
+        Assert.Empty(result);
+    }
 }

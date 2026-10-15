@@ -189,6 +189,34 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ---- Cancel (POST {id}/cancel) ----
+    // No request body shortcut to craft a 400 with here (Reason=ProblemaChofer alone is a
+    // valid-shape body) — same established convention as Publish, only 401/403 are proven here.
+
+    [Fact]
+    public async Task Cancel_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            $"{BasePath}/{Guid.NewGuid()}/cancel", new { Reason = "ProblemaChofer" }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Mecanico)]
+    public async Task Cancel_DisallowedRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+
+        var response = await client.PostAsJsonAsync(
+            $"{BasePath}/{Guid.NewGuid()}/cancel", new { Reason = "ProblemaChofer" }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ---- GetSeatMap (GET {id}/seats) ----
 
     [Fact]

@@ -56,6 +56,19 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
+        // Same narrow-status-transition shape as Publish above, with an extra body carrying the
+        // cancellation reason/description (CU-05).
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpPost("{id:guid}/cancel")]
+        public async Task<IActionResult> Cancel(
+            Guid id, [FromBody] CancelTripRequest request, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(
+                new CancelTripCommand { Id = id, Reason = request.Reason, Description = request.Description },
+                cancellationToken);
+            return NoContent();
+        }
+
         // Narrow update of the Route's Stops, not the whole Trip resource — same PUT-with-204
         // shape idea the project doesn't have a prior precedent for on this controller, but
         // matches a plain partial-update convention. TripId comes exclusively from the route

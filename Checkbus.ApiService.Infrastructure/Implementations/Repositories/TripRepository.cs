@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Trips;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,11 +46,15 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         // Standard interval-overlap condition: existing.DepartureDate <= arrivalDate &&
         // existing.ArrivalDate >= departureDate. A trip ending exactly when another starts
         // (or vice versa) counts as overlapping (boundary is inclusive on both sides).
+        // Cancelado is excluded: a cancelled trip must free its vehicle/driver for a new trip in
+        // the same window (CU-05) — there is no separate "unassign" step since VehicleId/DriverId
+        // are required, non-nullable FKs, so this exclusion IS the release mechanism.
         public async Task<IReadOnlyList<Trip>> GetOverlappingByVehicleIdAsync(
             Guid vehicleId, DateTime departureDate, DateTime arrivalDate, CancellationToken cancellationToken)
         {
             return await _context.Trips
                 .Where(t => t.VehicleId == vehicleId
+                    && t.Status != TripStatus.Cancelado
                     && t.DepartureDate <= arrivalDate
                     && t.ArrivalDate >= departureDate)
                 .ToListAsync(cancellationToken);
@@ -60,6 +65,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         {
             return await _context.Trips
                 .Where(t => t.DriverId == driverId
+                    && t.Status != TripStatus.Cancelado
                     && t.DepartureDate <= arrivalDate
                     && t.ArrivalDate >= departureDate)
                 .ToListAsync(cancellationToken);

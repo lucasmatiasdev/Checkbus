@@ -1,0 +1,333 @@
+@page "/support-tickets"
+@attribute [Authorize(Roles = "Administrador,Planificador")]
+@using Checkbus.Web.Features.SupportTickets.Contracts
+@using Checkbus.Web.Features.SupportTickets.Services
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Checkbus - Soporte</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+            Soporte
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@ToggleNewTicketForm">
+            Nuevo ticket
+        </MudButton>
+    </MudStack>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (showNewTicketForm)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mb-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Nuevo ticket de soporte</MudText>
+
+            <MudSelect T="WebSupportTicketCategory"
+                       @bind-Value="newCategory"
+                       Label="Categoría"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                @foreach (var category in Categories)
+                {
+                    <MudSelectItem T="WebSupportTicketCategory" Value="@category">@GetCategoryLabel(category)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="WebSupportTicketPriority"
+                       @bind-Value="newPriority"
+                       Label="Prioridad"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                @foreach (var priority in Priorities)
+                {
+                    <MudSelectItem T="WebSupportTicketPriority" Value="@priority">@GetPriorityLabel(priority)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                           @bind-Value="newSubject"
+                           Label="Asunto"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="newDescription"
+                           Label="Descripción"
+                           Variant="Variant.Outlined"
+                           Lines="4"
+                           Class="mb-4" />
+
+            <MudText Typo="Typo.body2" Class="mb-2">Adjunto (opcional)</MudText>
+            <InputFile OnChange="@OnFileSelected" Class="mb-4" />
+
+            @if (createError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@createError</MudAlert>
+            }
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@isCreating"
+                           OnClick="@HandleCreate">
+                    @if (isCreating)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Enviando...</span>
+                    }
+                    else
+                    {
+                        <span>Enviar ticket</span>
+                    }
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           Disabled="@isCreating"
+                           OnClick="@ToggleNewTicketForm">
+                    Cancelar
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        <MudText Typo="Typo.h6" Class="mb-4">Mis tickets</MudText>
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="SupportTicketResponse" Items="@tickets">
+                <Columns>
+                    <PropertyColumn Property="x => x.Subject" Title="Asunto" />
+                    <TemplateColumn Title="Categoría">
+                        <CellTemplate>
+                            @GetCategoryLabel(context.Item.Category)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Prioridad">
+                        <CellTemplate>
+                            @GetPriorityLabel(context.Item.Priority)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small">
+                                @GetStatusLabel(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Fecha">
+                        <CellTemplate>
+                            @context.Item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
+    // OpenReadStream buffer, same rationale and value as MyDocuments.razor/VehicleDocuments.razor.
+    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+
+    private static readonly WebSupportTicketCategory[] Categories = Enum.GetValues<WebSupportTicketCategory>();
+    private static readonly WebSupportTicketPriority[] Priorities = Enum.GetValues<WebSupportTicketPriority>();
+
+    [Inject]
+    private SupportTicketsClient TicketsClient { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private IReadOnlyList<SupportTicketResponse> tickets = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private bool showNewTicketForm;
+    private bool isCreating;
+    private string? createError;
+    private WebSupportTicketCategory newCategory = WebSupportTicketCategory.ConsultaGeneral;
+    private WebSupportTicketPriority newPriority = WebSupportTicketPriority.Media;
+    private string newSubject = string.Empty;
+    private string newDescription = string.Empty;
+    private IBrowserFile? selectedFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTicketsAsync();
+    }
+
+    private async Task LoadTicketsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await TicketsClient.GetMyTicketsAsync();
+
+            switch (outcome)
+            {
+                case SupportTicketsListOutcome.Success success:
+                    tickets = success.Tickets;
+                    errorMessage = null;
+                    break;
+
+                case SupportTicketsListOutcome.Forbidden:
+                case SupportTicketsListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar los tickets de soporte.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleNewTicketForm()
+    {
+        showNewTicketForm = !showNewTicketForm;
+        if (showNewTicketForm)
+        {
+            createError = null;
+            newCategory = WebSupportTicketCategory.ConsultaGeneral;
+            newPriority = WebSupportTicketPriority.Media;
+            newSubject = string.Empty;
+            newDescription = string.Empty;
+            selectedFile = null;
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+    }
+
+    private async Task HandleCreate()
+    {
+        createError = null;
+
+        if (string.IsNullOrWhiteSpace(newSubject))
+        {
+            createError = "Ingresá un asunto.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newDescription))
+        {
+            createError = "Ingresá una descripción.";
+            return;
+        }
+
+        isCreating = true;
+        try
+        {
+            Stream? attachmentStream = null;
+            try
+            {
+                if (selectedFile is not null)
+                {
+                    attachmentStream = selectedFile.OpenReadStream(maxAllowedSize: MaxUploadSizeBytes);
+                }
+
+                var outcome = await TicketsClient.CreateTicketAsync(
+                    newCategory,
+                    newSubject,
+                    newDescription,
+                    newPriority,
+                    attachmentStream,
+                    selectedFile?.Name,
+                    selectedFile?.ContentType);
+
+                switch (outcome)
+                {
+                    case SupportTicketCreateOutcome.Success:
+                        showNewTicketForm = false;
+                        Snackbar.Add("Ticket de soporte enviado correctamente.", Severity.Success);
+                        await LoadTicketsAsync();
+                        break;
+
+                    case SupportTicketCreateOutcome.ValidationFailed validationFailed:
+                        createError = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                        break;
+
+                    case SupportTicketCreateOutcome.Forbidden:
+                        createError = "No tenés permiso para crear tickets de soporte.";
+                        break;
+
+                    case SupportTicketCreateOutcome.TransportError transportError:
+                        createError = transportError.Message;
+                        break;
+                }
+            }
+            finally
+            {
+                if (attachmentStream is not null)
+                {
+                    await attachmentStream.DisposeAsync();
+                }
+            }
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    /// <summary>Spanish display label for a ticket category, same inline-mapping style as
+    /// <c>Usuarios.razor</c>'s <c>GetRoleLabel</c>.</summary>
+    private static string GetCategoryLabel(WebSupportTicketCategory category) => category switch
+    {
+        WebSupportTicketCategory.ProblemaReserva => "Problema de reserva",
+        WebSupportTicketCategory.ProblemaPago => "Problema de pago",
+        WebSupportTicketCategory.ProblemaViaje => "Problema de viaje",
+        WebSupportTicketCategory.ProblemaTecnico => "Problema técnico",
+        WebSupportTicketCategory.ConsultaGeneral => "Consulta general",
+        WebSupportTicketCategory.Otro => "Otro",
+        _ => category.ToString()
+    };
+
+    private static string GetPriorityLabel(WebSupportTicketPriority priority) => priority switch
+    {
+        WebSupportTicketPriority.Baja => "Baja",
+        WebSupportTicketPriority.Media => "Media",
+        WebSupportTicketPriority.Alta => "Alta",
+        WebSupportTicketPriority.Urgente => "Urgente",
+        _ => priority.ToString()
+    };
+
+    private static string GetStatusLabel(WebSupportTicketStatus status) => status switch
+    {
+        WebSupportTicketStatus.Abierto => "Abierto",
+        WebSupportTicketStatus.EnRevision => "En revisión",
+        WebSupportTicketStatus.EnProgreso => "En progreso",
+        WebSupportTicketStatus.EsperandoCliente => "Esperando cliente",
+        WebSupportTicketStatus.Resuelto => "Resuelto",
+        WebSupportTicketStatus.Reabierto => "Reabierto",
+        WebSupportTicketStatus.Cerrado => "Cerrado",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(WebSupportTicketStatus status) => status switch
+    {
+        WebSupportTicketStatus.Abierto => Color.Info,
+        WebSupportTicketStatus.EnRevision => Color.Warning,
+        WebSupportTicketStatus.EnProgreso => Color.Warning,
+        WebSupportTicketStatus.EsperandoCliente => Color.Default,
+        WebSupportTicketStatus.Resuelto => Color.Success,
+        WebSupportTicketStatus.Reabierto => Color.Error,
+        WebSupportTicketStatus.Cerrado => Color.Default,
+        _ => Color.Default
+    };
+}

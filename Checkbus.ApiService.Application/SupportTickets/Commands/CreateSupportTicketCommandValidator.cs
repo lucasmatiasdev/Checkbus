@@ -4,6 +4,9 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 {
     public sealed class CreateSupportTicketCommandValidator : AbstractValidator<CreateSupportTicketCommand>
     {
+        private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "application/pdf"];
+        private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
         public CreateSupportTicketCommandValidator()
         {
             RuleFor(x => x.Category).IsInEnum();
@@ -28,6 +31,13 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
             RuleFor(x => x.AttachmentContentType)
                 .NotEmpty().WithMessage("AttachmentContentType is required when an attachment is provided.")
+                .Must(contentType => AllowedContentTypes.Contains(contentType))
+                .WithMessage($"Content type must be one of: {string.Join(", ", AllowedContentTypes)}.")
+                .When(x => x.AttachmentStream is not null);
+
+            RuleFor(x => x.AttachmentStream!.Length)
+                .InclusiveBetween(1, MaxFileSizeBytes)
+                .WithMessage("File size must be between 1 byte and 10 MB.")
                 .When(x => x.AttachmentStream is not null);
         }
     }

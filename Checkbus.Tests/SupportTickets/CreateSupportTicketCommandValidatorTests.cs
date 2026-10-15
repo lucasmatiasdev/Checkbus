@@ -153,12 +153,67 @@ public class CreateSupportTicketCommandValidatorTests
     public void AttachmentStream_SetWithFileNameAndContentType_PassesShapeCheck()
     {
         var command = ValidCommand();
-        command.AttachmentStream = new MemoryStream();
+        command.AttachmentStream = new MemoryStream([1, 2, 3]);
         command.AttachmentFileName = "captura.png";
         command.AttachmentContentType = "image/png";
 
         var result = _validator.TestValidate(command);
 
         result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void AttachmentStream_ContentTypeNotInWhitelist_IsRejected()
+    {
+        var command = ValidCommand();
+        command.AttachmentStream = new MemoryStream([1, 2, 3]);
+        command.AttachmentFileName = "archivo.exe";
+        command.AttachmentContentType = "application/x-msdownload";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.AttachmentContentType);
+    }
+
+    [Theory]
+    [InlineData("image/jpeg")]
+    [InlineData("image/png")]
+    [InlineData("application/pdf")]
+    public void AttachmentStream_ContentTypeInWhitelist_PassesShapeCheck(string contentType)
+    {
+        var command = ValidCommand();
+        command.AttachmentStream = new MemoryStream([1, 2, 3]);
+        command.AttachmentFileName = "archivo";
+        command.AttachmentContentType = contentType;
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveValidationErrorFor(c => c.AttachmentContentType);
+    }
+
+    [Fact]
+    public void AttachmentStream_Empty_IsRejected()
+    {
+        var command = ValidCommand();
+        command.AttachmentStream = new MemoryStream();
+        command.AttachmentFileName = "captura.png";
+        command.AttachmentContentType = "image/png";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.AttachmentStream!.Length);
+    }
+
+    [Fact]
+    public void AttachmentStream_ExceedsMaxSize_IsRejected()
+    {
+        var command = ValidCommand();
+        command.AttachmentStream = new MemoryStream(new byte[10 * 1024 * 1024 + 1]);
+        command.AttachmentFileName = "captura.png";
+        command.AttachmentContentType = "image/png";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.AttachmentStream!.Length);
     }
 }

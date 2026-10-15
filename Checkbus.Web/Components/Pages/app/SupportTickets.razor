@@ -150,8 +150,13 @@
 
 @code {
     // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
-    // OpenReadStream buffer, same rationale and value as MyDocuments.razor/VehicleDocuments.razor.
-    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+    // OpenReadStream buffer. Matches the backend limit enforced in
+    // CreateSupportTicketCommandValidator.
+    private const long MaxUploadSizeBytes = 10 * 1024 * 1024;
+
+    // Same whitelist enforced server-side in CreateSupportTicketCommandValidator - checked here
+    // too so the user gets immediate feedback instead of a round-trip failure.
+    private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "application/pdf"];
 
     private static readonly WebSupportTicketCategory[] Categories = Enum.GetValues<WebSupportTicketCategory>();
     private static readonly WebSupportTicketPriority[] Priorities = Enum.GetValues<WebSupportTicketPriority>();
@@ -238,6 +243,12 @@
         if (string.IsNullOrWhiteSpace(newDescription))
         {
             createError = "Ingresá una descripción.";
+            return;
+        }
+
+        if (selectedFile is not null && !AllowedContentTypes.Contains(selectedFile.ContentType))
+        {
+            createError = "El adjunto debe ser JPG, PNG o PDF.";
             return;
         }
 

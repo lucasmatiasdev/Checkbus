@@ -93,7 +93,41 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(_currentUser.Email))
+            {
+                try
+                {
+                    var confirmationMessage = BuildConfirmationEmail(ticket, _currentUser.Email);
+                    await _emailService.SendAsync(confirmationMessage, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to send support ticket confirmation email for SupportTicketId {SupportTicketId}",
+                        ticket.Id);
+                }
+            }
+
             return MapToDto(ticket);
+        }
+
+        private static EmailMessage BuildConfirmationEmail(SupportTicket ticket, string authorEmail)
+        {
+            var subject = $"Recibimos tu ticket de soporte: {ticket.Subject}";
+            var body = $"""
+                <h2>Recibimos tu ticket de soporte</h2>
+                <p>Te vamos a contactar a la brevedad. Estos son los datos que registramos:</p>
+                <ul>
+                    <li>Categoria: {ticket.Category}</li>
+                    <li>Prioridad: {ticket.Priority}</li>
+                    <li>Asunto: {ticket.Subject}</li>
+                    <li>Descripcion: {ticket.Description}</li>
+                    <li>TicketId: {ticket.Id}</li>
+                </ul>
+                """;
+
+            return new EmailMessage(authorEmail, subject, body);
         }
 
         private static EmailMessage BuildNotificationEmail(SupportTicket ticket, Guid organizationId, string notificationEmail)

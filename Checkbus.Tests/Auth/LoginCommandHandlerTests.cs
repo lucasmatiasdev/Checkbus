@@ -13,7 +13,12 @@ namespace Checkbus.Tests.Auth;
 public class LoginCommandHandlerTests
 {
     private static User CreateUser(
-        bool isActive = true, Role role = Role.Administrador, bool mustChangePassword = false, Organization? organization = null) => new()
+        bool isActive = true,
+        Role role = Role.Administrador,
+        bool mustChangePassword = false,
+        Organization? organization = null,
+        int failedLoginAttempts = 0,
+        DateTime? lockedUntil = null) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Jane",
@@ -25,7 +30,9 @@ public class LoginCommandHandlerTests
         OrganizationId = Guid.NewGuid(),
         Organization = organization,
         IsActive = isActive,
-        MustChangePassword = mustChangePassword
+        MustChangePassword = mustChangePassword,
+        FailedLoginAttempts = failedLoginAttempts,
+        LockedUntil = lockedUntil
     };
 
     private static Organization CreateOrganization(bool isActive = true) => new()
@@ -260,6 +267,93 @@ public class LoginCommandHandlerTests
         Assert.True(updated.LastLoginAt >= beforeLogin);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Handle_WrongPassword_BelowLockoutThreshold_IncrementsCounterAndThrowsInvalidCredentials(int startingAttempts)
+    {
+        var user = CreateUser(failedLoginAttempts: startingAttempts);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(startingAttempts + 1, updated.FailedLoginAttempts);
+        Assert.Null(updated.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_ThirdAttempt_LocksAccountAndThrowsAccountLocked()
+    {
+        var user = CreateUser(failedLoginAttempts: 2);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+        var beforeAttempt = DateTime.UtcNow;
+
+        var exception = await Assert.ThrowsAsync<AccountLockedException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(3, updated.FailedLoginAttempts);
+        Assert.NotNull(updated.LockedUntil);
+        Assert.True(updated.LockedUntil >= beforeAttempt.AddMinutes(15));
+        Assert.Equal(updated.LockedUntil, exception.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Handle_AccountLockedAndStillWithinWindow_ThrowsAccountLockedWithoutCheckingPassword()
+    {
+        var lockedUntil = DateTime.UtcNow.AddMinutes(10);
+        var user = CreateUser(failedLoginAttempts: 3, lockedUntil: lockedUntil);
+        var userRepository = new FakeUserRepository(user);
+        var passwordHasher = new FakePasswordHasher(verifyResult: true);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            passwordHasher,
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var exception = await Assert.ThrowsAsync<AccountLockedException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Equal(lockedUntil, exception.LockedUntil);
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_LockoutWindowExpired_ValidCredentials_LogsInAndResetsCounter()
+    {
+        var lockedUntil = DateTime.UtcNow.AddMinutes(-1);
+        var user = CreateUser(failedLoginAttempts: 3, lockedUntil: lockedUntil);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(0, updated.FailedLoginAttempts);
+        Assert.Null(updated.LockedUntil);
+    }
+
     [Fact]
     public async Task Handle_UnknownEmail_DoesNotUpdateAnyUser()
     {
@@ -291,7 +385,9 @@ public class LoginCommandHandlerTests
         await Assert.ThrowsAsync<InvalidCredentialsException>(
             () => handler.Handle(command, TestContext.Current.CancellationToken));
 
-        Assert.Empty(userRepository.UpdatedUsers);
+        // A wrong password still persists the incremented FailedLoginAttempts counter (see the
+        // lockout tests), but must never touch LastLoginAt - that only happens on success.
+        Assert.All(userRepository.UpdatedUsers, u => Assert.Null(u.LastLoginAt));
     }
 
     [Fact]

@@ -26,6 +26,10 @@ namespace Checkbus.ApiService.ExceptionHandling
                     await WriteAuthenticationFailedAsync(httpContext, cancellationToken);
                     return true;
 
+                case AccountLockedException accountLockedException:
+                    await WriteAccountLockedAsync(httpContext, accountLockedException, cancellationToken);
+                    return true;
+
                 default:
                     return false;
             }
@@ -57,6 +61,22 @@ namespace Checkbus.ApiService.ExceptionHandling
                 Status = StatusCodes.Status401Unauthorized,
                 Title = "Authentication failed",
                 Detail = "Invalid email or password."
+            };
+
+            httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return httpContext.Response.WriteAsJsonAsync(problem, cancellationToken: cancellationToken);
+        }
+
+        private static Task WriteAccountLockedAsync(
+            HttpContext httpContext, AccountLockedException exception, CancellationToken cancellationToken)
+        {
+            var remainingMinutes = Math.Max(1, (int)Math.Ceiling((exception.LockedUntil - DateTime.UtcNow).TotalMinutes));
+
+            var problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Account locked",
+                Detail = $"Cuenta bloqueada temporalmente. Intentá de nuevo en {remainingMinutes} minuto(s)."
             };
 
             httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;

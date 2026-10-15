@@ -69,6 +69,28 @@ public class CreateSupportTicketCommandValidatorTests
     }
 
     [Fact]
+    public void Subject_BelowMinLength_IsRejected()
+    {
+        var command = ValidCommand();
+        command.Subject = new string('a', 4);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.Subject);
+    }
+
+    [Fact]
+    public void Subject_AtMinLength_PassesShapeCheck()
+    {
+        var command = ValidCommand();
+        command.Subject = new string('a', 5);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveValidationErrorFor(c => c.Subject);
+    }
+
+    [Fact]
     public void Description_Empty_IsRejected()
     {
         var command = ValidCommand();
@@ -77,6 +99,28 @@ public class CreateSupportTicketCommandValidatorTests
         var result = _validator.TestValidate(command);
 
         result.ShouldHaveValidationErrorFor(c => c.Description);
+    }
+
+    [Fact]
+    public void Description_BelowMinLength_IsRejected()
+    {
+        var command = ValidCommand();
+        command.Description = new string('a', 19);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.Description);
+    }
+
+    [Fact]
+    public void Description_AtMinLength_PassesShapeCheck()
+    {
+        var command = ValidCommand();
+        command.Description = new string('a', 20);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveValidationErrorFor(c => c.Description);
     }
 
     [Fact]

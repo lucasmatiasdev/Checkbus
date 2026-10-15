@@ -10,9 +10,12 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
             RuleFor(x => x.Subject)
                 .NotEmpty().WithMessage("Subject is required.")
+                .MinimumLength(5).WithMessage("Subject must be at least 5 characters long.")
                 .MaximumLength(200).WithMessage("Subject must not exceed 200 characters.");
 
-            RuleFor(x => x.Description).NotEmpty().WithMessage("Description is required.");
+            RuleFor(x => x.Description)
+                .NotEmpty().WithMessage("Description is required.")
+                .MinimumLength(20).WithMessage("Description must be at least 20 characters long.");
 
             RuleFor(x => x.Priority).IsInEnum();
 

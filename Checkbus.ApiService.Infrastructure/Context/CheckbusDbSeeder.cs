@@ -27,6 +27,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         private const string BrahmanAdminPassword = "Admin123!";
         private const string BrahmanOrganizationSlug = "brahman";
 
+        private const string CheckbusInternalAdminEmail = "soporte@checkbus.dev";
+        private const string CheckbusInternalAdminPassword = "Soporte123!";
+
         public static void Seed(DbContext context, bool isPopulated)
         {
             var db = (CheckbusDbContext)context;
@@ -75,6 +78,18 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 adminSurname: "Brahman",
                 adminDocumentNumber: "87654321");
 
+            StageOrganizationWithAdmin(
+                db,
+                slug: CheckbusInternalOrganization.Slug,
+                organizationName: "Checkbus Interno",
+                cuit: "20-00000000-0",
+                adminEmail: CheckbusInternalAdminEmail,
+                adminPassword: CheckbusInternalAdminPassword,
+                adminName: "Soporte",
+                adminSurname: "Checkbus",
+                adminDocumentNumber: "00000000",
+                role: Role.CheckbusSoporte);
+
             return db.ChangeTracker.HasChanges();
         }
 
@@ -99,7 +114,8 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             string adminPassword,
             string adminName,
             string adminSurname,
-            string adminDocumentNumber)
+            string adminDocumentNumber,
+            Role role = Role.Administrador)
         {
             var organization = db.Organizations.FirstOrDefault(o => o.Slug == slug);
             if (organization is null)
@@ -129,7 +145,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                     Email = adminEmail,
                     PasswordHash = string.Empty,
                     DocumentNumber = adminDocumentNumber,
-                    Role = Role.Administrador,
+                    Role = role,
                     OrganizationId = organization.Id,
                     Organization = organization,
                     IsActive = true

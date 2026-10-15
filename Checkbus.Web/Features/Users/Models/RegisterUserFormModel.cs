@@ -32,10 +32,15 @@ public sealed class RegisterUserFormModel
 
     /// <summary>
     /// Roles assignable from this form. Excludes <see cref="WebRole.Administrador"/> on purpose —
-    /// this registration screen must never be usable to create another Administrador.
+    /// this registration screen must never be usable to create another Administrador. Also
+    /// excludes <see cref="WebRole.CheckbusSoporte"/>: that role is only ever meaningful for a
+    /// user of the sentinel Checkbus-internal organization and must only ever be created by
+    /// seeding, never by self-service registration from any client organization.
     /// </summary>
     public static IReadOnlyList<WebRole> AssignableRoles { get; } =
-        Enum.GetValues<WebRole>().Where(role => role != WebRole.Administrador).ToArray();
+        Enum.GetValues<WebRole>()
+            .Where(role => role != WebRole.Administrador && role != WebRole.CheckbusSoporte)
+            .ToArray();
 
     /// <summary>
     /// Maps this form model to the wire request. Must only be called after validation has

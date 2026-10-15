@@ -107,13 +107,14 @@ public class RegisterUserFormModelTests
     }
 
     [Fact]
-    public void AssignableRoles_ContainsExactlyNonAdministradorRoles()
+    public void AssignableRoles_ExcludesAdministradorAndCheckbusSoporte()
     {
         Assert.Equal(3, RegisterUserFormModel.AssignableRoles.Count);
         Assert.Contains(WebRole.Chofer, RegisterUserFormModel.AssignableRoles);
         Assert.Contains(WebRole.Planificador, RegisterUserFormModel.AssignableRoles);
         Assert.Contains(WebRole.Mecanico, RegisterUserFormModel.AssignableRoles);
         Assert.DoesNotContain(WebRole.Administrador, RegisterUserFormModel.AssignableRoles);
+        Assert.DoesNotContain(WebRole.CheckbusSoporte, RegisterUserFormModel.AssignableRoles);
     }
 
     [Fact]

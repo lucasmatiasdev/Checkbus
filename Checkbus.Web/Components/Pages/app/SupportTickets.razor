@@ -131,6 +131,17 @@
                             @context.Item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                         </CellTemplate>
                     </TemplateColumn>
+                    <TemplateColumn Title="Adjunto">
+                        <CellTemplate>
+                            @if (context.Item.AttachmentFileName is not null)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                               Size="Size.Small"
+                                               Href="@($"/support-tickets/{context.Item.Id}/attachment")"
+                                               Target="_blank" />
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
                 </Columns>
             </MudDataGrid>
         }

@@ -82,10 +82,17 @@ public class GetTripSeatMapQueryHandlerTests
 
     private sealed class FakeReservationRepository(IReadOnlyList<Reservation> reservations) : IReservationRepository
     {
+        public bool ReleaseExpiredHoldsCalled { get; private set; }
+
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<Reservation>>(reservations.Where(r => r.TripId == tripId).ToList());
+            // Excludes Cancelada, matching ReservationRepository's real contract — needed so a
+            // hold just released by ReleaseExpiredHoldsAsync below correctly stops counting as
+            // occupied in the same Handle() call.
+            => Task.FromResult<IReadOnlyList<Reservation>>(
+                reservations.Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada).ToList());
 
         public Task CreateBatchAsync(
+            Checkbus.ApiService.Domain.Entities.Payments.Payment payment,
             IReadOnlyCollection<Checkbus.ApiService.Domain.Entities.Passengers.Passenger> passengers,
             IReadOnlyCollection<Reservation> newReservations,
             CancellationToken cancellationToken)
@@ -96,6 +103,21 @@ public class GetTripSeatMapQueryHandlerTests
 
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripSeatMapQueryHandler.");
+
+        // Fase E: mirrors ReservationRepository.ReleaseExpiredHoldsAsync's real behavior
+        // in-memory — see GetPublicTripSeatMapQueryHandlerTests' identical fake for rationale.
+        public Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
+        {
+            ReleaseExpiredHoldsCalled = true;
+            var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
+            foreach (var reservation in reservations.Where(r =>
+                r.TripId == tripId && r.Status == ReservationStatus.PendientePago && r.CreatedAt < cutoff))
+            {
+                reservation.Status = ReservationStatus.Cancelada;
+            }
+
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
@@ -205,6 +227,81 @@ public class GetTripSeatMapQueryHandlerTests
         Assert.Equal(4, result.Capacity);
         Assert.Equal(trip.Price, result.Price);
         Assert.Equal([2], result.OccupiedSeatNumbers);
+    }
+
+    // Fase E (odd/tasks/pagos-mercadopago.md): same release behavior as
+    // GetPublicTripSeatMapQueryHandlerTests, proven here for the authenticated/org-scoped
+    // counterpart handler.
+    [Fact]
+    public async Task Handle_PendientePagoReservationOlderThanHoldExpiration_IsReleasedAndSeatBecomesAvailable()
+    {
+        var organizationId = Guid.NewGuid();
+        var trip = CreateTrip(organizationId);
+        var vehicle = CreateVehicle(trip.VehicleId, organizationId, capacity: 2);
+        var seats = new List<Seat>
+        {
+            new() { Id = Guid.NewGuid(), VehicleId = trip.VehicleId, Number = 1 },
+            new() { Id = Guid.NewGuid(), VehicleId = trip.VehicleId, Number = 2 }
+        };
+        var expiredHold = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seats[0].Id,
+            PassengerId = Guid.NewGuid(),
+            Price = trip.Price,
+            Status = ReservationStatus.PendientePago,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-20)
+        };
+
+        var handler = new GetTripSeatMapQueryHandler(
+            new FakeTripRepository(trip),
+            new FakeVehicleRepository(vehicle),
+            new FakeSeatRepository(seats),
+            new FakeReservationRepository([expiredHold]),
+            new FakeCurrentUserService(organizationId));
+
+        var result = await handler.Handle(
+            new GetTripSeatMapQuery { TripId = trip.Id }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ReservationStatus.Cancelada, expiredHold.Status);
+        Assert.Empty(result.OccupiedSeatNumbers);
+    }
+
+    [Fact]
+    public async Task Handle_PendientePagoReservationYoungerThanHoldExpiration_IsLeftUntouched()
+    {
+        var organizationId = Guid.NewGuid();
+        var trip = CreateTrip(organizationId);
+        var vehicle = CreateVehicle(trip.VehicleId, organizationId, capacity: 2);
+        var seats = new List<Seat>
+        {
+            new() { Id = Guid.NewGuid(), VehicleId = trip.VehicleId, Number = 1 },
+            new() { Id = Guid.NewGuid(), VehicleId = trip.VehicleId, Number = 2 }
+        };
+        var freshHold = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seats[0].Id,
+            PassengerId = Guid.NewGuid(),
+            Price = trip.Price,
+            Status = ReservationStatus.PendientePago,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+        };
+
+        var handler = new GetTripSeatMapQueryHandler(
+            new FakeTripRepository(trip),
+            new FakeVehicleRepository(vehicle),
+            new FakeSeatRepository(seats),
+            new FakeReservationRepository([freshHold]),
+            new FakeCurrentUserService(organizationId));
+
+        var result = await handler.Handle(
+            new GetTripSeatMapQuery { TripId = trip.Id }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ReservationStatus.PendientePago, freshHold.Status);
+        Assert.Equal([1], result.OccupiedSeatNumbers);
     }
 
     [Fact]

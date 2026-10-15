@@ -32,7 +32,7 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PublicReservationsController", "PublicTripsController", "SupportTicketsAdminController", "SupportTicketsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
+        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "MercadoPagoConnectionsController", "MercadoPagoOAuthCallbackController", "PaymentsWebhookController", "PublicReservationsController", "PublicTripsController", "SimulatedCheckoutController", "SupportTicketsAdminController", "SupportTicketsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
     }
 
     [Fact]
@@ -46,6 +46,6 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController.Login", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap"], anonymousActions);
+        Assert.Equal(["AuthController.Login", "MercadoPagoOAuthCallbackController.Callback", "PaymentsWebhookController.Receive", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap", "SimulatedCheckoutController.Approve", "SimulatedCheckoutController.Reject", "SimulatedCheckoutController.Show"], anonymousActions);
     }
 }

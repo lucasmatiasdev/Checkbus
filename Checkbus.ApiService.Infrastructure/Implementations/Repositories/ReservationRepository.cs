@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
@@ -30,18 +31,22 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             return await _context.Reservations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         }
 
-        // Passenger + Reservation rows for the whole batch are added to the same ChangeTracker
-        // and saved in one SaveChangesAsync call, so they are persisted atomically as a single
-        // aggregate — same convention as TripRepository.AddAsync. Deliberately does NOT catch
-        // DbUpdateException here: that translation into a domain-level failure belongs to the
-        // handler, keeping this repository a thin persistence layer.
+        // Payment + Passenger + Reservation rows for the whole batch are added to the same
+        // ChangeTracker and saved in one SaveChangesAsync call, so they are persisted
+        // atomically as a single aggregate — same convention as TripRepository.AddAsync.
+        // Deliberately does NOT catch DbUpdateException here: that translation into a
+        // domain-level failure belongs to the handler, keeping this repository a thin
+        // persistence layer.
         public async Task CreateBatchAsync(
+            Payment payment,
             IReadOnlyCollection<Passenger> passengers,
             IReadOnlyCollection<Reservation> reservations,
             CancellationToken cancellationToken)
         {
+            _context.Payments.Add(payment);
             _context.Passengers.AddRange(passengers);
             _context.Reservations.AddRange(reservations);
+
             await _context.SaveChangesAsync(cancellationToken);
         }
 
@@ -56,6 +61,53 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 ?? throw new ReservationNotFoundException();
 
             reservation.Status = ReservationStatus.Cancelada;
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Fase D7: resolves every Reservation belonging to this Payment directly via its own
+        // PaymentId FK (supersedes the Fase D PaymentReservationLink join table), regardless of
+        // Status.
+        public async Task<IReadOnlyList<Reservation>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
+        {
+            return await _context.Reservations
+                .Where(r => r.PaymentId == paymentId)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Fase D's approved-webhook path — mirror image of CancelAsync above.
+        public async Task ConfirmAsync(Guid reservationId, CancellationToken cancellationToken)
+        {
+            var reservation = await _context.Reservations
+                .FirstOrDefaultAsync(r => r.Id == reservationId, cancellationToken)
+                ?? throw new ReservationNotFoundException();
+
+            reservation.Status = ReservationStatus.Confirmada;
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Fase E: lazy, idempotent release of unpaid holds — see IReservationRepository's doc
+        // comment. Same "check first, only write if something actually needs it" shape as
+        // SeatRepository.EnsureSeatsForVehicleAsync/BoardingRecordRepository.EnsureForTripAsync.
+        public async Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
+
+            var expiredHolds = await _context.Reservations
+                .Where(r => r.TripId == tripId && r.Status == ReservationStatus.PendientePago && r.CreatedAt < cutoff)
+                .ToListAsync(cancellationToken);
+
+            if (expiredHolds.Count == 0)
+            {
+                // Idempotent no-op read — nothing has expired for this Trip.
+                return;
+            }
+
+            foreach (var reservation in expiredHolds)
+            {
+                reservation.Status = ReservationStatus.Cancelada;
+            }
 
             await _context.SaveChangesAsync(cancellationToken);
         }

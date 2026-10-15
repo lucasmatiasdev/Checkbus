@@ -23,6 +23,7 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
             => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
 
         public Task CreateBatchAsync(
+            Checkbus.ApiService.Domain.Entities.Payments.Payment payment,
             IReadOnlyCollection<Passenger> passengers,
             IReadOnlyCollection<Reservation> newReservations,
             CancellationToken cancellationToken)

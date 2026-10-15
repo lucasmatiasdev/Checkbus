@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
 using MediatR;
@@ -49,6 +50,13 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             // seat map is requested — nothing in this codebase creates them yet (not Vehicle
             // registration, not PublishTripCommandHandler). See ISeatRepository's doc comment.
             await _seatRepository.EnsureSeatsForVehicleAsync(trip.VehicleId, capacity, cancellationToken);
+
+            // Fase E (odd/tasks/pagos-mercadopago.md): lazily release any PendientePago hold
+            // older than HoldExpirationMinutes before computing occupancy below — same
+            // "clean up state the next time something reads it" convention as
+            // EnsureSeatsForVehicleAsync above.
+            await _reservationRepository.ReleaseExpiredHoldsAsync(
+                trip.Id, CreatePublicReservationCommandHandler.HoldExpirationMinutes, cancellationToken);
 
             var seats = await _seatRepository.GetByVehicleIdAsync(trip.VehicleId, cancellationToken);
             var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);

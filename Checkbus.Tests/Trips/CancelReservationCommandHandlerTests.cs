@@ -1,13 +1,18 @@
 using Checkbus.ApiService.Application.Interfaces.Email;
+using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
+using Checkbus.ApiService.Domain.Entities.Refunds;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Entities.Seats;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.ApiService.Domain.Exceptions.Payments;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
+using Checkbus.ApiService.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.Trips;
@@ -24,7 +29,7 @@ namespace Checkbus.Tests.Trips;
 /// </summary>
 public class CancelReservationCommandHandlerTests
 {
-    private sealed class FakeReservationRepository(Reservation? reservation) : IReservationRepository
+    private sealed class FakeReservationRepository(Reservation? reservation, IReadOnlyList<Reservation>? paymentSiblings = null) : IReservationRepository
     {
         public Guid? CancelledReservationId { get; private set; }
 
@@ -33,7 +38,7 @@ public class CancelReservationCommandHandlerTests
 
         public Task<Reservation?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(reservation);
 
-        public Task CreateBatchAsync(IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
+        public Task CreateBatchAsync(Payment payment, IReadOnlyCollection<Passenger> passengers, IReadOnlyCollection<Reservation> reservations, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
 
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
@@ -46,6 +51,100 @@ public class CancelReservationCommandHandlerTests
 
             return Task.CompletedTask;
         }
+
+        // Fase F1: resolves this Payment's other Reservations so the handler can decide
+        // partial- vs. full-refund. Defaults to empty (no active siblings -> full refund) when
+        // a test doesn't care about the Payment-grouping scenario at all.
+        public Task<IReadOnlyList<Reservation>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
+            => Task.FromResult(paymentSiblings ?? (IReadOnlyList<Reservation>)[]);
+    }
+
+    private sealed class FakePaymentRepository(Payment? payment) : IPaymentRepository
+    {
+        public int UpdateCallCount { get; private set; }
+        public Payment? UpdatedPayment { get; private set; }
+
+        public Task AddAsync(Payment payment, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task<Payment?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+            => Task.FromResult(payment is not null && payment.Id == id ? payment : null);
+
+        public Task<Payment?> GetByExternalOrderIdAsync(string externalOrderId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task UpdateAsync(Payment payment, CancellationToken cancellationToken)
+        {
+            UpdateCallCount++;
+            UpdatedPayment = payment;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakePaymentService(bool throwOnRefund = false) : IPaymentService
+    {
+        public int RefundCallCount { get; private set; }
+        public string? LastExternalOrderId { get; private set; }
+        public Money? LastRefundAmount { get; private set; }
+        public string? LastSellerAccessToken { get; private set; }
+
+        public Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request, CancellationToken cancellationToken, string sellerAccessToken = "")
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task<OrderStatusResult> GetOrderAsync(string externalOrderId, CancellationToken cancellationToken, string sellerAccessToken = "")
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task RefundAsync(string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
+        {
+            if (throwOnRefund)
+            {
+                throw new InvalidOperationException("Simulated Mercado Pago refund failure.");
+            }
+
+            RefundCallCount++;
+            LastExternalOrderId = externalOrderId;
+            LastRefundAmount = amount;
+            LastSellerAccessToken = sellerAccessToken;
+            return Task.CompletedTask;
+        }
+    }
+
+    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — same fake style as every other port fake in
+    // this file. Defaults to a successful resolution so every pre-existing test keeps working
+    // unchanged.
+    private sealed class FakeMercadoPagoSellerTokenResolver(
+        string token = "seller-access-token", Exception? exception = null) : IMercadoPagoSellerTokenResolver
+    {
+        public Guid? ReceivedOrganizationId { get; private set; }
+
+        public Task<string> ResolveAccessTokenAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            ReceivedOrganizationId = organizationId;
+
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult(token);
+        }
+    }
+
+    private sealed class FakeRefundRepository : IRefundRepository
+    {
+        public List<Refund> AddedRefunds { get; } = [];
+
+        public Task AddAsync(Refund refund, CancellationToken cancellationToken)
+        {
+            AddedRefunds.Add(refund);
+            return Task.CompletedTask;
+        }
+
+        public Task<Refund?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task<IReadOnlyList<Refund>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
     }
 
     private sealed class FakeTripRepository(Trip? trip) : ITripRepository
@@ -141,13 +240,23 @@ public class CancelReservationCommandHandlerTests
         Status = TripStatus.Publicado
     };
 
-    private static Reservation CreateReservation(Guid tripId, Guid seatId, Guid passengerId) => new()
+    private static Reservation CreateReservation(Guid tripId, Guid seatId, Guid passengerId, Guid? paymentId = null) => new()
     {
         Id = Guid.NewGuid(),
         TripId = tripId,
         SeatId = seatId,
         PassengerId = passengerId,
-        Price = 15000m
+        Price = 15000m,
+        PaymentId = paymentId
+    };
+
+    private static Payment CreatePayment(PaymentStatus status = PaymentStatus.Aprobado) => new()
+    {
+        Id = Guid.NewGuid(),
+        ExternalOrderId = "mp-order-123",
+        TotalAmount = new Money(45000m),
+        Status = status,
+        CreatedAt = DateTime.UtcNow
     };
 
     private static Passenger CreatePassenger(string email = "juan@checkbus.test") => new()
@@ -167,7 +276,11 @@ public class CancelReservationCommandHandlerTests
         BoardingRecord? boardingRecord = null,
         Passenger? passenger = null,
         IReadOnlyList<Seat>? seats = null,
-        FakeEmailService? emailService = null)
+        FakeEmailService? emailService = null,
+        FakePaymentRepository? paymentRepository = null,
+        FakePaymentService? paymentService = null,
+        FakeRefundRepository? refundRepository = null,
+        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null)
     {
         return new CancelReservationCommandHandler(
             reservationRepository,
@@ -176,6 +289,10 @@ public class CancelReservationCommandHandlerTests
             new FakePassengerRepository(passenger),
             new FakeSeatRepository(seats ?? []),
             emailService ?? new FakeEmailService(),
+            paymentRepository ?? new FakePaymentRepository(null),
+            paymentService ?? new FakePaymentService(),
+            sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
+            refundRepository ?? new FakeRefundRepository(),
             NullLogger<CancelReservationCommandHandler>.Instance);
     }
 
@@ -331,5 +448,196 @@ public class CancelReservationCommandHandlerTests
             TestContext.Current.CancellationToken);
 
         Assert.Empty(emailService.SentMessages);
+    }
+
+    // --- Fase F (odd/tasks/pagos-mercadopago.md): cancellation triggers a real refund. ---
+
+    [Fact]
+    public async Task Handle_OneOfThreeActiveSeatsOnSamePayment_IssuesPartialRefundForThatSeatPriceOnly()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var sibling1 = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        sibling1.Status = ReservationStatus.Confirmada;
+        var sibling2 = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        sibling2.Status = ReservationStatus.PendientePago;
+
+        var reservationRepository = new FakeReservationRepository(reservation, [sibling1, sibling2]);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
+        Assert.Equal(1, paymentService.RefundCallCount);
+        Assert.Equal(payment.ExternalOrderId, paymentService.LastExternalOrderId);
+        Assert.Equal(new Money(trip.Price), paymentService.LastRefundAmount);
+
+        Assert.Single(refundRepository.AddedRefunds);
+        var refund = refundRepository.AddedRefunds[0];
+        Assert.Equal(payment.Id, refund.PaymentId);
+        Assert.Equal(reservation.Id, refund.ReservationId);
+        Assert.Equal(new Money(trip.Price), refund.Amount);
+
+        Assert.Equal(1, paymentRepository.UpdateCallCount);
+        Assert.Equal(PaymentStatus.ParcialmenteReembolsado, paymentRepository.UpdatedPayment?.Status);
+    }
+
+    [Fact]
+    public async Task Handle_LastActiveSeatOnPayment_IssuesFullRefund()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        // Only sibling on this Payment is already Cancelada — this is the last active seat.
+        var cancelledSibling = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        cancelledSibling.Status = ReservationStatus.Cancelada;
+
+        var reservationRepository = new FakeReservationRepository(reservation, [cancelledSibling]);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, paymentService.RefundCallCount);
+        Assert.Null(paymentService.LastRefundAmount);
+        Assert.Equal(PaymentStatus.Reembolsado, paymentRepository.UpdatedPayment?.Status);
+        Assert.Single(refundRepository.AddedRefunds);
+    }
+
+    [Fact]
+    public async Task Handle_ReservationWithNullPaymentId_SkipsRefundLogicEntirely()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        // PaymentId stays null (pre-payment-feature Reservation, or any edge case where it's unset).
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid());
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(null);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        // Existing cancellation flow still runs unchanged.
+        Assert.Equal(reservation.Id, reservationRepository.CancelledReservationId);
+        Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
+
+        // No refund machinery is ever touched.
+        Assert.Equal(0, paymentService.RefundCallCount);
+        Assert.Equal(0, paymentRepository.UpdateCallCount);
+        Assert.Empty(refundRepository.AddedRefunds);
+    }
+
+    [Fact]
+    public async Task Handle_RefundServiceThrows_ReservationStillCancelled()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService(throwOnRefund: true);
+        var refundRepository = new FakeRefundRepository();
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository);
+
+        // Must not throw — the refund failure is logged and swallowed, same posture as the
+        // existing email-failure test above; the already-persisted cancellation is unaffected.
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(reservation.Id, reservationRepository.CancelledReservationId);
+        Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
+
+        // The failed call never got to persist anything downstream of it.
+        Assert.Empty(refundRepository.AddedRefunds);
+        Assert.Equal(0, paymentRepository.UpdateCallCount);
+    }
+
+    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
+
+    [Fact]
+    public async Task Handle_ResolvesSellerToken_AndPassesItThroughToRefundAsync()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(token: "org-specific-token");
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository,
+            sellerTokenResolver: sellerTokenResolver);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(trip.OrganizationId, sellerTokenResolver.ReceivedOrganizationId);
+        Assert.Equal("org-specific-token", paymentService.LastSellerAccessToken);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotConnected_ReservationStillCancelled()
+    {
+        // No global fallback token exists any more (Fase I's whole point) — the resolver's
+        // OrganizationNotConnectedToMercadoPagoException is caught by the SAME try/catch that
+        // already wraps ProcessRefundAsync (same posture as a flaky RefundAsync call itself):
+        // the already-persisted cancellation must never be undone by a downstream refund
+        // failure.
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var payment = CreatePayment();
+        var reservation = CreateReservation(trip.Id, Guid.NewGuid(), Guid.NewGuid(), payment.Id);
+        var reservationRepository = new FakeReservationRepository(reservation);
+        var paymentRepository = new FakePaymentRepository(payment);
+        var paymentService = new FakePaymentService();
+        var refundRepository = new FakeRefundRepository();
+        var sellerTokenResolver = new FakeMercadoPagoSellerTokenResolver(
+            exception: new OrganizationNotConnectedToMercadoPagoException());
+
+        var handler = CreateHandler(
+            reservationRepository, trip,
+            paymentRepository: paymentRepository, paymentService: paymentService, refundRepository: refundRepository,
+            sellerTokenResolver: sellerTokenResolver);
+
+        await handler.Handle(
+            new CancelReservationCommand { ReservationId = reservation.Id },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(reservation.Id, reservationRepository.CancelledReservationId);
+        Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
+
+        // The failed resolution never got to persist anything downstream of it.
+        Assert.Equal(0, paymentService.RefundCallCount);
+        Assert.Empty(refundRepository.AddedRefunds);
+        Assert.Equal(0, paymentRepository.UpdateCallCount);
     }
 }

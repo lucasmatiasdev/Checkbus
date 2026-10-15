@@ -19,6 +19,12 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.2" />
+    <!-- Design-time only: required on the startup project by `dotnet ef` tooling (migrations
+         add/remove, database update, etc.) — never used at application runtime. Version pinned
+         to match Microsoft.EntityFrameworkCore/.Relational in Checkbus.ApiService.Infrastructure.csproj. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

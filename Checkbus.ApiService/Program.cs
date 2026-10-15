@@ -3,12 +3,15 @@ using Checkbus.ApiService.Application.Common.Behaviors;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
+using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Application.Payments;
 using Checkbus.ApiService.Application.Interfaces.Storage;
 using Checkbus.ApiService.ExceptionHandling;
 using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Email;
 using Checkbus.ApiService.Infrastructure.Implementations.Maps;
+using Checkbus.ApiService.Infrastructure.Implementations.Payments;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
 using Checkbus.ApiService.Infrastructure.Persistence;
@@ -60,6 +63,70 @@ var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
+// Mercado Pago binds permissively too, same reason as Email above: real sandbox credentials
+// have not been provisioned yet (G1, odd/tasks/pagos-mercadopago.md) so a missing section/
+// values must not fail startup.
+var mercadoPagoOptions = builder.Configuration.GetSection("MercadoPago").Get<MercadoPagoOptions>()
+    ?? new MercadoPagoOptions();
+
+builder.Services.AddSingleton(mercadoPagoOptions);
+
+// Fase J (odd/tasks/pagos-mercadopago.md) — the I10 KYC-blocker workaround: SimulatedPaymentOptions
+// binds permissively too, same reason as MercadoPago/Email above.
+var simulatedPaymentOptions = builder.Configuration.GetSection("Simulation").Get<SimulatedPaymentOptions>()
+    ?? new SimulatedPaymentOptions();
+
+builder.Services.AddSingleton(simulatedPaymentOptions);
+
+// J3's named HttpClient for SimulatedCheckoutController's self-POST to this same app's own
+// webhook endpoint (built per-request from Request.Scheme/Host, never a hardcoded base address
+// here — same AddHttpClient<...> registration mechanism as GoogleDirectionsService above, just
+// as a named client since the target is a controller, not a service class).
+builder.Services.AddHttpClient("SimulatedWebhook");
+
+if (mercadoPagoOptions.Simulated)
+{
+    // Deliberate lifetime change from the MercadoPagoPaymentService registration below:
+    // SimulatedPaymentService's in-memory order dictionary must survive across the separate HTTP
+    // requests the simulated flow spans (order creation, checkout-page GET, approve/reject POST,
+    // webhook POST) — a scoped/per-request instance would lose every order immediately. Both
+    // IPaymentService and the narrower ISimulatedOrderStore (SimulatedCheckoutController's own
+    // dependency, J1/J2) resolve to the SAME singleton instance.
+    builder.Services.AddSingleton<SimulatedPaymentService>();
+    builder.Services.AddSingleton<IPaymentService>(sp => sp.GetRequiredService<SimulatedPaymentService>());
+    builder.Services.AddSingleton<ISimulatedOrderStore>(sp => sp.GetRequiredService<SimulatedPaymentService>());
+}
+else
+{
+    builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
+}
+
+// Fase I (odd/tasks/pagos-mercadopago.md, Marketplace/Split Payments): encrypts/decrypts
+// MercadoPagoConnection.AccessToken/RefreshToken at rest (OrganizationMercadoPagoConnectionRepository).
+// AddDataProtection() registers IDataProtectionProvider explicitly rather than relying on it
+// being pulled in incidentally by some other ASP.NET Core feature (Antiforgery/cookie auth)
+// that might not always be present.
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<IMercadoPagoOAuthService, MercadoPagoOAuthService>();
+builder.Services.AddScoped<IOrganizationMercadoPagoConnectionRepository, OrganizationMercadoPagoConnectionRepository>();
+
+// Fase J: the real resolver throws OrganizationNotConnectedToMercadoPagoException for every
+// Organization while I10's OAuth connect stays blocked — swap in a dummy resolver alongside the
+// simulated payment service so CreateOrderAsync is actually reached. SimulatedPaymentService
+// ignores sellerAccessToken entirely, so the dummy value is never acted on.
+if (mercadoPagoOptions.Simulated)
+{
+    builder.Services.AddSingleton<IMercadoPagoSellerTokenResolver, SimulatedMercadoPagoSellerTokenResolver>();
+}
+else
+{
+    builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
+}
+// I7's own CSRF/account-linking state token — see IMercadoPagoConnectionStateService's own doc
+// comment for why this is a separate Data Protection purpose from
+// OrganizationMercadoPagoConnectionRepository's token encryption.
+builder.Services.AddScoped<IMercadoPagoConnectionStateService, MercadoPagoConnectionStateService>();
+
 // The Web app's externally-reachable base URL, used to build links embedded in outgoing
 // emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
 // on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
@@ -84,6 +151,10 @@ builder.Services.AddScoped<ISeatRepository, SeatRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
 builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
+builder.Services.AddScoped<IProcessedWebhookEventRepository, ProcessedWebhookEventRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {
@@ -174,7 +245,10 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<CheckbusDbContext>();
     var strategy = dbContext.Database.CreateExecutionStrategy();
-    await strategy.ExecuteAsync(() => dbContext.Database.EnsureCreatedAsync());
+    // Any future entity/schema change needs its own `dotnet ef migrations add <Name>
+    // --project Checkbus.ApiService.Infrastructure --startup-project Checkbus.ApiService` —
+    // MigrateAsync() only applies migrations that already exist as files, it does not infer them.
+    await strategy.ExecuteAsync(() => dbContext.Database.MigrateAsync());
 }
 
 // Configure the HTTP request pipeline.

@@ -1,12 +1,16 @@
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Documents;
+using Checkbus.ApiService.Domain.Entities.Invoices;
 using Checkbus.ApiService.Domain.Entities.Passengers;
+using Checkbus.ApiService.Domain.Entities.Payments;
+using Checkbus.ApiService.Domain.Entities.Refunds;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Entities.Seats;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
+using Checkbus.ApiService.Infrastructure.Implementations.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace Checkbus.ApiService.Infrastructure.Persistence
@@ -32,6 +36,17 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Passenger> Passengers => Set<Passenger>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
         public DbSet<BoardingRecord> BoardingRecords => Set<BoardingRecord>();
+        public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<Invoice> Invoices => Set<Invoice>();
+        public DbSet<Refund> Refunds => Set<Refund>();
+
+        // Fase I (odd/tasks/pagos-mercadopago.md) — Marketplace/Split Payments: one connected
+        // Mercado Pago seller account per Organization.
+        public DbSet<MercadoPagoConnection> MercadoPagoConnections => Set<MercadoPagoConnection>();
+
+        // Fase D (odd/tasks/pagos-mercadopago.md) — Infrastructure-only EF-mapped class with no
+        // Domain/business meaning, see its own doc comment for why.
+        public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -215,6 +230,12 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Passenger>()
                     .WithMany()
                     .HasForeignKey(x => x.PassengerId);
+                // D7 (odd/tasks/pagos-mercadopago.md): plain 1:N, one Reservation belongs to
+                // exactly one Payment — replaces the PaymentReservationLink join table. Nullable
+                // FK, no navigation property, same posture as TripId/SeatId/PassengerId above.
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
             });
 
             modelBuilder.Entity<BoardingRecord>(entity =>
@@ -227,6 +248,77 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Reservation>()
                     .WithMany()
                     .HasForeignKey(x => x.ReservationId);
+            });
+
+            modelBuilder.Entity<Payment>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Status).HasConversion<string>();
+                // Money is a value object, not its own table — mapped inline as an EF Core
+                // owned type (odd/tasks/pagos-mercadopago.md A4/A6). IsRequired() because
+                // Payment.TotalAmount is a non-nullable `required` property.
+                entity.OwnsOne(x => x.TotalAmount, money =>
+                {
+                    money.Property(m => m.Amount).HasColumnName("TotalAmount");
+                    money.Property(m => m.Currency).HasColumnName("TotalAmountCurrency");
+                });
+                entity.Navigation(x => x.TotalAmount).IsRequired();
+            });
+
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                // FK-only, no navigation properties, same pattern as every other entity here —
+                // Trip/Passenger/Payment are related tables but this entity never dereferences
+                // them in code (odd/tasks/pagos-mercadopago.md A3).
+                entity.HasOne<Trip>()
+                    .WithMany()
+                    .HasForeignKey(x => x.TripId);
+                entity.HasOne<Passenger>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PassengerId);
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
+            });
+
+            modelBuilder.Entity<Refund>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.OwnsOne(x => x.Amount, money =>
+                {
+                    money.Property(m => m.Amount).HasColumnName("Amount");
+                    money.Property(m => m.Currency).HasColumnName("AmountCurrency");
+                });
+                entity.Navigation(x => x.Amount).IsRequired();
+                entity.HasOne<Payment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PaymentId);
+                // Deliberate: references the specific Reservation this refund covers, not just
+                // the Payment — see Refund's own doc comment for why (partial-refund traceability).
+                entity.HasOne<Reservation>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ReservationId);
+            });
+
+            modelBuilder.Entity<ProcessedWebhookEvent>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                // The whole point of this table: a given Mercado Pago notification id is
+                // recorded at most once (Fase D3's dedupe guarantee).
+                entity.HasIndex(x => x.ExternalEventId).IsUnique();
+            });
+
+            modelBuilder.Entity<MercadoPagoConnection>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                // At most one connection per Organization (odd/tasks/pagos-mercadopago.md Fase I,
+                // I1) — the DB itself enforces this, not just the repository's own
+                // find-then-insert-or-update UpsertAsync logic.
+                entity.HasIndex(x => x.OrganizationId).IsUnique();
+                entity.HasOne<Organization>()
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId);
             });
         }
     }

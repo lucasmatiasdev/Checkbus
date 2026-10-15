@@ -447,6 +447,109 @@ public class ReservationPersistenceTests
     }
 
     [Fact]
+    public async Task Reservation_FilteredUniqueIndex_PendientePagoRow_BlocksNewReservationOnSameSeat()
+    {
+        // Sibling of Reservation_FilteredUniqueIndex_CanceladaRow_DoesNotBlockNewConfirmadaOnSameSeat
+        // (odd/tasks/pagos-mercadopago.md Fase A / A2): the filtered unique index on
+        // (TripId, SeatId) excludes only Cancelada rows, so a PendientePago row — the new
+        // payment-hold state — must still count as "active" and block a second Reservation on
+        // the same seat, with no index change required.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB123CD");
+        db.Vehicles.Add(vehicle);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var driver = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Juan",
+            Surname = "Perez",
+            Email = "driver6@checkbus.test",
+            PasswordHash = "hash",
+            DocumentNumber = "30111232",
+            Role = Role.Chofer,
+            OrganizationId = organization.Id
+        };
+        var location = new Location
+        {
+            Id = Guid.NewGuid(),
+            Name = "Estadio Monumental",
+            Address = "Av. Pres. Figueroa Alcorta 7597",
+            PlaceId = "ChIJ-reservation-pendientepago-index-test",
+            Latitude = -34.5453,
+            Longitude = -58.4498
+        };
+        db.Users.Add(driver);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var @event = new Event
+        {
+            Id = Guid.NewGuid(),
+            Name = "River vs Boca",
+            Type = EventType.Partido,
+            Date = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc),
+            LocationId = location.Id,
+            OrganizationId = organization.Id
+        };
+        db.Events.Add(@event);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var trip = new Trip
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            EventId = @event.Id,
+            DepartureDate = new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            ArrivalDate = new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc),
+            Capacity = 45,
+            AvailableSeats = 45,
+            Price = 1500m,
+            Status = TripStatus.Publicado
+        };
+        db.Trips.Add(trip);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicle.Id, Number = 1 };
+        db.Seats.Add(seat);
+        var firstPassenger = CreatePassenger("30111222");
+        var secondPassenger = CreatePassenger("30111233");
+        db.Passengers.Add(firstPassenger);
+        db.Passengers.Add(secondPassenger);
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.Reservations.Add(new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = firstPassenger.Id,
+            Price = trip.Price,
+            Status = ReservationStatus.PendientePago
+        });
+        await db.SaveChangesAsync(cancellationToken);
+
+        // A second Reservation for the SAME (TripId, SeatId) must still be rejected while the
+        // first one sits in PendientePago — it is not Cancelada, so it keeps counting against
+        // the filtered unique index.
+        db.Reservations.Add(new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = seat.Id,
+            PassengerId = secondPassenger.Id,
+            Price = trip.Price
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync(cancellationToken));
+    }
+
+    [Fact]
     public async Task ReservationRepository_CancelAsync_SetsStatusToCancelada_AndFreesTheSeatForANewReservation()
     {
         // Repository-level equivalent of the EF test above (odd/tasks/reservas-publicas.md

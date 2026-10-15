@@ -1,0 +1,159 @@
+@page "/payments-settings"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using Checkbus.Web.Features.Payments.Services
+
+<PageTitle>Checkbus - Pagos</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Mercado Pago
+    </MudText>
+
+    @if (bannerMessage is not null)
+    {
+        <MudAlert Severity="@bannerSeverity" Class="mb-4">@bannerMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else if (connected)
+        {
+            <MudText Class="mb-2">Tu cuenta de Mercado Pago está conectada.</MudText>
+            @if (!string.IsNullOrWhiteSpace(sellerUserId))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">ID de vendedor: @sellerUserId</MudText>
+            }
+        }
+        else
+        {
+            <MudText Class="mb-4">
+                Todavía no conectaste tu cuenta de Mercado Pago. Conectala para poder recibir los pagos de tus propias reservas.
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@isConnecting"
+                       OnClick="OnConnectClick">
+                Conectar Mercado Pago
+            </MudButton>
+        }
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@errorMessage</MudAlert>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private PaymentsClient PaymentsClient { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    // I7's OAuth callback redirects here with these two query params — see
+    // MercadoPagoOAuthCallbackController/HandleMercadoPagoOAuthCallbackCommandHandler for the
+    // exact values. Read as plain strings (not bool?) to avoid any query-binding edge case —
+    // parsed manually below.
+    [SupplyParameterFromQuery(Name = "connected")]
+    public string? ConnectedQueryParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reason")]
+    public string? ReasonQueryParam { get; set; }
+
+    private bool isLoading = true;
+    private bool isConnecting;
+    private bool connected;
+    private string? sellerUserId;
+    private string? errorMessage;
+    private string? bannerMessage;
+    private Severity bannerSeverity = Severity.Success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ConnectedQueryParam == "true")
+        {
+            bannerMessage = "Conectaste tu cuenta de Mercado Pago correctamente.";
+            bannerSeverity = Severity.Success;
+        }
+        else if (ConnectedQueryParam == "false")
+        {
+            bannerMessage = $"No pudimos conectar tu cuenta de Mercado Pago ({GetReasonLabel(ReasonQueryParam)}).";
+            bannerSeverity = Severity.Error;
+        }
+
+        await LoadStatusAsync();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await PaymentsClient.GetStatusAsync();
+
+            switch (outcome)
+            {
+                case MercadoPagoConnectionStatusOutcome.Success success:
+                    connected = success.Connected;
+                    sellerUserId = success.SellerUserId;
+                    errorMessage = null;
+                    break;
+
+                case MercadoPagoConnectionStatusOutcome.Forbidden:
+                case MercadoPagoConnectionStatusOutcome.TransportError:
+                    errorMessage = "No pudimos cargar el estado de la conexión.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnConnectClick()
+    {
+        isConnecting = true;
+        try
+        {
+            var outcome = await PaymentsClient.StartConnectionAsync();
+
+            switch (outcome)
+            {
+                case StartMercadoPagoConnectionOutcome.Success success:
+                    // Full external navigation to Mercado Pago's own hosted authorization page —
+                    // same forceLoad:true precedent TripReservation.razor already established
+                    // for its own checkout redirect.
+                    NavigationManager.NavigateTo(success.AuthorizationUrl, forceLoad: true);
+                    break;
+
+                case StartMercadoPagoConnectionOutcome.Forbidden:
+                case StartMercadoPagoConnectionOutcome.TransportError:
+                    errorMessage = "No pudimos iniciar la conexión con Mercado Pago.";
+                    isConnecting = false;
+                    break;
+            }
+        }
+        catch
+        {
+            isConnecting = false;
+            throw;
+        }
+    }
+
+    // Public static deliberately — this codebase has no bUnit
+    // (see RegisterUserPageAuthorizationTests' own doc comment), so the page's markup itself
+    // cannot be rendered in a test; this pure mapping is made directly testable without one,
+    // same precedent ReservationConfirmation.GetStatusLabel already established.
+    public static string GetReasonLabel(string? reason) => reason switch
+    {
+        "invalid_state" => "el enlace de conexión expiró o no es válido, probá de nuevo",
+        "exchange_failed" => "Mercado Pago rechazó la autorización, probá de nuevo",
+        "missing_parameters" => "la autorización fue cancelada",
+        _ => "error desconocido"
+    };
+}

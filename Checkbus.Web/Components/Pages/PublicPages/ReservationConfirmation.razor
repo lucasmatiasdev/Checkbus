@@ -48,7 +48,7 @@
                     </MudItem>
                     <MudItem xs="6">
                         <MudText Typo="Typo.caption">Estado</MudText>
-                        <MudText Typo="Typo.body1">@reservation.Status</MudText>
+                        <MudText Typo="Typo.body1">@GetStatusLabel(reservation.Status)</MudText>
                     </MudItem>
                     <MudItem xs="6">
                         <MudText Typo="Typo.caption">Pasajero</MudText>
@@ -64,7 +64,7 @@
                     </MudItem>
                 </MudGrid>
 
-                @if (reservation.Status != CanceladaStatus)
+                @if (CanCancel(reservation.Status))
                 {
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Error"
@@ -99,8 +99,10 @@
 
     // Reservation.Status is exposed as a plain string by the API (see
     // ReservationsConfirmationResponse's doc comment) — this page only ever compares against
-    // this one literal, matching the server's HasConversion<string>() representation.
+    // these literals, matching the server's HasConversion<string>() representation.
     private const string CanceladaStatus = "Cancelada";
+    private const string ConfirmadaStatus = "Confirmada";
+    private const string PendientePagoStatus = "PendientePago";
 
     private ReservationsConfirmationResponse? confirmation;
 
@@ -206,6 +208,26 @@
             cancellingReservationIds.Remove(reservation.ReservationId);
         }
     }
+
+    // Added in odd/tasks/pagos-mercadopago.md Fase C2: a PendientePago row is a payment-pending
+    // hold, not an actual booking yet — offering to "cancel" it here would be a different,
+    // unscoped operation (CancelReservationCommandHandler only knows how to cancel a
+    // Confirmada reservation). Public and static (not private) specifically so this pure logic
+    // is unit-testable without bUnit, which this repo does not have (see
+    // RegisterUserPageAuthorizationTests's own doc comment for that same constraint).
+    public static bool CanCancel(string status) => status == ConfirmadaStatus;
+
+    // Plain-string status values coming straight off the server (see the field's own doc
+    // comment above) rendered as short, buyer-facing Spanish labels instead of the raw enum
+    // name — "PendientePago" read literally would be confusing to a non-technical visitor.
+    // Falls back to the raw value for anything unrecognized rather than hiding it.
+    public static string GetStatusLabel(string status) => status switch
+    {
+        ConfirmadaStatus => "Confirmada",
+        PendientePagoStatus => "Pendiente de pago",
+        CanceladaStatus => "Cancelada",
+        _ => status
+    };
 
     // The route segment is a comma-separated list of Reservation ids (the small batch
     // returned together by one R4 submission) — any entry that isn't a valid GUID is

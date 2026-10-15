@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
 using MediatR;
 
@@ -50,6 +51,12 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             // Lazily, idempotently backfills Seat rows, same as GetPublicTripSeatMapQueryHandler
             // — a no-op read when seats already exist, so it's safe here too.
             await _seatRepository.EnsureSeatsForVehicleAsync(trip.VehicleId, capacity, cancellationToken);
+
+            // Fase E (odd/tasks/pagos-mercadopago.md): lazily release any PendientePago hold
+            // older than HoldExpirationMinutes before computing occupancy below — same
+            // convention as GetPublicTripSeatMapQueryHandler.
+            await _reservationRepository.ReleaseExpiredHoldsAsync(
+                trip.Id, CreatePublicReservationCommandHandler.HoldExpirationMinutes, cancellationToken);
 
             var seats = await _seatRepository.GetByVehicleIdAsync(trip.VehicleId, cancellationToken);
             var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);

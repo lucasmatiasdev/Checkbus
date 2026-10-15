@@ -60,6 +60,13 @@ var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
+// Support binds permissively too: the real Checkbus notification address may not be
+// provisioned yet, so a missing section/value must not fail startup.
+var supportOptions = builder.Configuration.GetSection("Support").Get<SupportOptions>()
+    ?? new SupportOptions();
+
+builder.Services.AddSingleton(supportOptions);
+
 // The Web app's externally-reachable base URL, used to build links embedded in outgoing
 // emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
 // on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
@@ -84,6 +91,7 @@ builder.Services.AddScoped<ISeatRepository, SeatRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
 builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
+builder.Services.AddScoped<ISupportTicketRepository, SupportTicketRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(cfg =>
 {

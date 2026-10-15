@@ -26,6 +26,12 @@ public class CreateSupportTicketCommandHandlerTests
 
         public Task<IReadOnlyList<SupportTicket>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateSupportTicketCommandHandler.");
+
+        public Task<IReadOnlyList<SupportTicket>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateSupportTicketCommandHandler.");
+
+        public Task UpdateAsync(SupportTicket ticket, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateSupportTicketCommandHandler.");
     }
 
     private sealed class FakeFileStorageService : IFileStorageService

@@ -18,6 +18,12 @@ public class GetMySupportTicketsQueryHandlerTests
 
         public Task<IReadOnlyList<SupportTicket>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(tickets.Where(t => t.OrganizationId == organizationId).ToList() as IReadOnlyList<SupportTicket>);
+
+        public Task<IReadOnlyList<SupportTicket>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetMySupportTicketsQueryHandler.");
+
+        public Task UpdateAsync(SupportTicket ticket, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetMySupportTicketsQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

@@ -18,6 +18,12 @@ public class GetSupportTicketAttachmentQueryHandlerTests
 
         public Task<IReadOnlyList<SupportTicket>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetSupportTicketAttachmentQueryHandler.");
+
+        public Task<IReadOnlyList<SupportTicket>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetSupportTicketAttachmentQueryHandler.");
+
+        public Task UpdateAsync(SupportTicket ticket, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetSupportTicketAttachmentQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

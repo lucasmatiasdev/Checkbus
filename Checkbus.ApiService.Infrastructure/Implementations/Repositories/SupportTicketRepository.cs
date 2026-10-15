@@ -32,5 +32,18 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<IReadOnlyList<SupportTicket>> GetAllAsync(CancellationToken cancellationToken)
+        {
+            return await _context.SupportTickets
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task UpdateAsync(SupportTicket ticket, CancellationToken cancellationToken)
+        {
+            _context.SupportTickets.Update(ticket);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

@@ -32,7 +32,7 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PublicReservationsController", "PublicTripsController", "SupportTicketsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
+        Assert.Equal(["AuthController", "BoardingController", "DriverRequirementsController", "EventsController", "MaintenanceRecordsController", "PublicReservationsController", "PublicTripsController", "SupportTicketsAdminController", "SupportTicketsController", "TripsController", "UsersController", "VehicleDiagnosticsController", "VehicleDocumentsController", "VehiclesController"], controllerTypes);
     }
 
     [Fact]

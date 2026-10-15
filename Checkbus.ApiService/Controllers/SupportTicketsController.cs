@@ -85,6 +85,16 @@ namespace Checkbus.ApiService.Controllers
         }
 
         [Authorize(Roles = "Administrador,Planificador")]
+        [HttpGet("check-duplicate")]
+        public async Task<IActionResult> CheckDuplicate(
+            [FromQuery] SupportTicketCategory category, CancellationToken cancellationToken)
+        {
+            var hasPossibleDuplicate = await _mediator.Send(
+                new CheckDuplicateSupportTicketQuery { Category = category }, cancellationToken);
+            return Ok(hasPossibleDuplicate);
+        }
+
+        [Authorize(Roles = "Administrador,Planificador")]
         [HttpGet("{id:guid}/attachment")]
         public async Task<IActionResult> GetAttachment(
             Guid id,

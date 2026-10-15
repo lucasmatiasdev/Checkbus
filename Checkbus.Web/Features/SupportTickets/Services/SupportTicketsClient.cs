@@ -71,6 +71,36 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
         }
     }
 
+    /// <summary>
+    /// Non-blocking duplicate hint: returns whether the caller's organization already has an
+    /// open ticket in this category created within the last 24 hours. Always resolves to
+    /// <c>false</c> on any transport/parsing failure — this is a UX hint, never a gate on ticket
+    /// creation, so a failed check must stay silent rather than surface an error.
+    /// </summary>
+    public async Task<bool> CheckDuplicateAsync(
+        WebSupportTicketCategory category, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(
+                $"SupportTickets/check-duplicate?category={category}", cancellationToken);
+
+            using (response)
+            {
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    return false;
+                }
+
+                return await response.Content.ReadFromJsonAsync<bool>(cancellationToken);
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public async Task<SupportTicketCreateOutcome> CreateTicketAsync(
         WebSupportTicketCategory category,
         string subject,

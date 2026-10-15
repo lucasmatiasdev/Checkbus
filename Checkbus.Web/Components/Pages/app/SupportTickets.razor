@@ -30,7 +30,8 @@
             <MudText Typo="Typo.h6" Class="mb-4">Nuevo ticket de soporte</MudText>
 
             <MudSelect T="WebSupportTicketCategory"
-                       @bind-Value="newCategory"
+                       Value="@newCategory"
+                       ValueChanged="@OnCategoryChanged"
                        Label="Categoría"
                        Variant="Variant.Outlined"
                        Class="mb-4">
@@ -39,6 +40,14 @@
                     <MudSelectItem T="WebSupportTicketCategory" Value="@category">@GetCategoryLabel(category)</MudSelectItem>
                 }
             </MudSelect>
+
+            @if (hasPossibleDuplicate)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    Ya tenés un ticket abierto de esta categoría en las últimas 24hs. Podés enviar
+                    este igual si es un problema distinto.
+                </MudAlert>
+            }
 
             <MudTextField T="string"
                            @bind-Value="newSubject"
@@ -161,6 +170,7 @@
     private string newSubject = string.Empty;
     private string newDescription = string.Empty;
     private IBrowserFile? selectedFile;
+    private bool hasPossibleDuplicate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,7 +203,7 @@
         }
     }
 
-    private void ToggleNewTicketForm()
+    private async Task ToggleNewTicketForm()
     {
         showNewTicketForm = !showNewTicketForm;
         if (showNewTicketForm)
@@ -203,7 +213,14 @@
             newSubject = string.Empty;
             newDescription = string.Empty;
             selectedFile = null;
+            hasPossibleDuplicate = await TicketsClient.CheckDuplicateAsync(newCategory);
         }
+    }
+
+    private async Task OnCategoryChanged(WebSupportTicketCategory category)
+    {
+        newCategory = category;
+        hasPossibleDuplicate = await TicketsClient.CheckDuplicateAsync(newCategory);
     }
 
     private void OnFileSelected(InputFileChangeEventArgs e)

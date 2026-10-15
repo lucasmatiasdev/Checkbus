@@ -128,6 +128,59 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
         }
     }
 
+    public async Task<TripCancelOutcome> CancelAsync(
+        Guid id,
+        CancelTripRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsJsonAsync($"Trips/{id}/cancel", request, cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new TripCancelOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.NoContent:
+                        return new TripCancelOutcome.Success();
+
+                    case HttpStatusCode.BadRequest:
+                        var validationProblem = await response.Content
+                            .ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                        IReadOnlyDictionary<string, string[]> errors = validationProblem is null
+                            ? new Dictionary<string, string[]>()
+                            : (IReadOnlyDictionary<string, string[]>)validationProblem.Errors;
+                        return new TripCancelOutcome.ValidationFailed(errors);
+
+                    case HttpStatusCode.NotFound:
+                        return new TripCancelOutcome.NotFound();
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new TripCancelOutcome.Forbidden();
+
+                    default:
+                        return new TripCancelOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new TripCancelOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<TripsListOutcome> GetListAsync(CancellationToken cancellationToken = default)
     {
         HttpResponseMessage response;
@@ -321,6 +374,36 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
         }
     }
+}
+
+/// <summary>
+/// Closed outcome of a <c>POST api/Trips/{id}/cancel</c> call (CU-05). Mirrors
+/// <see cref="TripPublishOutcome"/>'s no-body-success shape (204 No Content).
+/// <see cref="ValidationFailed"/> also covers the "not Programado/Publicado" and
+/// "inside the 5-day notice window" rejections (both keyed under "Habilitacion" by
+/// <see cref="Checkbus.ApiService.ExceptionHandling.TripExceptionHandler"/>) — its message is
+/// the useful "why" and must be surfaced directly, never replaced with a generic string.
+/// </summary>
+public abstract record TripCancelOutcome
+{
+    private TripCancelOutcome()
+    {
+    }
+
+    /// <summary>204 No Content — the trip was cancelled successfully.</summary>
+    public sealed record Success : TripCancelOutcome;
+
+    /// <summary>400 Bad Request — FluentValidation failures or a business-rule rejection.</summary>
+    public sealed record ValidationFailed(IReadOnlyDictionary<string, string[]> Errors) : TripCancelOutcome;
+
+    /// <summary>404 Not Found — the trip doesn't exist or is outside the caller's organization.</summary>
+    public sealed record NotFound : TripCancelOutcome;
+
+    /// <summary>401 Unauthorized or 403 Forbidden — no reliable body to parse for either.</summary>
+    public sealed record Forbidden : TripCancelOutcome;
+
+    /// <summary>Any transport-level failure, short and user-presentable.</summary>
+    public sealed record TransportError(string Message) : TripCancelOutcome;
 }
 
 /// <summary>

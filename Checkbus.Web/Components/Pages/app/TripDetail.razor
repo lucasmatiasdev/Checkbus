@@ -21,23 +21,31 @@
             <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
                 Viaje a @trip.EventName
             </MudText>
-            @if (trip.Status == WebTripStatus.Programado)
-            {
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Disabled="@isPublishing"
-                           OnClick="HandlePublish">
-                    @if (isPublishing)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        <span>Publicando...</span>
-                    }
-                    else
-                    {
-                        <span>Publicar Viaje</span>
-                    }
-                </MudButton>
-            }
+            <MudStack Row="true" Spacing="2">
+                @if (trip.Status == WebTripStatus.Programado)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@isPublishing"
+                               OnClick="HandlePublish">
+                        @if (isPublishing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Publicando...</span>
+                        }
+                        else
+                        {
+                            <span>Publicar Viaje</span>
+                        }
+                    </MudButton>
+                }
+                @if (trip.Status is WebTripStatus.Programado or WebTripStatus.Publicado)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="OpenCancelTripDialog">
+                        Cancelar viaje
+                    </MudButton>
+                }
+            </MudStack>
         </MudStack>
 
         @if (trip.Status == WebTripStatus.Publicado)
@@ -212,6 +220,81 @@
     </MudDialog>
 }
 
+@if (trip is not null)
+{
+    <MudDialog Visible="@isCancelTripDialogOpen" Options="@(new DialogOptions { CloseOnEscapeKey = true })">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Cancelar viaje</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (cancelTripErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@cancelTripErrorMessage</MudAlert>
+            }
+            @if (!isCancelTripConfirmationStep)
+            {
+                <MudSelect T="WebTripCancellationReason"
+                           @bind-Value="cancelReason"
+                           Label="Motivo"
+                           Variant="Variant.Outlined"
+                           Class="mb-4">
+                    @foreach (var reason in CancellationReasons)
+                    {
+                        <MudSelectItem T="WebTripCancellationReason" Value="@reason">@GetCancellationReasonLabel(reason)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudTextField T="string"
+                               @bind-Value="cancelDescription"
+                               Label="Descripción"
+                               HelperText="@(cancelReason == WebTripCancellationReason.Otro ? "Obligatoria para el motivo \"Otro\"." : "Opcional")"
+                               Variant="Variant.Outlined"
+                               Lines="3" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-2">
+                    Esto va a cancelar el viaje a <strong>@trip.EventName</strong> del
+                    <strong>@trip.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong>,
+                    notificar a todos los pasajeros con reserva y procesar sus reembolsos
+                    correspondientes. Esta acción no se puede deshacer.
+                </MudAlert>
+                <MudText Typo="Typo.body2"><strong>Motivo:</strong> @GetCancellationReasonLabel(cancelReason)</MudText>
+                @if (!string.IsNullOrWhiteSpace(cancelDescription))
+                {
+                    <MudText Typo="Typo.body2"><strong>Descripción:</strong> @cancelDescription</MudText>
+                }
+            }
+        </DialogContent>
+        <DialogActions>
+            @if (!isCancelTripConfirmationStep)
+            {
+                <MudButton OnClick="CloseCancelTripDialog">Cerrar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ContinueToCancelConfirmation">
+                    Continuar
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Disabled="@isCancellingTrip" OnClick="@(() => isCancelTripConfirmationStep = false)">
+                    Volver
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" Disabled="@isCancellingTrip" OnClick="ConfirmCancelTripAsync">
+                    @if (isCancellingTrip)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Cancelando...</span>
+                    }
+                    else
+                    {
+                        <span>Confirmar cancelación</span>
+                    }
+                </MudButton>
+            }
+        </DialogActions>
+    </MudDialog>
+}
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
@@ -240,6 +323,15 @@
     private string? seatMapErrorMessage;
     private TripSeatMapResponse? seatMap;
     private List<int?[]> seatRows = [];
+
+    // CU-05 — cancel trip dialog.
+    private static readonly WebTripCancellationReason[] CancellationReasons = Enum.GetValues<WebTripCancellationReason>();
+    private bool isCancelTripDialogOpen;
+    private bool isCancelTripConfirmationStep;
+    private bool isCancellingTrip;
+    private string? cancelTripErrorMessage;
+    private WebTripCancellationReason cancelReason = WebTripCancellationReason.ProblemaChofer;
+    private string? cancelDescription;
 
     // Fase D — stop times edit dialog (odd/tasks/mejoras-detalle-viaje.md).
     private bool isEditStopTimesDialogOpen;
@@ -464,6 +556,84 @@
             isPublishing = false;
         }
     }
+
+    private void OpenCancelTripDialog()
+    {
+        isCancelTripDialogOpen = true;
+        isCancelTripConfirmationStep = false;
+        cancelTripErrorMessage = null;
+        cancelReason = WebTripCancellationReason.ProblemaChofer;
+        cancelDescription = null;
+    }
+
+    private void CloseCancelTripDialog()
+    {
+        isCancelTripDialogOpen = false;
+    }
+
+    private void ContinueToCancelConfirmation()
+    {
+        if (cancelReason == WebTripCancellationReason.Otro && string.IsNullOrWhiteSpace(cancelDescription))
+        {
+            cancelTripErrorMessage = "Ingresá una descripción para el motivo \"Otro\".";
+            return;
+        }
+
+        cancelTripErrorMessage = null;
+        isCancelTripConfirmationStep = true;
+    }
+
+    private async Task ConfirmCancelTripAsync()
+    {
+        cancelTripErrorMessage = null;
+        isCancellingTrip = true;
+        try
+        {
+            var outcome = await TripsClient.CancelAsync(
+                Id, new CancelTripRequest { Reason = cancelReason, Description = cancelDescription });
+
+            switch (outcome)
+            {
+                case TripCancelOutcome.Success:
+                    trip = trip! with { Status = WebTripStatus.Cancelado };
+                    isCancelTripDialogOpen = false;
+                    Snackbar.Add("Viaje cancelado correctamente.", Severity.Success);
+                    break;
+
+                case TripCancelOutcome.ValidationFailed validationFailed:
+                    cancelTripErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripCancelOutcome.NotFound:
+                    cancelTripErrorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripCancelOutcome.Forbidden:
+                    cancelTripErrorMessage = "No tenés permiso para cancelar este viaje.";
+                    break;
+
+                case TripCancelOutcome.TransportError transportError:
+                    cancelTripErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isCancellingTrip = false;
+        }
+    }
+
+    private static string GetCancellationReasonLabel(WebTripCancellationReason reason) => reason switch
+    {
+        WebTripCancellationReason.ProblemaChofer => "Problema con el chofer",
+        WebTripCancellationReason.DesperfectoVehiculo => "Desperfecto del vehículo",
+        WebTripCancellationReason.DemandaInsuficiente => "Demanda insuficiente",
+        WebTripCancellationReason.CondicionesClimaticas => "Condiciones climáticas",
+        WebTripCancellationReason.DocumentacionVencida => "Documentación vencida",
+        WebTripCancellationReason.CausaOperativa => "Causa operativa",
+        WebTripCancellationReason.Otro => "Otro",
+        _ => reason.ToString()
+    };
 
     private static string GetStatusLabel(WebTripStatus status) => status switch
     {

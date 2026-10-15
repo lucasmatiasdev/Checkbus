@@ -42,6 +42,14 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 throw new UserInactiveException();
             }
 
+            if (user.Organization is { IsActive: false })
+            {
+                _logger.LogWarning(
+                    "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
+                    user.Id, user.OrganizationId, "OrganizationInactive");
+                throw new OrganizationInactiveException();
+            }
+
             if (!_passwordHasher.Verify(user.PasswordHash, request.Password))
             {
                 _logger.LogWarning(

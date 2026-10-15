@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,7 +12,8 @@ namespace Checkbus.Tests.Auth;
 
 public class LoginCommandHandlerTests
 {
-    private static User CreateUser(bool isActive = true, Role role = Role.Administrador, bool mustChangePassword = false) => new()
+    private static User CreateUser(
+        bool isActive = true, Role role = Role.Administrador, bool mustChangePassword = false, Organization? organization = null) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Jane",
@@ -21,8 +23,19 @@ public class LoginCommandHandlerTests
         DocumentNumber = "12345678",
         Role = role,
         OrganizationId = Guid.NewGuid(),
+        Organization = organization,
         IsActive = isActive,
         MustChangePassword = mustChangePassword
+    };
+
+    private static Organization CreateOrganization(bool isActive = true) => new()
+    {
+        Id = Guid.NewGuid(),
+        CUIT = "20-12345678-9",
+        Name = "Checkbus Demo",
+        Slug = "checkbus-demo",
+        LogoUrl = "https://example.com/logo.png",
+        IsActive = isActive
     };
 
     private sealed class FakeUserRepository(User? user) : IUserRepository
@@ -124,6 +137,78 @@ public class LoginCommandHandlerTests
 
         await Assert.ThrowsAsync<UserInactiveException>(
             () => handler.Handle(command, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_InactiveOrganization_ThrowsOrganizationInactiveException()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: false));
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_InactiveOrganization_LogsLoginFailedWithUserId()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: false));
+        var logger = new FakeLogger<LoginCommandHandler>();
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            logger);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal("OrganizationInactive", entry.Fields["FailureReason"]);
+        Assert.Equal(user.Id, entry.Fields["UserId"]);
+        Assert.Equal(user.OrganizationId, entry.Fields["OrganizationId"]);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveOrganization_GeneratesTokenAndReturnsResult()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: true));
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotLoaded_DoesNotThrowOrganizationInactiveException()
+    {
+        // Organization is null here (not Included) - must never be treated as inactive. In
+        // production UserRepository.FindByEmailAsync always Includes it, so this only guards
+        // against a future repository regression dropping that Include.
+        var user = CreateUser(organization: null);
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
     }
 
     [Fact]

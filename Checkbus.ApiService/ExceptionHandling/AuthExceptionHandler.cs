@@ -22,6 +22,7 @@ namespace Checkbus.ApiService.ExceptionHandling
                 case UserNotFoundException:
                 case InvalidCredentialsException:
                 case UserInactiveException:
+                case OrganizationInactiveException:
                     await WriteAuthenticationFailedAsync(httpContext, cancellationToken);
                     return true;
 

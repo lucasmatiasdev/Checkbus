@@ -140,9 +140,6 @@ namespace Checkbus.ApiService.Controllers.Public
             return $"""
                 <html>
                 <body>
-                <div style="background:#ffeb3b;color:#000;padding:1rem;font-weight:bold;">
-                SIMULACIÓN &mdash; Proyecto acad&eacute;mico, no se procesa ning&uacute;n pago real
-                </div>
                 <h1>Checkout simulado</h1>
                 <p>Monto: {WebUtility.HtmlEncode($"{record.TotalAmount.Amount} {record.TotalAmount.Currency}")}</p>
                 <form method="post" action="/api/public/payments/simulate/{escapedOrderId}/approve">

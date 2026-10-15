@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Domain.Authorization;
 using FluentValidation;
 
 namespace Checkbus.ApiService.Application.Users.Commands
@@ -26,7 +27,10 @@ namespace Checkbus.ApiService.Application.Users.Commands
             // moved to login, not to the DNI used here as the initial password.
 
             RuleFor(x => x.DocumentType).IsInEnum();
-            RuleFor(x => x.Role).IsInEnum();
+            RuleFor(x => x.Role)
+                .IsInEnum()
+                .Must(role => role != Role.CheckbusSoporte)
+                    .WithMessage("CheckbusSoporte cannot be self-registered.");
         }
     }
 }

@@ -1,0 +1,193 @@
+@page "/admin/support-tickets"
+@attribute [Authorize(Roles = "CheckbusSoporte")]
+@using Checkbus.Web.Features.SupportTickets.Contracts
+@using Checkbus.Web.Features.SupportTickets.Services
+
+<PageTitle>Checkbus - Panel Checkbus</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Panel Checkbus - Tickets de soporte
+    </MudText>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6">
+        <MudText Typo="Typo.h6" Class="mb-4">Todos los tickets</MudText>
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudDataGrid T="SupportTicketAdminResponse" Items="@tickets">
+                <Columns>
+                    <PropertyColumn Property="x => x.OrganizationName" Title="Organización" />
+                    <PropertyColumn Property="x => x.Subject" Title="Asunto" />
+                    <TemplateColumn Title="Categoría">
+                        <CellTemplate>
+                            @GetCategoryLabel(context.Item.Category)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Prioridad">
+                        <CellTemplate>
+                            @GetPriorityLabel(context.Item.Priority)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Fecha">
+                        <CellTemplate>
+                            @context.Item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Adjunto">
+                        <CellTemplate>
+                            @if (context.Item.AttachmentFileName is not null)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                               Size="Size.Small"
+                                               Href="@($"/support-tickets/{context.Item.Id}/attachment")"
+                                               Target="_blank" />
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            <MudSelect T="WebSupportTicketStatus"
+                                       Value="@context.Item.Status"
+                                       ValueChanged="@(newStatus => HandleStatusChanged(context.Item, newStatus))"
+                                       Disabled="@updatingTicketIds.Contains(context.Item.Id)"
+                                       Dense="true"
+                                       Margin="Margin.Dense"
+                                       Variant="Variant.Outlined">
+                                @foreach (var status in Statuses)
+                                {
+                                    <MudSelectItem T="WebSupportTicketStatus" Value="@status">@GetStatusLabel(status)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private static readonly WebSupportTicketStatus[] Statuses = Enum.GetValues<WebSupportTicketStatus>();
+
+    [Inject]
+    private SupportTicketsAdminClient TicketsAdminClient { get; set; } = default!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = default!;
+
+    private IReadOnlyList<SupportTicketAdminResponse> tickets = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+    private readonly HashSet<Guid> updatingTicketIds = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTicketsAsync();
+    }
+
+    private async Task LoadTicketsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await TicketsAdminClient.GetAllTicketsAsync();
+
+            switch (outcome)
+            {
+                case SupportTicketsAdminListOutcome.Success success:
+                    tickets = success.Tickets;
+                    errorMessage = null;
+                    break;
+
+                case SupportTicketsAdminListOutcome.Forbidden:
+                case SupportTicketsAdminListOutcome.TransportError:
+                    errorMessage = "No pudimos cargar los tickets de soporte.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleStatusChanged(SupportTicketAdminResponse ticket, WebSupportTicketStatus newStatus)
+    {
+        if (newStatus == ticket.Status)
+        {
+            return;
+        }
+
+        updatingTicketIds.Add(ticket.Id);
+        try
+        {
+            var outcome = await TicketsAdminClient.UpdateStatusAsync(ticket.Id, newStatus);
+
+            switch (outcome)
+            {
+                case UpdateSupportTicketStatusOutcome.Success:
+                    Snackbar.Add("Estado del ticket actualizado.", Severity.Success);
+                    await LoadTicketsAsync();
+                    break;
+
+                case UpdateSupportTicketStatusOutcome.Forbidden:
+                    Snackbar.Add("No tenés permiso para actualizar este ticket.", Severity.Error);
+                    break;
+
+                case UpdateSupportTicketStatusOutcome.TransportError transportError:
+                    Snackbar.Add(transportError.Message, Severity.Error);
+                    break;
+            }
+        }
+        finally
+        {
+            updatingTicketIds.Remove(ticket.Id);
+        }
+    }
+
+    /// <summary>Spanish display label for a ticket category, duplicated from
+    /// <c>SupportTickets.razor</c>'s private <c>GetCategoryLabel</c> — no shared abstraction
+    /// exists for this small switch-expression, and this page is for a different audience
+    /// (Checkbus staff, not the client organization).</summary>
+    private static string GetCategoryLabel(WebSupportTicketCategory category) => category switch
+    {
+        WebSupportTicketCategory.ProblemaReserva => "Problema de reserva",
+        WebSupportTicketCategory.ProblemaPago => "Problema de pago",
+        WebSupportTicketCategory.ProblemaViaje => "Problema de viaje",
+        WebSupportTicketCategory.ProblemaTecnico => "Problema técnico",
+        WebSupportTicketCategory.ConsultaGeneral => "Consulta general",
+        WebSupportTicketCategory.Otro => "Otro",
+        _ => category.ToString()
+    };
+
+    private static string GetPriorityLabel(WebSupportTicketPriority priority) => priority switch
+    {
+        WebSupportTicketPriority.Baja => "Baja",
+        WebSupportTicketPriority.Media => "Media",
+        WebSupportTicketPriority.Alta => "Alta",
+        WebSupportTicketPriority.Urgente => "Urgente",
+        _ => priority.ToString()
+    };
+
+    private static string GetStatusLabel(WebSupportTicketStatus status) => status switch
+    {
+        WebSupportTicketStatus.Abierto => "Abierto",
+        WebSupportTicketStatus.EnRevision => "En revisión",
+        WebSupportTicketStatus.EnProgreso => "En progreso",
+        WebSupportTicketStatus.EsperandoCliente => "Esperando cliente",
+        WebSupportTicketStatus.Resuelto => "Resuelto",
+        WebSupportTicketStatus.Reabierto => "Reabierto",
+        WebSupportTicketStatus.Cerrado => "Cerrado",
+        _ => status.ToString()
+    };
+}

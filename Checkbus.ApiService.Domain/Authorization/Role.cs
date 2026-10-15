@@ -5,6 +5,7 @@ namespace Checkbus.ApiService.Domain.Authorization
         Administrador,
         Chofer,
         Planificador,
-        Mecanico
+        Mecanico,
+        CheckbusSoporte
     }
 }

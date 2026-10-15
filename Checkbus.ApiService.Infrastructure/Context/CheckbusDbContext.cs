@@ -7,6 +7,7 @@ using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Refunds;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Entities.Seats;
+using Checkbus.ApiService.Domain.Entities.Support;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
@@ -36,6 +37,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Passenger> Passengers => Set<Passenger>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
         public DbSet<BoardingRecord> BoardingRecords => Set<BoardingRecord>();
+        public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
         public DbSet<Payment> Payments => Set<Payment>();
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<Refund> Refunds => Set<Refund>();
@@ -248,6 +250,21 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Reservation>()
                     .WithMany()
                     .HasForeignKey(x => x.ReservationId);
+            });
+
+            modelBuilder.Entity<SupportTicket>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Category).HasConversion<string>();
+                entity.Property(x => x.Priority).HasConversion<string>();
+                entity.Property(x => x.Status).HasConversion<string>();
+                entity.Property(x => x.Subject).HasMaxLength(200);
+                entity.HasOne<Organization>()
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId);
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(x => x.CreatedByUserId);
             });
 
             modelBuilder.Entity<Payment>(entity =>

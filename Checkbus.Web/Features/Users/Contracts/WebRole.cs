@@ -11,5 +11,6 @@ public enum WebRole
     Administrador,
     Chofer,
     Planificador,
-    Mecanico
+    Mecanico,
+    CheckbusSoporte
 }

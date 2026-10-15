@@ -63,6 +63,13 @@ var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
+// Support binds permissively too: the real Checkbus notification address may not be
+// provisioned yet, so a missing section/value must not fail startup.
+var supportOptions = builder.Configuration.GetSection("Support").Get<SupportOptions>()
+    ?? new SupportOptions();
+
+builder.Services.AddSingleton(supportOptions);
+
 // Mercado Pago binds permissively too, same reason as Email above: real sandbox credentials
 // have not been provisioned yet (G1, odd/tasks/pagos-mercadopago.md) so a missing section/
 // values must not fail startup.
@@ -151,6 +158,7 @@ builder.Services.AddScoped<ISeatRepository, SeatRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPassengerRepository, PassengerRepository>();
 builder.Services.AddScoped<IBoardingRecordRepository, BoardingRecordRepository>();
+builder.Services.AddScoped<ISupportTicketRepository, SupportTicketRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IRefundRepository, RefundRepository>();
@@ -228,6 +236,7 @@ builder.Services.AddExceptionHandler<MaintenanceRecordExceptionHandler>();
 builder.Services.AddExceptionHandler<TripExceptionHandler>();
 builder.Services.AddExceptionHandler<ReservationExceptionHandler>();
 builder.Services.AddExceptionHandler<BoardingExceptionHandler>();
+builder.Services.AddExceptionHandler<SupportTicketExceptionHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

@@ -159,4 +159,18 @@ public class RegisterUserCommandValidatorTests
 
         result.ShouldHaveValidationErrorFor(c => c.Role);
     }
+
+    [Fact]
+    public void Role_CheckbusSoporte_IsRejected()
+    {
+        // CheckbusSoporte must never be self-registered: it is only ever meaningful for a
+        // user of the sentinel Checkbus-internal organization and is created exclusively by
+        // seeding (see CheckbusDbSeeder), never through this self-service registration path.
+        var command = ValidCommand();
+        command.Role = Role.CheckbusSoporte;
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.Role);
+    }
 }

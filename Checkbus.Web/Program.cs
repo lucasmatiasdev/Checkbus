@@ -7,6 +7,7 @@ using Checkbus.Web.Features.Events.Services;
 using Checkbus.Web.Features.MaintenanceRecords.Services;
 using Checkbus.Web.Features.Payments.Services;
 using Checkbus.Web.Features.PublicReservations.Services;
+using Checkbus.Web.Features.SupportTickets.Services;
 using Checkbus.Web.Features.Trips.Services;
 using Checkbus.Web.Features.Users.Services;
 using Checkbus.Web.Features.VehicleDiagnostics.Services;
@@ -57,6 +58,8 @@ builder.Services.AddScoped<UsersClient>();
 builder.Services.AddScoped<DriverRequirementsClient>();
 builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
+builder.Services.AddScoped<SupportTicketsClient>();
+builder.Services.AddScoped<SupportTicketsAdminClient>();
 builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();
@@ -190,6 +193,35 @@ app.MapGet("/vehicle-documents/{vehicleId:guid}/{type}", async (
 
     var httpClient = httpClientFactory.CreateClient("apiservice");
     using var request = new HttpRequestMessage(HttpMethod.Get, $"VehicleDocuments/{vehicleId}/{type}/document");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    if (!response.IsSuccessStatusCode)
+        return Results.StatusCode((int)response.StatusCode);
+
+    var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+    return Results.Stream(stream, contentType);
+})
+.RequireAuthorization();
+
+// Same corrected pattern as the driver-documents/vehicle-documents proxies above (see the
+// driver-documents comment for the full rationale): a plain (non-keyed) "apiservice" HttpClient
+// via IHttpClientFactory, with the bearer token attached manually from the already-authenticated
+// HttpContext.User's "access_token" claim — never the keyed client, which depends on a live
+// Razor circuit this minimal-API endpoint does not have.
+app.MapGet("/support-tickets/{id:guid}/attachment", async (
+    Guid id,
+    ClaimsPrincipal user,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken cancellationToken) =>
+{
+    var token = user.FindFirst("access_token")?.Value;
+    if (string.IsNullOrEmpty(token))
+        return Results.Unauthorized();
+
+    var httpClient = httpClientFactory.CreateClient("apiservice");
+    using var request = new HttpRequestMessage(HttpMethod.Get, $"SupportTickets/{id}/attachment");
     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
     var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);

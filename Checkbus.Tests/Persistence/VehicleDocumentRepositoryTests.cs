@@ -53,13 +53,15 @@ public class VehicleDocumentRepositoryTests
         Guid vehicleId,
         VehicleDocumentType type,
         VehicleDocumentStatus status = VehicleDocumentStatus.Pendiente,
-        DateOnly? expirationDate = null) => new()
+        DateOnly? expirationDate = null,
+        string? documentNumber = null) => new()
     {
         Id = Guid.NewGuid(),
         VehicleId = vehicleId,
         Type = type,
         Status = status,
         ExpirationDate = expirationDate,
+        DocumentNumber = documentNumber,
         DocumentPresent = false
     };
 
@@ -156,6 +158,102 @@ public class VehicleDocumentRepositoryTests
 
         await Assert.ThrowsAsync<DbUpdateException>(() => repository.AddAsync(
             CreateDocument(vehicle.Id, VehicleDocumentType.Seguro), cancellationToken));
+    }
+
+    [Fact]
+    public async Task DocumentNumberExistsAsync_SameOrganizationDifferentVehicle_ReturnsTrue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicleA = CreateVehicle(organization.Id, "AB111CD");
+        var vehicleB = CreateVehicle(organization.Id, "AB222CD");
+        db.Vehicles.AddRange(vehicleA, vehicleB);
+        db.VehicleDocuments.Add(CreateDocument(vehicleA.Id, VehicleDocumentType.Seguro, documentNumber: "POL-999"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleDocumentRepository(db);
+
+        var exists = await repository.DocumentNumberExistsAsync(
+            organization.Id, VehicleDocumentType.Seguro, "POL-999", vehicleB.Id, cancellationToken);
+
+        Assert.True(exists);
+    }
+
+    [Fact]
+    public async Task DocumentNumberExistsAsync_ExcludedVehicleOwnsTheNumber_ReturnsFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicle = CreateVehicle(organization.Id, "AB111CD");
+        db.Vehicles.Add(vehicle);
+        db.VehicleDocuments.Add(CreateDocument(vehicle.Id, VehicleDocumentType.Seguro, documentNumber: "POL-999"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleDocumentRepository(db);
+
+        var exists = await repository.DocumentNumberExistsAsync(
+            organization.Id, VehicleDocumentType.Seguro, "POL-999", vehicle.Id, cancellationToken);
+
+        Assert.False(exists);
+    }
+
+    [Fact]
+    public async Task DocumentNumberExistsAsync_DifferentOrganization_ReturnsFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organizationA = CreateOrganization("org-a");
+        var organizationB = CreateOrganization("org-b");
+        db.Organizations.AddRange(organizationA, organizationB);
+        var vehicleA = CreateVehicle(organizationA.Id, "AB111CD");
+        var vehicleB = CreateVehicle(organizationB.Id, "AB222CD");
+        db.Vehicles.AddRange(vehicleA, vehicleB);
+        db.VehicleDocuments.Add(CreateDocument(vehicleA.Id, VehicleDocumentType.Seguro, documentNumber: "POL-999"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleDocumentRepository(db);
+
+        var exists = await repository.DocumentNumberExistsAsync(
+            organizationB.Id, VehicleDocumentType.Seguro, "POL-999", vehicleB.Id, cancellationToken);
+
+        Assert.False(exists);
+    }
+
+    [Fact]
+    public async Task DocumentNumberExistsAsync_SameOrganizationDifferentType_ReturnsFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        var vehicleA = CreateVehicle(organization.Id, "AB111CD");
+        var vehicleB = CreateVehicle(organization.Id, "AB222CD");
+        db.Vehicles.AddRange(vehicleA, vehicleB);
+        db.VehicleDocuments.Add(CreateDocument(vehicleA.Id, VehicleDocumentType.Seguro, documentNumber: "POL-999"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new VehicleDocumentRepository(db);
+
+        var exists = await repository.DocumentNumberExistsAsync(
+            organization.Id, VehicleDocumentType.RTO_VTV, "POL-999", vehicleB.Id, cancellationToken);
+
+        Assert.False(exists);
     }
 
     [Fact]

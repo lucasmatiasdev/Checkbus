@@ -30,6 +30,7 @@ public class UploadVehicleDocumentCommandHandlerTests
         public IReadOnlyList<VehicleDocument> Documents { get; set; } = [];
         public List<VehicleDocument> AddedDocuments { get; } = [];
         public List<VehicleDocument> UpdatedDocuments { get; } = [];
+        public bool DocumentNumberExists { get; set; }
 
         public Task<IReadOnlyList<VehicleDocument>> GetByVehicleIdAsync(Guid vehicleId, CancellationToken cancellationToken)
             => Task.FromResult(Documents);
@@ -52,6 +53,10 @@ public class UploadVehicleDocumentCommandHandlerTests
         public Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by UploadVehicleDocumentCommandHandler.");
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => Task.FromResult(DocumentNumberExists);
     }
 
     private sealed class FakeFileStorageService : IFileStorageService
@@ -121,6 +126,7 @@ public class UploadVehicleDocumentCommandHandlerTests
         ContentType = "application/pdf",
         FileSizeBytes = 3,
         OriginalFileName = "seguro.pdf",
+        DocumentNumber = "POL-12345",
         ExpirationDate = new DateOnly(2027, 1, 1),
         IssueDate = new DateOnly(2026, 1, 1)
     };
@@ -143,6 +149,7 @@ public class UploadVehicleDocumentCommandHandlerTests
         Assert.Same(document, updated);
         Assert.Equal(VehicleDocumentStatus.Pendiente, updated.Status);
         Assert.True(updated.DocumentPresent);
+        Assert.Equal("POL-12345", updated.DocumentNumber);
         Assert.Equal(new DateOnly(2026, 1, 1), updated.IssueDate);
         Assert.Equal(new DateOnly(2027, 1, 1), updated.ExpirationDate);
         Assert.NotNull(updated.FileKey);
@@ -173,6 +180,7 @@ public class UploadVehicleDocumentCommandHandlerTests
         Assert.Equal(VehicleDocumentType.TituloPropiedad, created.Type);
         Assert.Equal(VehicleDocumentStatus.Pendiente, created.Status);
         Assert.True(created.DocumentPresent);
+        Assert.Equal("POL-12345", created.DocumentNumber);
         Assert.NotNull(created.FileKey);
         Assert.Single(fileStorage.SavedKeys);
     }
@@ -222,6 +230,24 @@ public class UploadVehicleDocumentCommandHandlerTests
 
         Assert.Contains("vehicle-documents/old-key.pdf", fileStorage.DeletedKeys);
         Assert.Single(fileStorage.SavedKeys);
+    }
+
+    [Fact]
+    public async Task Handle_DuplicateDocumentNumberInOrganization_ThrowsVehicleDocumentNumberAlreadyRegisteredException()
+    {
+        var organizationId = Guid.NewGuid();
+        var vehicle = CreateVehicle(organizationId);
+        var vehicleDocumentRepository = new FakeVehicleDocumentRepository { DocumentNumberExists = true };
+        var fileStorage = new FakeFileStorageService();
+        var handler = new UploadVehicleDocumentCommandHandler(
+            new FakeVehicleRepository(vehicle), vehicleDocumentRepository, fileStorage, new FakeCurrentUserService(organizationId));
+
+        await Assert.ThrowsAsync<VehicleDocumentNumberAlreadyRegisteredException>(
+            () => handler.Handle(CreateCommand(vehicle.Id, VehicleDocumentType.TituloPropiedad), TestContext.Current.CancellationToken));
+
+        Assert.Empty(vehicleDocumentRepository.AddedDocuments);
+        Assert.Empty(vehicleDocumentRepository.UpdatedDocuments);
+        Assert.Empty(fileStorage.SavedKeys);
     }
 
     [Fact]

@@ -58,6 +58,7 @@ namespace Checkbus.ApiService.Controllers
                 ContentType = request.File.ContentType,
                 FileSizeBytes = request.File.Length,
                 OriginalFileName = request.File.FileName,
+                DocumentNumber = request.DocumentNumber,
                 ExpirationDate = request.ExpirationDate,
                 IssueDate = request.IssueDate
             };

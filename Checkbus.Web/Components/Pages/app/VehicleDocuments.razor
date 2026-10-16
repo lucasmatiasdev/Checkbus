@@ -61,6 +61,16 @@
                     }
                 </MudStack>
 
+                @if (document?.DocumentNumber is not null)
+                {
+                    <MudText Typo="Typo.body2">@($"Número de documento: {document.DocumentNumber}")</MudText>
+                }
+
+                @if (document is { Status: WebVehicleDocumentStatus.Apto or WebVehicleDocumentStatus.NoApto, ValidatedByName: not null })
+                {
+                    <MudText Typo="Typo.body2">@($"Validado por: {document.ValidatedByName}")</MudText>
+                }
+
                 @if (document?.IssueDate is not null)
                 {
                     <MudText Typo="Typo.body2">@($"Emitido: {document.IssueDate.Value:dd/MM/yyyy}")</MudText>
@@ -89,13 +99,16 @@
                 }
 
                 <MudGrid>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
                         <InputFile OnChange="@(e => OnFileSelected(type, e))" />
                     </MudItem>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
+                        <MudTextField Label="Número de documento" @bind-Value="documentNumbers[type]" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
                         <MudDatePicker Label="Fecha de vencimiento" @bind-Date="expirationDates[type]" />
                     </MudItem>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
                         <MudDatePicker Label="Fecha de emisión (opcional)" @bind-Date="issueDates[type]" />
                     </MudItem>
                 </MudGrid>
@@ -149,8 +162,10 @@
 
 @code {
     // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
-    // OpenReadStream buffer and matching the backend's 5MB cap, same as MyDocuments.razor.
-    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+    // OpenReadStream buffer and matching the backend's 10MB cap
+    // (UploadVehicleDocumentCommandValidator.cs). MyDocuments.razor has its own independent
+    // 5MB cap for driver documents, deliberately not raised here.
+    private const long MaxUploadSizeBytes = 10 * 1024 * 1024;
 
     private static readonly WebVehicleDocumentType[] DocumentTypes = Enum.GetValues<WebVehicleDocumentType>();
 
@@ -171,6 +186,7 @@
 
     private string headingName = string.Empty;
     private IReadOnlyList<VehicleDocumentResponse> documents = [];
+    private readonly Dictionary<WebVehicleDocumentType, string?> documentNumbers = new();
     private readonly Dictionary<WebVehicleDocumentType, DateTime?> expirationDates = new();
     private readonly Dictionary<WebVehicleDocumentType, DateTime?> issueDates = new();
     private readonly Dictionary<WebVehicleDocumentType, IBrowserFile?> selectedFiles = new();
@@ -192,6 +208,7 @@
 
         foreach (var type in DocumentTypes)
         {
+            documentNumbers.TryAdd(type, null);
             expirationDates.TryAdd(type, null);
             issueDates.TryAdd(type, null);
             selectedFiles.TryAdd(type, null);
@@ -261,6 +278,13 @@
             return;
         }
 
+        var documentNumber = documentNumbers.GetValueOrDefault(type);
+        if (string.IsNullOrWhiteSpace(documentNumber))
+        {
+            uploadErrors[type] = "Ingresá el número de documento.";
+            return;
+        }
+
         var expirationDate = expirationDates.GetValueOrDefault(type);
         if (expirationDate is null)
         {
@@ -280,6 +304,7 @@
                 stream,
                 file.Name,
                 file.ContentType,
+                documentNumber,
                 DateOnly.FromDateTime(expirationDate.Value),
                 issueDate is null ? null : DateOnly.FromDateTime(issueDate.Value));
 
@@ -287,6 +312,7 @@
             {
                 case VehicleDocumentActionOutcome.Success:
                     selectedFiles[type] = null;
+                    documentNumbers[type] = null;
                     expirationDates[type] = null;
                     issueDates[type] = null;
                     Snackbar.Add("Documento subido correctamente.", Severity.Success);

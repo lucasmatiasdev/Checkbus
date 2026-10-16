@@ -16,6 +16,7 @@ public class UploadVehicleDocumentCommandValidatorTests
         ContentType = "application/pdf",
         FileSizeBytes = 1024,
         OriginalFileName = "seguro.pdf",
+        DocumentNumber = "POL-12345",
         ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30)
     };
 
@@ -68,10 +69,10 @@ public class UploadVehicleDocumentCommandValidatorTests
     }
 
     [Fact]
-    public void FileSizeBytes_ExceedsFiveMegabytes_IsRejected()
+    public void FileSizeBytes_ExceedsTenMegabytes_IsRejected()
     {
         var command = ValidCommand();
-        command.FileSizeBytes = 5 * 1024 * 1024 + 1;
+        command.FileSizeBytes = 10 * 1024 * 1024 + 1;
 
         var result = _validator.TestValidate(command);
 
@@ -79,10 +80,10 @@ public class UploadVehicleDocumentCommandValidatorTests
     }
 
     [Fact]
-    public void FileSizeBytes_ExactlyFiveMegabytes_IsAccepted()
+    public void FileSizeBytes_ExactlyTenMegabytes_IsAccepted()
     {
         var command = ValidCommand();
-        command.FileSizeBytes = 5 * 1024 * 1024;
+        command.FileSizeBytes = 10 * 1024 * 1024;
 
         var result = _validator.TestValidate(command);
 
@@ -98,6 +99,30 @@ public class UploadVehicleDocumentCommandValidatorTests
         var result = _validator.TestValidate(command);
 
         result.ShouldNotHaveValidationErrorFor(c => c.FileSizeBytes);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void DocumentNumber_EmptyOrWhitespace_IsRejected(string documentNumber)
+    {
+        var command = ValidCommand();
+        command.DocumentNumber = documentNumber;
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
+    }
+
+    [Fact]
+    public void DocumentNumber_ExceedsFiftyCharacters_IsRejected()
+    {
+        var command = ValidCommand();
+        command.DocumentNumber = new string('9', 51);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
     }
 
     [Fact]

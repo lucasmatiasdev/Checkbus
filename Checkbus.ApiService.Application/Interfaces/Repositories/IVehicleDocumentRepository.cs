@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Domain.Entities.Vehicles;
+using Checkbus.ApiService.Domain.Enums;
 
 namespace Checkbus.ApiService.Application.Interfaces.Repositories
 {
@@ -15,5 +16,15 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // that date is either already expired or about to expire within 30 days.
         Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken);
+
+        // Scoped to (OrganizationId, Type, DocumentNumber) via a join to Vehicles —
+        // VehicleDocument has no OrganizationId column of its own. excludeVehicleId lets a
+        // re-upload on the same vehicle keep its own number without tripping the check.
+        Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId,
+            VehicleDocumentType type,
+            string documentNumber,
+            Guid excludeVehicleId,
+            CancellationToken cancellationToken);
     }
 }

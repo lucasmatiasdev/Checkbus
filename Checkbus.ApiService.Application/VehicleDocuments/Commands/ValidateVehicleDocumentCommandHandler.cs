@@ -45,6 +45,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
             // No requirement that DocumentPresent be true first — an admin can mark NoApto
             // on an empty row too (mirrors ValidateDriverRequirementCommandHandler).
             document.Status = request.Approved ? VehicleDocumentStatus.Apto : VehicleDocumentStatus.NoApto;
+            document.ValidatedBy = _currentUser.UserId;
             document.UpdatedAt = DateTime.UtcNow;
 
             await _vehicleDocumentRepository.UpdateAsync(document, cancellationToken);

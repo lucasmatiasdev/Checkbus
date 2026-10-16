@@ -58,6 +58,10 @@ public class CreateVehicleCommandHandlerTests
         public Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateVehicleCommandHandler.");
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateVehicleCommandHandler.");
     }
 
     private sealed class FakeUserRepository : IUserRepository

@@ -5,7 +5,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
     public sealed class UploadVehicleDocumentCommandValidator : AbstractValidator<UploadVehicleDocumentCommand>
     {
         private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "application/pdf"];
-        private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+        private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
         public UploadVehicleDocumentCommandValidator()
         {
@@ -15,7 +15,12 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
 
             RuleFor(x => x.FileSizeBytes)
                 .InclusiveBetween(1, MaxFileSizeBytes)
-                .WithMessage("File size must be between 1 byte and 5 MB.");
+                .WithMessage("File size must be between 1 byte and 10 MB.");
+
+            RuleFor(x => x.DocumentNumber)
+                .NotEmpty()
+                .MaximumLength(50)
+                .WithMessage("Document number is required and must be at most 50 characters.");
 
             RuleFor(x => x.ExpirationDate)
                 .GreaterThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow))

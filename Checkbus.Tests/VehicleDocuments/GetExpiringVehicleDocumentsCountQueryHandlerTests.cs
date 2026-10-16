@@ -2,6 +2,7 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.VehicleDocuments.Queries;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
+using Checkbus.ApiService.Domain.Enums;
 
 namespace Checkbus.Tests.VehicleDocuments;
 
@@ -32,6 +33,10 @@ public class GetExpiringVehicleDocumentsCountQueryHandlerTests
             ReceivedThreshold = expiringThresholdDate;
             return Task.FromResult(CountToReturn);
         }
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetExpiringVehicleDocumentsCountQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

@@ -1,0 +1,289 @@
+@page "/reports"
+@attribute [Authorize(Roles = "Planificador,Administrador")]
+@using Checkbus.Web.Features.Trips.Contracts
+@using Checkbus.Web.Features.TripsReport.Contracts
+@using Checkbus.Web.Features.TripsReport.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.Users.Services
+@using Checkbus.Web.Features.Vehicles.Contracts
+@using Checkbus.Web.Features.Vehicles.Services
+
+<PageTitle>Checkbus - Reportes</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Reportes de viajes
+    </MudText>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Desde" @bind-Date="filterDateFrom" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Hasta" @bind-Date="filterDateTo" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="WebTripStatus?" @bind-Value="filterStatus" Label="Estado" Variant="Variant.Outlined">
+                    <MudSelectItem T="WebTripStatus?" Value="@((WebTripStatus?)null)">Todos los estados</MudSelectItem>
+                    @foreach (var status in StatusValues)
+                    {
+                        <MudSelectItem T="WebTripStatus?" Value="@((WebTripStatus?)status)">@GetStatusLabel(status)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="Guid?" @bind-Value="filterVehicleId" Label="Vehículo" Variant="Variant.Outlined">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Todos los vehículos</MudSelectItem>
+                    @foreach (var vehicle in vehicles)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">
+                            @($"{vehicle.Patent} ({vehicle.Brand} {vehicle.Model})")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="Guid?" @bind-Value="filterDriverId" Label="Chofer" Variant="Variant.Outlined">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Todos los choferes</MudSelectItem>
+                    @foreach (var driver in drivers)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)driver.Id)">
+                            @($"{driver.Name} {driver.Surname}")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => LoadReportAsync())">
+                Generar reporte
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilters">
+                Limpiar
+            </MudButton>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Tertiary"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       Href="@BuildExportHref("xlsx")"
+                       Target="_blank">
+                Exportar Excel
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Tertiary"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       Href="@BuildExportHref("csv")"
+                       Target="_blank">
+                Exportar CSV
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (report is not null)
+    {
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudText Typo="Typo.h5">@report.Statistics.TotalTrips</MudText>
+                    <MudText Typo="Typo.body2">Total de viajes</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudText Typo="Typo.h5">@report.Statistics.TotalPassengers</MudText>
+                    <MudText Typo="Typo.body2">Total de pasajeros</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudText Typo="Typo.h5">@report.Statistics.EstimatedRevenue.ToString("C")</MudText>
+                    <MudText Typo="Typo.body2">Ingreso estimado</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.body2" Class="mb-2">Por estado</MudText>
+                    @foreach (var (status, count) in report.Statistics.TripsByStatus)
+                    {
+                        <MudText Typo="Typo.caption">@GetStatusLabel(status): @count</MudText>
+                        <br />
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudDataGrid T="TripResponse" Items="@report.Trips">
+                <Columns>
+                    <TemplateColumn Title="Evento">
+                        <CellTemplate>
+                            @(context.Item.EventName ?? "-")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Vehículo">
+                        <CellTemplate>
+                            @(context.Item.VehiclePatent is null
+                                ? "-"
+                                : $"{context.Item.VehiclePatent} ({context.Item.VehicleBrand} {context.Item.VehicleModel})")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Chofer">
+                        <CellTemplate>
+                            @(context.Item.DriverName is null ? "-" : $"{context.Item.DriverName} {context.Item.DriverSurname}")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Salida">
+                        <CellTemplate>
+                            @context.Item.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Llegada">
+                        <CellTemplate>
+                            @context.Item.ArrivalDate.ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Estado">
+                        <CellTemplate>
+                            @GetStatusLabel(context.Item.Status)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Capacidad">
+                        <CellTemplate>
+                            @context.Item.Capacity
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Asientos disponibles">
+                        <CellTemplate>
+                            @context.Item.AvailableSeats
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Precio">
+                        <CellTemplate>
+                            @context.Item.Price.ToString("C")
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private static readonly WebTripStatus[] StatusValues = Enum.GetValues<WebTripStatus>();
+
+    [Inject]
+    private TripsReportClient TripsReportClient { get; set; } = default!;
+
+    [Inject]
+    private VehiclesClient VehiclesClient { get; set; } = default!;
+
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    private IReadOnlyList<VehicleResponse> vehicles = [];
+    private IReadOnlyList<UserListItemResponse> drivers = [];
+    private TripsReportResponse? report;
+    private DateTime? filterDateFrom;
+    private DateTime? filterDateTo;
+    private WebTripStatus? filterStatus;
+    private Guid? filterVehicleId;
+    private Guid? filterDriverId;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVehiclesAsync();
+        await LoadDriversAsync();
+        await LoadReportAsync();
+    }
+
+    private async Task LoadVehiclesAsync()
+    {
+        var outcome = await VehiclesClient.GetVehiclesAsync();
+        if (outcome is VehiclesListOutcome.Success success)
+        {
+            vehicles = success.Vehicles;
+        }
+    }
+
+    // The driver dropdown reuses the organization's full user list — there is no dedicated
+    // "list drivers" endpoint — filtered to Role.Chofer here rather than touching the shared
+    // GetUsersQuery/UsersClient for a single consumer's filter.
+    private async Task LoadDriversAsync()
+    {
+        var outcome = await UsersClient.GetUsersAsync();
+        if (outcome is UsersListOutcome.Success success)
+        {
+            drivers = success.Users.Where(u => u.Role == WebRole.Chofer).ToList();
+        }
+    }
+
+    private async Task LoadReportAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var outcome = await TripsReportClient.GetReportAsync(
+                filterDateFrom, filterDateTo, filterStatus, filterDriverId, filterVehicleId);
+
+            switch (outcome)
+            {
+                case TripsReportOutcome.Success success:
+                    report = success.Report;
+                    errorMessage = null;
+                    break;
+
+                case TripsReportOutcome.Forbidden:
+                case TripsReportOutcome.TransportError:
+                    errorMessage = "No pudimos generar el reporte.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterStatus = null;
+        filterVehicleId = null;
+        filterDriverId = null;
+        await LoadReportAsync();
+    }
+
+    // Reuses the exact same filter-to-query-string logic as TripsReportClient.GetReportAsync so
+    // the exported file always matches what's currently on screen, then appends the format the
+    // /trips/report/export proxy (Checkbus.Web/Program.cs) expects.
+    private string BuildExportHref(string format)
+    {
+        var query = TripsReportClient.BuildReportQuery(
+            filterDateFrom, filterDateTo, filterStatus, filterDriverId, filterVehicleId);
+        var separator = query.Length == 0 ? "?" : "&";
+        return $"/trips/report/export{query}{separator}format={format}";
+    }
+
+    private static string GetStatusLabel(WebTripStatus status) => status switch
+    {
+        WebTripStatus.Programado => "Programado",
+        WebTripStatus.EnProceso => "En proceso",
+        WebTripStatus.Completado => "Completado",
+        WebTripStatus.Cancelado => "Cancelado",
+        WebTripStatus.Publicado => "Publicado",
+        _ => status.ToString()
+    };
+}

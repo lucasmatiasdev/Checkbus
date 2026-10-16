@@ -160,6 +160,32 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ---- Start (POST {id}/start) ----
+    // No request body shortcut to craft a 400 with here — same established convention as
+    // Publish, only 401/403 are proven here.
+
+    [Fact]
+    public async Task Start_MissingToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsync($"{BasePath}/{Guid.NewGuid()}/start", null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Role.Chofer)]
+    [InlineData(Role.Mecanico)]
+    public async Task Start_DisallowedRole_Returns403(Role role)
+    {
+        var client = CreateAuthorizedClient(role);
+
+        var response = await client.PostAsync($"{BasePath}/{Guid.NewGuid()}/start", null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ---- UpdateStopTimes (PUT {id}/stops/times) ----
     // No request body shortcut to craft a 400 with here (an empty Stops list is a valid-shape
     // but semantically empty request, still resolved by FluentValidation before any DB touch) —

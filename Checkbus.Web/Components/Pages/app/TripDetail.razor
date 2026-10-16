@@ -3,6 +3,7 @@
 @using Checkbus.Web.Features.Trips.Contracts
 @using Checkbus.Web.Features.Trips.Services
 @using Checkbus.Web.Shared
+@implements IDisposable
 
 <PageTitle>Checkbus - Detalle de viaje</PageTitle>
 
@@ -21,23 +22,44 @@
             <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
                 Viaje a @trip.EventName
             </MudText>
-            @if (trip.Status == WebTripStatus.Programado)
-            {
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Disabled="@isPublishing"
-                           OnClick="HandlePublish">
-                    @if (isPublishing)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        <span>Publicando...</span>
-                    }
-                    else
-                    {
-                        <span>Publicar Viaje</span>
-                    }
-                </MudButton>
-            }
+            <MudStack Row="true" Spacing="2">
+                @if (trip.Status == WebTripStatus.Programado)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@isPublishing"
+                               OnClick="HandlePublish">
+                        @if (isPublishing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Publicando...</span>
+                        }
+                        else
+                        {
+                            <span>Publicar Viaje</span>
+                        }
+                    </MudButton>
+                }
+                @if (trip.Status == WebTripStatus.Publicado)
+                {
+                    <MudTooltip Text="@(CanStartTrip ? null : "Se habilita 30 minutos antes de la salida programada.")">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Disabled="@(isStarting || !CanStartTrip)"
+                                   OnClick="HandleStart">
+                            @if (isStarting)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Iniciando...</span>
+                            }
+                            else
+                            {
+                                <span>Iniciar viaje</span>
+                            }
+                        </MudButton>
+                    </MudTooltip>
+                }
+            </MudStack>
         </MudStack>
 
         @if (trip.Status == WebTripStatus.Publicado)
@@ -54,6 +76,11 @@
         @if (publishErrorMessage is not null)
         {
             <MudAlert Severity="Severity.Error" Class="mb-4">@publishErrorMessage</MudAlert>
+        }
+
+        @if (startErrorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@startErrorMessage</MudAlert>
         }
 
         <MudPaper Elevation="2" Class="pa-6 mb-6">
@@ -235,6 +262,18 @@
     private bool isPublishing;
     private string? publishErrorMessage;
 
+    // CU-08 — start trip. The ±30-minute window must stay in sync with
+    // StartTripCommandHandler.StartWindow; a timer re-checks it periodically so the button
+    // enables itself once the window opens, without requiring a page refresh.
+    private static readonly TimeSpan StartWindow = TimeSpan.FromMinutes(30);
+    private bool isStarting;
+    private string? startErrorMessage;
+    private System.Threading.Timer? startWindowTimer;
+    private bool CanStartTrip =>
+        trip is not null
+        && DateTime.UtcNow >= trip.DepartureDate - StartWindow
+        && DateTime.UtcNow <= trip.DepartureDate + StartWindow;
+
     // Fase E — seat-map panel (odd/tasks/mejoras-detalle-viaje.md).
     private bool isLoadingSeatMap;
     private string? seatMapErrorMessage;
@@ -280,6 +319,57 @@
         if (trip is not null)
         {
             await LoadSeatMapAsync();
+
+            if (trip.Status == WebTripStatus.Publicado)
+            {
+                startWindowTimer = new System.Threading.Timer(
+                    _ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        startWindowTimer?.Dispose();
+    }
+
+    private async Task HandleStart()
+    {
+        startErrorMessage = null;
+        isStarting = true;
+        try
+        {
+            var outcome = await TripsClient.StartAsync(Id);
+
+            switch (outcome)
+            {
+                case TripStartOutcome.Success:
+                    trip = trip! with { Status = WebTripStatus.EnProceso };
+                    startWindowTimer?.Dispose();
+                    startWindowTimer = null;
+                    Snackbar.Add("Viaje iniciado correctamente.", Severity.Success);
+                    break;
+
+                case TripStartOutcome.ValidationFailed validationFailed:
+                    startErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripStartOutcome.NotFound:
+                    startErrorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripStartOutcome.Forbidden:
+                    startErrorMessage = "No tenés permiso para iniciar este viaje.";
+                    break;
+
+                case TripStartOutcome.TransportError transportError:
+                    startErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isStarting = false;
         }
     }
 

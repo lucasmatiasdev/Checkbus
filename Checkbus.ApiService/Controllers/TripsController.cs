@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Application.Trips.Commands;
 using Checkbus.ApiService.Application.Trips.Queries;
 using Checkbus.ApiService.Contracts;
+using Checkbus.ApiService.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,6 +35,31 @@ namespace Checkbus.ApiService.Controllers
         public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         {
             var result = await _mediator.Send(new GetTripsQuery(), cancellationToken);
+            return Ok(result);
+        }
+
+        // Report for CU-07 (notes/casos-de-uso-adaptacion.md) — separate query/endpoint
+        // from GetAll so the existing trips-listing screen stays untouched.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpGet("report")]
+        public async Task<IActionResult> GetReport(
+            [FromQuery] DateOnly? dateFrom,
+            [FromQuery] DateOnly? dateTo,
+            [FromQuery] TripStatus? status,
+            [FromQuery] Guid? driverId,
+            [FromQuery] Guid? vehicleId,
+            CancellationToken cancellationToken)
+        {
+            var query = new GetTripsReportQuery
+            {
+                DateFrom = dateFrom,
+                DateTo = dateTo,
+                Status = status,
+                DriverId = driverId,
+                VehicleId = vehicleId
+            };
+
+            var result = await _mediator.Send(query, cancellationToken);
             return Ok(result);
         }
 

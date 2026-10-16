@@ -643,6 +643,10 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -659,9 +663,10 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
 
                     b.HasIndex("EventId");
 
-                    b.HasIndex("OrganizationId");
-
                     b.HasIndex("VehicleId");
+
+                    b.HasIndex("OrganizationId", "Slug")
+                        .IsUnique();
 
                     b.ToTable("Trips");
                 });

@@ -62,6 +62,12 @@ public class PaymentApprovedEventHandlerTests
 
         public Task UpdateStopDepartureTimesAsync(IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by PaymentApprovedEventHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by PaymentApprovedEventHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by PaymentApprovedEventHandler.");
     }
 
     private sealed class FakePassengerRepository(IReadOnlyList<Passenger> passengers) : IPassengerRepository
@@ -108,6 +114,7 @@ public class PaymentApprovedEventHandlerTests
     private static Trip CreateTrip(Guid eventId) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

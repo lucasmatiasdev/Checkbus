@@ -117,6 +117,7 @@ public class PaymentPersistenceTests
             DriverId = driver.Id,
             VehicleId = vehicle.Id,
             EventId = @event.Id,
+            Slug = Guid.NewGuid().ToString(),
             DepartureDate = new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
             ArrivalDate = new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc),
             Capacity = 45,

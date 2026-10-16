@@ -169,6 +169,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Event>()
                     .WithMany()
                     .HasForeignKey(x => x.EventId);
+                entity.HasIndex(x => new { x.OrganizationId, x.Slug }).IsUnique();
             });
 
             modelBuilder.Entity<Route>(entity =>

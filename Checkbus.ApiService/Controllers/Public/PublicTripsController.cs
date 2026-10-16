@@ -35,6 +35,20 @@ namespace Checkbus.ApiService.Controllers.Public
             _mediator = mediator;
         }
 
+        // Slug->Guid resolution for the friendly share link (CU-03,
+        // odd/tasks/gaps-reescritura-cu.md T2). A distinct "by-slug/" prefix keeps this from
+        // ever ambiguating with the {id:guid} routes below — those stay untouched.
+        [AllowAnonymous]
+        [HttpGet("by-slug/{slug}")]
+        public async Task<IActionResult> ResolveSlug(string slug, CancellationToken cancellationToken)
+        {
+            var tripId = await _mediator.Send(new ResolveTripSlugQuery { Slug = slug }, cancellationToken);
+            if (tripId is null)
+                return NotFound();
+
+            return Ok(new ResolvedTripResponse { TripId = tripId.Value });
+        }
+
         [AllowAnonymous]
         [HttpGet("{id:guid}/seatmap")]
         public async Task<IActionResult> GetSeatMap(Guid id, CancellationToken cancellationToken)
@@ -101,5 +115,11 @@ namespace Checkbus.ApiService.Controllers.Public
     public class CreatePublicReservationRequestBody
     {
         public required IReadOnlyList<PassengerSeatRequest> Passengers { get; set; }
+    }
+
+    // Response body of the slug->Guid resolution endpoint above.
+    public class ResolvedTripResponse
+    {
+        public required Guid TripId { get; set; }
     }
 }

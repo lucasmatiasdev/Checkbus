@@ -1,7 +1,9 @@
+using System.Text.RegularExpressions;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Queries;
+using Checkbus.ApiService.Application.Users;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Trips;
@@ -121,6 +123,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             var directionsResult = await _directionsService.GetDirectionsAsync(points, cancellationToken);
 
+            var slug = await GenerateUniqueSlugAsync(@event.Name, departureDate, callerOrganizationId, cancellationToken);
+
             var createdAt = DateTime.UtcNow;
             var trip = new Trip
             {
@@ -129,6 +133,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 DriverId = request.DriverId,
                 VehicleId = request.VehicleId,
                 EventId = request.EventId,
+                Slug = slug,
                 DepartureDate = departureDate,
                 ArrivalDate = arrivalDate,
                 Capacity = vehicle.Capacity,
@@ -265,6 +270,29 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     throw new TripNotEligibleException("El chofer no está habilitado: tiene documentación vencida.");
                 }
             }
+        }
+
+        // Human-readable public identifier: "<event-name>-<yyyyMMdd>", lowercased, accents and
+        // punctuation stripped (reuses UserEmailGenerator.SanitizeSlug, same normalization
+        // already used for Organization slugs). Disambiguated with a numeric suffix within the
+        // organization on collision (e.g. two trips to the same event on the same date).
+        private async Task<string> GenerateUniqueSlugAsync(
+            string eventName, DateTime departureDate, Guid organizationId, CancellationToken cancellationToken)
+        {
+            var hyphenated = Regex.Replace(eventName.Trim(), @"\s+", "-");
+            var sanitized = UserEmailGenerator.SanitizeSlug(hyphenated);
+            var datePart = departureDate.ToString("yyyyMMdd");
+            var slugBase = sanitized.Length > 0 ? $"{sanitized}-{datePart}" : datePart;
+
+            var slug = slugBase;
+            var suffix = 2;
+            while (await _tripRepository.SlugExistsAsync(organizationId, slug, cancellationToken))
+            {
+                slug = $"{slugBase}-{suffix}";
+                suffix++;
+            }
+
+            return slug;
         }
 
         private async Task EnsureDriverNoOverlapAsync(

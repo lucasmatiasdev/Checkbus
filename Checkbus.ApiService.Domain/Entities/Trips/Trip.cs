@@ -17,6 +17,12 @@ namespace Checkbus.ApiService.Domain.Entities.Trips
         public required Guid DriverId { get; set; }
         public required Guid VehicleId { get; set; }
         public required Guid EventId { get; set; }
+
+        // Human-readable public identifier (e.g. "river-vs-boca-20261025"), unique per
+        // organization. Generated once at creation time (CreateTripCommandHandler) — the
+        // existing api/public/trips/{id:guid}/... routes keep using the Guid; this is only
+        // resolved by a separate slug->Guid endpoint for the public-facing share link.
+        public required string Slug { get; set; }
         public DateTime DepartureDate { get; set; }
         public DateTime ArrivalDate { get; set; }
         public int Capacity { get; set; }

@@ -42,6 +42,12 @@ public class GetPublicTripEventImageQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository
@@ -61,6 +67,7 @@ public class GetPublicTripEventImageQueryHandlerTests
     private static Trip CreateTrip(Guid eventId, TripStatus status = TripStatus.Publicado) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

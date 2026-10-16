@@ -11,6 +11,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         public required Guid VehicleId { get; set; }
         public required Guid DriverId { get; set; }
         public required Guid EventId { get; set; }
+        public required string Slug { get; set; }
         public DateTime DepartureDate { get; set; }
         public DateTime ArrivalDate { get; set; }
         public int Capacity { get; set; }

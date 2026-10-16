@@ -57,6 +57,7 @@ public class TripsClientTests
         VehicleId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         EventId = Guid.NewGuid(),
+        Slug = "final-copa-argentina-20261025",
         DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
         ArrivalDate = new DateTime(2026, 5, 1, 18, 0, 0, DateTimeKind.Utc),
         Capacity = 45,

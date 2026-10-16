@@ -80,6 +80,12 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
     }
 
     private sealed class FakeEventRepository(IReadOnlyList<Event> events) : IEventRepository
@@ -100,6 +106,7 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
     private static Trip CreateTrip(Guid vehicleId, Guid eventId) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = vehicleId,

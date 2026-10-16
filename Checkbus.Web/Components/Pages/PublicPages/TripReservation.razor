@@ -1,4 +1,4 @@
-@page "/reservar/{tripId:guid}"
+@page "/reservar/{slug}"
 @layout PublicReservationLayout
 @attribute [AllowAnonymous]
 @using Checkbus.Web.Features.PublicReservations.Contracts
@@ -236,7 +236,12 @@
 
 @code {
     [Parameter]
-    public Guid TripId { get; set; }
+    public string Slug { get; set; } = string.Empty;
+
+    // Resolved from Slug in OnInitializedAsync, before any other call on this page — every
+    // method below still takes the real Guid, same as pre-slug. Not a [Parameter]; the route
+    // only ever carries the friendly slug (CU-03, odd/tasks/gaps-reescritura-cu.md T2).
+    private Guid tripId;
 
     [Inject]
     private PublicTripsClient PublicTripsClient { get; set; } = default!;
@@ -277,6 +282,25 @@
 
     protected override async Task OnInitializedAsync()
     {
+        isLoading = true;
+        var resolveOutcome = await PublicTripsClient.ResolveSlugAsync(Slug);
+        switch (resolveOutcome)
+        {
+            case ResolveTripSlugOutcome.Success success:
+                tripId = success.TripId;
+                break;
+
+            case ResolveTripSlugOutcome.NotFound:
+                notFound = true;
+                isLoading = false;
+                return;
+
+            case ResolveTripSlugOutcome.TransportError transportError:
+                errorMessage = transportError.Message;
+                isLoading = false;
+                return;
+        }
+
         await LoadDetailAsync();
     }
 
@@ -285,7 +309,7 @@
         isLoading = true;
         try
         {
-            var outcome = await PublicTripsClient.GetDetailsAsync(TripId);
+            var outcome = await PublicTripsClient.GetDetailsAsync(tripId);
 
             switch (outcome)
             {
@@ -317,7 +341,7 @@
     {
         // A missing/broken image is not worth failing the whole detail view over — silently
         // skip rendering it on NotFound/TransportError rather than surfacing a page-level error.
-        var outcome = await PublicTripsClient.GetEventImageAsync(TripId);
+        var outcome = await PublicTripsClient.GetEventImageAsync(tripId);
         if (outcome is PublicTripEventImageOutcome.Success success)
         {
             eventImageDataUri = $"data:{success.ContentType};base64,{Convert.ToBase64String(success.Content)}";
@@ -335,7 +359,7 @@
         isLoadingSeatMap = true;
         try
         {
-            var outcome = await PublicTripsClient.GetSeatMapAsync(TripId);
+            var outcome = await PublicTripsClient.GetSeatMapAsync(tripId);
 
             switch (outcome)
             {
@@ -404,7 +428,7 @@
         try
         {
             var request = new CreateReservationRequest { Passengers = passengers };
-            var outcome = await PublicTripsClient.CreateReservationAsync(TripId, request);
+            var outcome = await PublicTripsClient.CreateReservationAsync(tripId, request);
 
             switch (outcome)
             {

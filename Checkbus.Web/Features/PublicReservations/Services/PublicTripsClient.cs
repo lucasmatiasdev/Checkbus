@@ -21,6 +21,51 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
 {
     private readonly HttpClient _httpClient = httpClient;
 
+    // Slug->Guid resolution for the friendly share link (CU-03,
+    // odd/tasks/gaps-reescritura-cu.md T2) — called once at page init, before every other
+    // method here, all of which still take the resolved Guid.
+    public async Task<ResolveTripSlugOutcome> ResolveSlugAsync(
+        string slug,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"public/trips/by-slug/{slug}", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new ResolveTripSlugOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var resolved = await response.Content
+                            .ReadFromJsonAsync<ResolvedTripResponse>(cancellationToken);
+                        return new ResolveTripSlugOutcome.Success(resolved!.TripId);
+
+                    case HttpStatusCode.NotFound:
+                        return new ResolveTripSlugOutcome.NotFound();
+
+                    default:
+                        return new ResolveTripSlugOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new ResolveTripSlugOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<PublicTripSeatMapOutcome> GetSeatMapAsync(
         Guid tripId,
         CancellationToken cancellationToken = default)

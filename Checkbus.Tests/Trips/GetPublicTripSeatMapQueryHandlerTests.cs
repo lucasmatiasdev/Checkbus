@@ -46,6 +46,12 @@ public class GetPublicTripSeatMapQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository
@@ -129,6 +135,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
     private static Trip CreateTrip(TripStatus status = TripStatus.Publicado) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

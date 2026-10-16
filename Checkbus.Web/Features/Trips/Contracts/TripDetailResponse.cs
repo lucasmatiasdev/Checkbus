@@ -12,6 +12,7 @@ public sealed record TripDetailResponse
     public required Guid VehicleId { get; init; }
     public required Guid DriverId { get; init; }
     public required Guid EventId { get; init; }
+    public required string Slug { get; init; }
     public DateTime DepartureDate { get; init; }
     public DateTime ArrivalDate { get; init; }
     public int Capacity { get; init; }

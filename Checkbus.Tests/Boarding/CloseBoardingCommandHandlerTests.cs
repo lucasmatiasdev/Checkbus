@@ -44,6 +44,12 @@ public class CloseBoardingCommandHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CloseBoardingCommandHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CloseBoardingCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CloseBoardingCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository : IBoardingRecordRepository
@@ -81,6 +87,7 @@ public class CloseBoardingCommandHandlerTests
     private static Trip CreateTrip(Guid organizationId, Guid driverId) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
         VehicleId = Guid.NewGuid(),

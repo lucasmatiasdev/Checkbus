@@ -108,5 +108,20 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+        {
+            return _context.Trips.AnyAsync(t => t.OrganizationId == organizationId && t.Slug == slug, cancellationToken);
+        }
+
+        public async Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+        {
+            var trip = await _context.Trips
+                .Where(t => t.Slug == slug)
+                .Select(t => new { t.Id })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return trip?.Id;
+        }
     }
 }

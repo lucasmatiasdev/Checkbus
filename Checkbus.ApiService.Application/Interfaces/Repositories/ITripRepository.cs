@@ -36,5 +36,14 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // codebase (e.g. IReservationRepository.CreateBatchAsync).
         Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken);
+
+        // Scoped by organization, not global — same criterion as Patent/DocumentNumber.
+        // Used by CreateTripCommandHandler to disambiguate a generated slug before persisting.
+        Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken);
+
+        // Public, unauthenticated lookup for the slug->Guid resolution endpoint. Does not leak
+        // organization scoping since the slug itself carries no sensitive info and the caller
+        // has no organization context (anonymous visitor).
+        Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken);
     }
 }

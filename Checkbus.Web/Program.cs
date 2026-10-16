@@ -205,6 +205,37 @@ app.MapGet("/vehicle-documents/{vehicleId:guid}/{type}", async (
 })
 .RequireAuthorization();
 
+// Same corrected pattern as the other proxies above — a plain (non-keyed) "apiservice"
+// HttpClient via IHttpClientFactory, with the bearer token attached manually. The incoming
+// query string (filters + format) is forwarded as-is rather than re-parsed/rebuilt field by
+// field — this proxy has no business knowing the filter shape, only relaying it.
+app.MapGet("/trips/report/export", async (
+    HttpContext httpContext,
+    ClaimsPrincipal user,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken cancellationToken) =>
+{
+    var token = user.FindFirst("access_token")?.Value;
+    if (string.IsNullOrEmpty(token))
+        return Results.Unauthorized();
+
+    var httpClient = httpClientFactory.CreateClient("apiservice");
+    using var request = new HttpRequestMessage(HttpMethod.Get, $"Trips/report/export{httpContext.Request.QueryString}");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    if (!response.IsSuccessStatusCode)
+        return Results.StatusCode((int)response.StatusCode);
+
+    var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+    var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+        ?? response.Content.Headers.ContentDisposition?.FileName
+        ?? "reporte-viajes";
+    return Results.Stream(stream, contentType, fileDownloadName: fileName);
+})
+.RequireAuthorization();
+
 // Same corrected pattern as the driver-documents/vehicle-documents proxies above (see the
 // driver-documents comment for the full rationale): a plain (non-keyed) "apiservice" HttpClient
 // via IHttpClientFactory, with the bearer token attached manually from the already-authenticated

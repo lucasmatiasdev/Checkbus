@@ -4,6 +4,7 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Maps;
 using Checkbus.ApiService.Application.Interfaces.Payments;
+using Checkbus.ApiService.Application.Interfaces.Reports;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Payments;
 using Checkbus.ApiService.Application.Interfaces.Storage;
@@ -12,6 +13,7 @@ using Checkbus.ApiService.Infrastructure.Implementations.Authentication;
 using Checkbus.ApiService.Infrastructure.Implementations.Email;
 using Checkbus.ApiService.Infrastructure.Implementations.Maps;
 using Checkbus.ApiService.Infrastructure.Implementations.Payments;
+using Checkbus.ApiService.Infrastructure.Implementations.Reports;
 using Checkbus.ApiService.Infrastructure.Implementations.Repositories;
 using Checkbus.ApiService.Infrastructure.Implementations.Storage;
 using Checkbus.ApiService.Infrastructure.Persistence;
@@ -164,6 +166,7 @@ builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IRefundRepository, RefundRepository>();
 builder.Services.AddScoped<IProcessedWebhookEventRepository, ProcessedWebhookEventRepository>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddScoped<IReportExportService, ReportExportService>();
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<LoginCommand>();

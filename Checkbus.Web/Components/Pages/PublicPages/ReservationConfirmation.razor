@@ -111,6 +111,29 @@
                     </MudGrid>
                 }
 
+                @if (reservation.Status == ConfirmadaStatus)
+                {
+                    // Computed once per card rather than inline twice below (<img src> and the
+                    // download <a href> both need it) — QR generation is cheap but there is no
+                    // reason to run it twice for the same reservation on every render.
+                    var ticketQrDataUrl = ReservationTicketQrCode.GeneratePngDataUrl(reservation.ReservationId);
+
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Ticket</MudText>
+                    <MudStack Row="false" AlignItems="AlignItems.Start">
+                        <img src="@ticketQrDataUrl"
+                             alt="Código QR de la reserva"
+                             width="180" height="180" />
+                        <MudText Typo="Typo.button" Color="Color.Primary">
+                            <a href="@ticketQrDataUrl"
+                               download="@($"ticket-{reservation.ReservationId}.png")"
+                               style="text-decoration:none;color:inherit;">
+                                Descargar ticket
+                            </a>
+                        </MudText>
+                    </MudStack>
+                }
+
                 @if (CanCancel(reservation.Status))
                 {
                     <MudButton Variant="Variant.Outlined"

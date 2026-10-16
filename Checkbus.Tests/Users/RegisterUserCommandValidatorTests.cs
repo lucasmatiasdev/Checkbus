@@ -126,12 +126,50 @@ public class RegisterUserCommandValidatorTests
     }
 
     [Fact]
-    public void DocumentNumber_SevenChars_IsAccepted()
+    public void DocumentNumber_SevenChars_PasaporteType_IsAccepted()
     {
-        // No MinimumLength on this field: the Q1 decision moved the short-password
-        // floor to login, not to the DNI used here as the initial password.
+        // No generic MinimumLength on this field: the Q1 decision moved the short-password
+        // floor to login, not to the document number used here as the initial password.
+        // The exact-8-digit rule below only applies to DocumentType.DNI (CU-06).
         var command = ValidCommand();
+        command.DocumentType = DocumentType.Pasaporte;
         command.DocumentNumber = "4012345";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveValidationErrorFor(c => c.DocumentNumber);
+    }
+
+    [Fact]
+    public void DocumentNumber_DniWithFewerThanEightDigits_IsRejected()
+    {
+        var command = ValidCommand();
+        command.DocumentType = DocumentType.DNI;
+        command.DocumentNumber = "4012345";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
+    }
+
+    [Fact]
+    public void DocumentNumber_DniWithNonDigitCharacters_IsRejected()
+    {
+        var command = ValidCommand();
+        command.DocumentType = DocumentType.DNI;
+        command.DocumentNumber = "4012345A";
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
+    }
+
+    [Fact]
+    public void DocumentNumber_DniWithExactlyEightDigits_IsAccepted()
+    {
+        var command = ValidCommand();
+        command.DocumentType = DocumentType.DNI;
+        command.DocumentNumber = "40123456";
 
         var result = _validator.TestValidate(command);
 

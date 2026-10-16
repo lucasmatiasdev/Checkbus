@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
+using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Users.Commands;
 using Checkbus.ApiService.Domain.Authorization;
@@ -6,11 +7,29 @@ using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Documents;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.Users;
 
 public class RegisterUserCommandHandlerTests
 {
+    private sealed class FakeEmailService : IEmailService
+    {
+        public List<EmailMessage> SentMessages { get; } = [];
+        public bool ThrowOnSend { get; set; }
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+        {
+            if (ThrowOnSend)
+            {
+                throw new InvalidOperationException("Simulated SMTP failure.");
+            }
+
+            SentMessages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeUserRepository : IUserRepository
     {
         public List<User> AddedUsers { get; } = [];
@@ -116,7 +135,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -131,7 +152,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -147,7 +170,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var before = DateTime.UtcNow;
         await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
@@ -169,7 +194,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            passwordHasher);
+            passwordHasher,
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -185,7 +212,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<DocumentNumberAlreadyRegisteredException>(
             () => handler.Handle(CreateCommand(), TestContext.Current.CancellationToken));
@@ -201,7 +230,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId: null),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.Handle(CreateCommand(), TestContext.Current.CancellationToken));
@@ -215,7 +246,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository(slug: null),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.Handle(CreateCommand(), TestContext.Current.CancellationToken));
@@ -230,7 +263,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -250,7 +285,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -266,7 +303,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             new FakeDriverRequirementRepository(),
             new FakeCurrentUserService(organizationId),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
         var command = CreateCommand();
         command.Role = Role.Administrador;
 
@@ -285,7 +324,9 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             driverRequirementRepository,
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
@@ -314,12 +355,57 @@ public class RegisterUserCommandHandlerTests
             new FakeOrganizationRepository("checkbus-demo"),
             driverRequirementRepository,
             new FakeCurrentUserService(Guid.NewGuid()),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new FakeEmailService(),
+            NullLogger<RegisterUserCommandHandler>.Instance);
         var command = CreateCommand();
         command.Role = role;
 
         await handler.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Empty(driverRequirementRepository.AddedRequirements);
+    }
+
+    [Fact]
+    public async Task Handle_ValidRequest_SendsCredentialsEmailWithGeneratedAddressAndInitialPassword()
+    {
+        var emailService = new FakeEmailService();
+        var handler = new RegisterUserCommandHandler(
+            new FakeUserRepository(),
+            new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakePasswordHasher(),
+            emailService,
+            NullLogger<RegisterUserCommandHandler>.Instance);
+        var command = CreateCommand();
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Single(emailService.SentMessages);
+        var message = emailService.SentMessages[0];
+        Assert.Equal(result.Email, message.To);
+        Assert.Contains(result.Email, message.HtmlBody);
+        Assert.Contains(command.DocumentNumber, message.HtmlBody);
+    }
+
+    [Fact]
+    public async Task Handle_CredentialsEmailSendFails_RegistrationStillSucceeds()
+    {
+        var emailService = new FakeEmailService { ThrowOnSend = true };
+        var userRepository = new FakeUserRepository();
+        var handler = new RegisterUserCommandHandler(
+            userRepository,
+            new FakeOrganizationRepository("checkbus-demo"),
+            new FakeDriverRequirementRepository(),
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakePasswordHasher(),
+            emailService,
+            NullLogger<RegisterUserCommandHandler>.Instance);
+
+        var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(Guid.Empty, result.UserId);
+        Assert.Single(userRepository.AddedUsers);
     }
 }

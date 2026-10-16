@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Enums;
 using FluentValidation;
 
 namespace Checkbus.ApiService.Application.Users.Commands
@@ -23,8 +24,13 @@ namespace Checkbus.ApiService.Application.Users.Commands
                 .NotEmpty().WithMessage("Document number is required.")
                 .MaximumLength(20)
                 .Matches("^[A-Za-z0-9]+$").WithMessage("Document number must be alphanumeric.");
-            // No MinimumLength: per the resolved Q1 decision, the short-password floor
-            // moved to login, not to the DNI used here as the initial password.
+            // No generic MinimumLength: per the resolved Q1 decision, the short-password floor
+            // moved to login, not to the DNI used here as the initial password. The exact
+            // 8-digit rule below is specific to DocumentType.DNI (CU-06) and doesn't reopen
+            // that decision — Pasaporte numbers keep the generic alphanumeric rule above.
+            RuleFor(x => x.DocumentNumber)
+                .Matches("^[0-9]{8}$").WithMessage("DNI must be exactly 8 digits.")
+                .When(x => x.DocumentType == DocumentType.DNI);
 
             RuleFor(x => x.DocumentType).IsInEnum();
             RuleFor(x => x.Role)

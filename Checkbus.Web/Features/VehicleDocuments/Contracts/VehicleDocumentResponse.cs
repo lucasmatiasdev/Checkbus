@@ -18,4 +18,5 @@ public sealed record VehicleDocumentResponse
     public DateOnly? ExpirationDate { get; init; }
     public bool DocumentPresent { get; init; }
     public string? DocumentNumber { get; init; }
+    public string? ValidatedByName { get; init; }
 }

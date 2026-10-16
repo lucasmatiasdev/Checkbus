@@ -15,5 +15,9 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
         public DateOnly? ExpirationDate { get; set; }
         public bool DocumentPresent { get; set; }
         public string? DocumentNumber { get; set; }
+
+        // Resolved display name of whoever approved/rejected the document, never the raw
+        // ValidatedBy Guid — a history of "who validated" is only useful if it's legible.
+        public string? ValidatedByName { get; set; }
     }
 }

@@ -874,6 +874,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("ValidatedBy")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("VehicleId")
                         .HasColumnType("uuid");
 

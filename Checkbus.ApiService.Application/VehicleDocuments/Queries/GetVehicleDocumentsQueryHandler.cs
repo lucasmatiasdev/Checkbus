@@ -9,15 +9,18 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
     {
         private readonly IVehicleRepository _vehicleRepository;
         private readonly IVehicleDocumentRepository _vehicleDocumentRepository;
+        private readonly IUserRepository _userRepository;
         private readonly ICurrentUserService _currentUser;
 
         public GetVehicleDocumentsQueryHandler(
             IVehicleRepository vehicleRepository,
             IVehicleDocumentRepository vehicleDocumentRepository,
+            IUserRepository userRepository,
             ICurrentUserService currentUser)
         {
             _vehicleRepository = vehicleRepository;
             _vehicleDocumentRepository = vehicleDocumentRepository;
+            _userRepository = userRepository;
             _currentUser = currentUser;
         }
 
@@ -35,6 +38,18 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
 
             var documents = await _vehicleDocumentRepository.GetByVehicleIdAsync(request.VehicleId, cancellationToken);
 
+            // At most a handful of document types per vehicle, so resolving each distinct
+            // validator individually is simpler than adding a batch lookup to IUserRepository.
+            var validatorNames = new Dictionary<Guid, string>();
+            foreach (var validatorId in documents.Where(d => d.ValidatedBy.HasValue).Select(d => d.ValidatedBy!.Value).Distinct())
+            {
+                var validator = await _userRepository.FindByIdAsync(validatorId, cancellationToken);
+                if (validator is not null)
+                {
+                    validatorNames[validatorId] = $"{validator.Name} {validator.Surname}";
+                }
+            }
+
             return documents
                 .Select(d => new VehicleDocumentDto
                 {
@@ -43,7 +58,8 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
                     IssueDate = d.IssueDate,
                     ExpirationDate = d.ExpirationDate,
                     DocumentPresent = d.DocumentPresent,
-                    DocumentNumber = d.DocumentNumber
+                    DocumentNumber = d.DocumentNumber,
+                    ValidatedByName = d.ValidatedBy.HasValue ? validatorNames.GetValueOrDefault(d.ValidatedBy.Value) : null
                 })
                 .ToList();
         }

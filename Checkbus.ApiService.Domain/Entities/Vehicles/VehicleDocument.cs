@@ -24,6 +24,10 @@ namespace Checkbus.ApiService.Domain.Entities.Vehicles
         // universal types (Seguro, RTO_VTV) get their row pre-created at vehicle registration,
         // before any number is known.
         public string? DocumentNumber { get; set; }
+
+        // Who approved/rejected the document, FK-only (no navigation property), same
+        // pattern as the rest of this entity. Null until the first ValidateVehicleDocumentCommand.
+        public Guid? ValidatedBy { get; set; }
         public string? FileKey { get; set; }
 
         // Captured from the uploaded file's Content-Type at upload time so the download

@@ -66,6 +66,11 @@
                     <MudText Typo="Typo.body2">@($"Número de documento: {document.DocumentNumber}")</MudText>
                 }
 
+                @if (document is { Status: WebVehicleDocumentStatus.Apto or WebVehicleDocumentStatus.NoApto, ValidatedByName: not null })
+                {
+                    <MudText Typo="Typo.body2">@($"Validado por: {document.ValidatedByName}")</MudText>
+                }
+
                 @if (document?.IssueDate is not null)
                 {
                     <MudText Typo="Typo.body2">@($"Emitido: {document.IssueDate.Value:dd/MM/yyyy}")</MudText>
@@ -157,8 +162,10 @@
 
 @code {
     // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
-    // OpenReadStream buffer and matching the backend's 5MB cap, same as MyDocuments.razor.
-    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+    // OpenReadStream buffer and matching the backend's 10MB cap
+    // (UploadVehicleDocumentCommandValidator.cs). MyDocuments.razor has its own independent
+    // 5MB cap for driver documents, deliberately not raised here.
+    private const long MaxUploadSizeBytes = 10 * 1024 * 1024;
 
     private static readonly WebVehicleDocumentType[] DocumentTypes = Enum.GetValues<WebVehicleDocumentType>();
 

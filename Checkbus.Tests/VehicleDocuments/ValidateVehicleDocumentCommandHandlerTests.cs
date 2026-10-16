@@ -53,10 +53,10 @@ public class ValidateVehicleDocumentCommandHandlerTests
             => throw new NotSupportedException("Not needed by ValidateVehicleDocumentCommandHandler.");
     }
 
-    private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
+    private sealed class FakeCurrentUserService(Guid? organizationId, Guid? userId = null) : ICurrentUserService
     {
         public bool IsAuthenticated => true;
-        public Guid? UserId => Guid.NewGuid();
+        public Guid? UserId { get; } = userId ?? Guid.NewGuid();
         public Guid? OrganizationId => organizationId;
         public string? Role => "Administrador";
         public string? Email => "admin@checkbus-demo.com";
@@ -110,6 +110,24 @@ public class ValidateVehicleDocumentCommandHandlerTests
 
         var updated = Assert.Single(repository.UpdatedDocuments);
         Assert.Equal(expectedStatus, updated.Status);
+    }
+
+    [Fact]
+    public async Task Handle_ExistingRow_SetsValidatedByToCallerUserId()
+    {
+        var organizationId = Guid.NewGuid();
+        var callerUserId = Guid.NewGuid();
+        var vehicle = CreateVehicle(organizationId);
+        var document = CreateDocument(vehicle.Id, VehicleDocumentType.Seguro);
+        var repository = new FakeVehicleDocumentRepository { Documents = [document] };
+        var handler = new ValidateVehicleDocumentCommandHandler(
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId, callerUserId));
+
+        await handler.Handle(
+            CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken);
+
+        var updated = Assert.Single(repository.UpdatedDocuments);
+        Assert.Equal(callerUserId, updated.ValidatedBy);
     }
 
     [Fact]

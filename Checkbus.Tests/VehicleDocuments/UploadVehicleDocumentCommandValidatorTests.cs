@@ -69,10 +69,10 @@ public class UploadVehicleDocumentCommandValidatorTests
     }
 
     [Fact]
-    public void FileSizeBytes_ExceedsFiveMegabytes_IsRejected()
+    public void FileSizeBytes_ExceedsTenMegabytes_IsRejected()
     {
         var command = ValidCommand();
-        command.FileSizeBytes = 5 * 1024 * 1024 + 1;
+        command.FileSizeBytes = 10 * 1024 * 1024 + 1;
 
         var result = _validator.TestValidate(command);
 
@@ -80,10 +80,10 @@ public class UploadVehicleDocumentCommandValidatorTests
     }
 
     [Fact]
-    public void FileSizeBytes_ExactlyFiveMegabytes_IsAccepted()
+    public void FileSizeBytes_ExactlyTenMegabytes_IsAccepted()
     {
         var command = ValidCommand();
-        command.FileSizeBytes = 5 * 1024 * 1024;
+        command.FileSizeBytes = 10 * 1024 * 1024;
 
         var result = _validator.TestValidate(command);
 

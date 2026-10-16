@@ -59,6 +59,12 @@
                         </MudButton>
                     </MudTooltip>
                 }
+                @if (trip.Status == WebTripStatus.EnProceso)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenFinishTripDialog">
+                        Finalizar viaje
+                    </MudButton>
+                }
             </MudStack>
         </MudStack>
 
@@ -106,6 +112,20 @@
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Estado</MudText>
                     <MudText Typo="Typo.body1">@GetStatusLabel(trip.Status)</MudText>
                 </MudItem>
+                @if (trip.ActualArrivalDate is not null)
+                {
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Llegada real</MudText>
+                        <MudText Typo="Typo.body1">@trip.ActualArrivalDate.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
+                    </MudItem>
+                }
+                @if (!string.IsNullOrWhiteSpace(trip.Observations))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Observaciones</MudText>
+                        <MudText Typo="Typo.body1">@trip.Observations</MudText>
+                    </MudItem>
+                }
                 <MudItem xs="6">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Precio</MudText>
                     <MudText Typo="Typo.body1">@trip.Price.ToString("C")</MudText>
@@ -239,6 +259,45 @@
     </MudDialog>
 }
 
+@if (trip is not null)
+{
+    <MudDialog Visible="@isFinishTripDialogOpen" Options="@(new DialogOptions { CloseOnEscapeKey = true })">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Finalizar viaje</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (finishTripErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@finishTripErrorMessage</MudAlert>
+            }
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudDatePicker Label="Fecha de llegada" @bind-Date="finishArrivalDate" />
+                <MudTimePicker Label="Hora de llegada" @bind-Time="finishArrivalTime" />
+            </MudStack>
+            <MudTextField T="string"
+                           @bind-Value="finishObservations"
+                           Label="Observaciones"
+                           HelperText="Opcional"
+                           Variant="Variant.Outlined"
+                           Lines="3" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton Disabled="@isFinishingTrip" OnClick="CloseFinishTripDialog">Cerrar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isFinishingTrip" OnClick="ConfirmFinishTripAsync">
+                @if (isFinishingTrip)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Finalizando...</span>
+                }
+                else
+                {
+                    <span>Finalizar viaje</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
@@ -273,6 +332,14 @@
         trip is not null
         && DateTime.UtcNow >= trip.DepartureDate - StartWindow
         && DateTime.UtcNow <= trip.DepartureDate + StartWindow;
+
+    // CU-08 — finish trip.
+    private bool isFinishTripDialogOpen;
+    private bool isFinishingTrip;
+    private string? finishTripErrorMessage;
+    private DateTime? finishArrivalDate;
+    private TimeSpan? finishArrivalTime;
+    private string? finishObservations;
 
     // Fase E — seat-map panel (odd/tasks/mejoras-detalle-viaje.md).
     private bool isLoadingSeatMap;
@@ -370,6 +437,68 @@
         finally
         {
             isStarting = false;
+        }
+    }
+
+    private void OpenFinishTripDialog()
+    {
+        isFinishTripDialogOpen = true;
+        finishTripErrorMessage = null;
+        var now = DateTime.Now;
+        finishArrivalDate = now.Date;
+        finishArrivalTime = now.TimeOfDay;
+        finishObservations = null;
+    }
+
+    private void CloseFinishTripDialog()
+    {
+        isFinishTripDialogOpen = false;
+    }
+
+    private async Task ConfirmFinishTripAsync()
+    {
+        if (finishArrivalDate is null || finishArrivalTime is null)
+        {
+            finishTripErrorMessage = "Ingresá la fecha y hora de llegada.";
+            return;
+        }
+
+        finishTripErrorMessage = null;
+        isFinishingTrip = true;
+        try
+        {
+            var actualArrivalDate = (finishArrivalDate.Value.Date + finishArrivalTime.Value).ToUniversalTime();
+            var outcome = await TripsClient.FinishAsync(
+                Id, new FinishTripRequest { ActualArrivalDate = actualArrivalDate, Observations = finishObservations });
+
+            switch (outcome)
+            {
+                case TripFinishOutcome.Success:
+                    trip = trip! with { Status = WebTripStatus.Completado };
+                    isFinishTripDialogOpen = false;
+                    Snackbar.Add("Viaje finalizado correctamente.", Severity.Success);
+                    break;
+
+                case TripFinishOutcome.ValidationFailed validationFailed:
+                    finishTripErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripFinishOutcome.NotFound:
+                    finishTripErrorMessage = "No encontramos ese viaje.";
+                    break;
+
+                case TripFinishOutcome.Forbidden:
+                    finishTripErrorMessage = "No tenés permiso para finalizar este viaje.";
+                    break;
+
+                case TripFinishOutcome.TransportError transportError:
+                    finishTripErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isFinishingTrip = false;
         }
     }
 

@@ -23,6 +23,13 @@ namespace Checkbus.ApiService.Domain.Entities.Trips
         public int AvailableSeats { get; set; }
         public decimal Price { get; set; }
         public TripStatus Status { get; set; } = TripStatus.Programado;
+
+        // CU-08: set by FinishTripCommandHandler when the trip transitions to Completado.
+        // ArrivalDate above stays the originally scheduled value (never overwritten) so a
+        // delay/early-arrival is always comparable against what was planned.
+        public DateTime? ActualArrivalDate { get; set; }
+        public string? Observations { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

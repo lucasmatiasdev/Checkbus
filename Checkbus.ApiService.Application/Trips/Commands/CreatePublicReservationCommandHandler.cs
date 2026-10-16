@@ -1,9 +1,12 @@
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Reservations;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
@@ -55,6 +58,18 @@ namespace Checkbus.ApiService.Application.Trips.Commands
     // email once Mercado Pago's webhook actually confirms payment — this handler no longer
     // depends on IEventRepository/IEmailService at all.
     //
+    // CU-14 gap closure: the transport organization was never told a new public reservation
+    // came in. User-confirmed decision — notify every User with Role.Administrador in
+    // trip.OrganizationId, by email, one message per recipient. Zero Administradores means
+    // nothing is sent (not an error, not logged). Same defensive posture as
+    // CloseBoardingCommandHandler.NotifyAbsentPassengersAsync: runs AFTER CreateBatchAsync has
+    // durably persisted the batch, each recipient's send is try/caught independently so one
+    // bad address never blocks another recipient or the caller's response, and nothing here
+    // ever propagates — a flaky SMTP relay must not turn an already-successful reservation
+    // into a failed response. No IEventRepository/IOrganizationRepository added only to
+    // enrich the email body — the event/organization display name is intentionally omitted;
+    // the trip/date/seat-count data already in scope at this point is enough to be useful.
+    //
     // C5: PublicWebOptions IS still a dependency again, but only to build Mercado Pago's
     // success/failure/pending back-URLs (config.online in the order-create request) — NOT to
     // send an email. All three outcomes point at the same /reservas/confirmacion/{ids} route
@@ -83,6 +98,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly IReservationRepository _reservationRepository;
         private readonly IPaymentService _paymentService;
         private readonly IMercadoPagoSellerTokenResolver _sellerTokenResolver;
+        private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
         private readonly PublicWebOptions _publicWebOptions;
         private readonly ILogger<CreatePublicReservationCommandHandler> _logger;
 
@@ -92,6 +109,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             IReservationRepository reservationRepository,
             IPaymentService paymentService,
             IMercadoPagoSellerTokenResolver sellerTokenResolver,
+            IUserRepository userRepository,
+            IEmailService emailService,
             PublicWebOptions publicWebOptions,
             ILogger<CreatePublicReservationCommandHandler> logger)
         {
@@ -100,6 +119,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _reservationRepository = reservationRepository;
             _paymentService = paymentService;
             _sellerTokenResolver = sellerTokenResolver;
+            _userRepository = userRepository;
+            _emailService = emailService;
             _publicWebOptions = publicWebOptions;
             _logger = logger;
         }
@@ -281,11 +302,55 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new SeatsNoLongerAvailableException();
             }
 
+            // CU-14: the batch is now real — notify the organization's admins. See class doc
+            // comment for the full defensive-posture rationale; failures here must never
+            // affect the response already earned above.
+            await NotifyOrganizationAdminsAsync(trip, reservations.Count, cancellationToken);
+
             return new CreatePublicReservationResultDto
             {
                 Reservations = created,
                 CheckoutUrl = orderResult.CheckoutUrl
             };
+        }
+
+        private async Task NotifyOrganizationAdminsAsync(
+            Trip trip, int seatCount, CancellationToken cancellationToken)
+        {
+            var organizationUsers = await _userRepository.GetAllByOrganizationAsync(
+                trip.OrganizationId, cancellationToken);
+            var admins = organizationUsers.Where(u => u.Role == Role.Administrador).ToList();
+
+            foreach (var admin in admins)
+            {
+                try
+                {
+                    await _emailService.SendAsync(BuildNewReservationEmail(admin, trip, seatCount), cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to send new-reservation notification to UserId {UserId} for TripId {TripId}",
+                        admin.Id, trip.Id);
+                }
+            }
+        }
+
+        private static EmailMessage BuildNewReservationEmail(User admin, Trip trip, int seatCount)
+        {
+            var subject = $"Nueva reserva — viaje del {trip.DepartureDate:dd/MM/yyyy}";
+            var seatsLabel = seatCount == 1 ? "1 asiento" : $"{seatCount} asientos";
+            var body = $"""
+                <h2>Nueva reserva recibida</h2>
+                <p>Hola {admin.Name} {admin.Surname},</p>
+                <p>Se registró una nueva reserva para el viaje con salida el
+                <strong>{trip.DepartureDate:dd/MM/yyyy HH:mm}</strong>, por
+                <strong>{seatsLabel}</strong>.</p>
+                <p>TripId: {trip.Id}</p>
+                """;
+
+            return new EmailMessage(admin.Email, subject, body);
         }
     }
 }

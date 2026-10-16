@@ -123,6 +123,12 @@ public class HandlePaymentWebhookCommandHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
     }
 
     private sealed class FakeMercadoPagoSellerTokenResolver(
@@ -264,6 +270,7 @@ public class HandlePaymentWebhookCommandHandlerTests
     private static Trip CreateTrip(Guid id) => new()
     {
         Id = id,
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

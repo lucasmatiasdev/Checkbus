@@ -48,6 +48,12 @@ public class GetTripBoardingListQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripBoardingListQueryHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository(List<BoardingRecord> records) : IBoardingRecordRepository
@@ -115,6 +121,7 @@ public class GetTripBoardingListQueryHandlerTests
     private static Trip CreateTrip(Guid organizationId, Guid driverId, Guid vehicleId) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
         VehicleId = vehicleId,

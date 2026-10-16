@@ -32,5 +32,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         public required string PlaceId { get; set; }
         public required double Latitude { get; set; }
         public required double Longitude { get; set; }
+
+        // CU-13: caller-provided per-stop attributes — unlike Order/Type above, these are NOT
+        // computed server-side.
+        public int StopDurationMinutes { get; set; }
+        public bool IsBoardingPoint { get; set; }
     }
 }

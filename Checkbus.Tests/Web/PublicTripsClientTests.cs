@@ -391,4 +391,43 @@ public class PublicTripsClientTests
         Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
         Assert.Contains($"public/trips/{TripId}/reservations", stub.CapturedRequest.RequestUri!.ToString());
     }
+
+    [Fact]
+    public async Task ResolveSlugAsync_WhenOk_ReturnsSuccessWithResolvedTripId()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new ResolvedTripResponse { TripId = TripId })
+        });
+        var client = CreateClient(stub);
+
+        var outcome = await client.ResolveSlugAsync("river-vs-boca-20261025", TestContext.Current.CancellationToken);
+
+        var success = Assert.IsType<ResolveTripSlugOutcome.Success>(outcome);
+        Assert.Equal(TripId, success.TripId);
+        Assert.Contains("public/trips/by-slug/river-vs-boca-20261025", stub.CapturedRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task ResolveSlugAsync_WhenNotFound_ReturnsNotFound()
+    {
+        var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(stub);
+
+        var outcome = await client.ResolveSlugAsync("does-not-exist", TestContext.Current.CancellationToken);
+
+        Assert.IsType<ResolveTripSlugOutcome.NotFound>(outcome);
+    }
+
+    [Fact]
+    public async Task ResolveSlugAsync_WhenHandlerThrows_ReturnsTransportErrorWithGenericMessage()
+    {
+        var client = CreateClient(new ThrowingHttpMessageHandler());
+
+        var outcome = await client.ResolveSlugAsync("river-vs-boca-20261025", TestContext.Current.CancellationToken);
+
+        var transportError = Assert.IsType<ResolveTripSlugOutcome.TransportError>(outcome);
+        Assert.NotEmpty(transportError.Message);
+        Assert.DoesNotContain("HttpRequestException", transportError.Message);
+    }
 }

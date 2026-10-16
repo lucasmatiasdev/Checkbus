@@ -47,6 +47,12 @@ public class GetDriverTripsQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(IReadOnlyList<Vehicle> vehicles) : IVehicleRepository
@@ -155,6 +161,7 @@ public class GetDriverTripsQueryHandlerTests
         TripStatus status = TripStatus.Publicado, DateTime? departureDate = null) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
         VehicleId = vehicleId,

@@ -65,6 +65,12 @@ public class StartTripCommandHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by StartTripCommandHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by StartTripCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by StartTripCommandHandler.");
     }
 
     private sealed class FakeReservationRepository(IReadOnlyList<Reservation> reservations) : IReservationRepository
@@ -123,6 +129,7 @@ public class StartTripCommandHandlerTests
         DateTime departureDate, TripStatus status = TripStatus.Publicado, Guid? organizationId = null) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId ?? Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

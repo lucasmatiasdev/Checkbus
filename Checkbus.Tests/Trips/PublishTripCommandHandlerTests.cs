@@ -55,11 +55,18 @@ public class PublishTripCommandHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by PublishTripCommandHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by PublishTripCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by PublishTripCommandHandler.");
     }
 
     private static Trip CreateTrip(TripStatus status = TripStatus.Programado, Guid? organizationId = null) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId ?? OrganizationId,
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

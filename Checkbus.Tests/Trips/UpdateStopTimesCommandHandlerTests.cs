@@ -44,6 +44,12 @@ public class UpdateStopTimesCommandHandlerTests
             UpdatedDepartureTimesByStopId = departureTimesByStopId;
             return Task.CompletedTask;
         }
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateStopTimesCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateStopTimesCommandHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
@@ -58,6 +64,7 @@ public class UpdateStopTimesCommandHandlerTests
     private static Trip CreateTrip(Guid organizationId) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

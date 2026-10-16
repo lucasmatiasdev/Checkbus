@@ -89,6 +89,7 @@ public class TripRepositoryTests
         DateTime fechaSalida, DateTime fechaLlegada) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
         VehicleId = vehicleId,

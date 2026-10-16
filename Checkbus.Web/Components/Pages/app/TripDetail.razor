@@ -415,7 +415,7 @@
     private IJSRuntime JsRuntime { get; set; } = default!;
 
     private TripDetailResponse? trip;
-    private string PublicReservationUrl => NavigationManager.ToAbsoluteUri($"/reservar/{Id}").ToString();
+    private string PublicReservationUrl => NavigationManager.ToAbsoluteUri($"/reservar/{trip?.Slug}").ToString();
     private bool isLoading = true;
     private string? errorMessage;
     private bool isPublishing;

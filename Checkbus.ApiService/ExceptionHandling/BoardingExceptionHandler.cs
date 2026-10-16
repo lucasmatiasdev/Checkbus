@@ -26,6 +26,10 @@ namespace Checkbus.ApiService.ExceptionHandling
                     await WriteConflictAsync(httpContext, alreadyValidatedException.Message, cancellationToken);
                     return true;
 
+                case ReservationNotEligibleForBoardingException notEligibleException:
+                    await WriteConflictAsync(httpContext, notEligibleException.Message, cancellationToken);
+                    return true;
+
                 default:
                     return false;
             }

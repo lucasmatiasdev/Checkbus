@@ -49,6 +49,12 @@ public class GetTripPendingRefundsQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripPendingRefundsQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripPendingRefundsQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripPendingRefundsQueryHandler.");
     }
 
     private sealed class FakeReservationRepository(IReadOnlyList<Reservation> reservations) : IReservationRepository
@@ -90,6 +96,7 @@ public class GetTripPendingRefundsQueryHandlerTests
     private static Trip CreateTrip(Guid? organizationId = null) => new()
     {
         Id = Guid.NewGuid(),
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId ?? Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         VehicleId = Guid.NewGuid(),

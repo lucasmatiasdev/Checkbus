@@ -78,6 +78,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                 VehicleId = trip.VehicleId,
                 DriverId = trip.DriverId,
                 EventId = trip.EventId,
+                Slug = trip.Slug,
                 DepartureDate = trip.DepartureDate,
                 ArrivalDate = trip.ArrivalDate,
                 Capacity = trip.Capacity,

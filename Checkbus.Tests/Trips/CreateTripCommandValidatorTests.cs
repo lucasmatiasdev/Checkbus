@@ -11,8 +11,8 @@ public class CreateTripCommandValidatorTests
         VehicleId = Guid.NewGuid(),
         DriverId = Guid.NewGuid(),
         EventId = Guid.NewGuid(),
-        DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
-        ArrivalDate = new DateTime(2026, 5, 1, 18, 0, 0, DateTimeKind.Utc),
+        DepartureDate = DateTime.UtcNow.AddDays(30),
+        ArrivalDate = DateTime.UtcNow.AddDays(30).AddHours(8),
         Price = 15000m,
         Stops =
         [
@@ -63,6 +63,19 @@ public class CreateTripCommandValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateTripCommand.EventId));
+    }
+
+    [Fact]
+    public void Validate_DepartureDateInThePast_HasError()
+    {
+        var command = CreateValidCommand();
+        command.DepartureDate = DateTime.UtcNow.AddDays(-1);
+        command.ArrivalDate = DateTime.UtcNow.AddHours(-1);
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateTripCommand.DepartureDate));
     }
 
     [Fact]

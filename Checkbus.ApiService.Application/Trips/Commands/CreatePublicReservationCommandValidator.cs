@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Domain.Enums;
 using FluentValidation;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
@@ -30,10 +31,17 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 passenger.RuleFor(p => p.Surname).NotEmpty().WithMessage("Surname is required.");
                 passenger.RuleFor(p => p.DocumentType).IsInEnum();
                 passenger.RuleFor(p => p.DocumentNumber).NotEmpty().WithMessage("DocumentNumber is required.");
+                // Same CU-06 rule, condicional a DocumentType.DNI — Pasaporte keeps only the
+                // NotEmpty check above.
+                passenger.RuleFor(p => p.DocumentNumber)
+                    .Matches("^[0-9]{8}$").WithMessage("DNI must be exactly 8 digits.")
+                    .When(p => p.DocumentType == DocumentType.DNI);
                 passenger.RuleFor(p => p.Email)
                     .NotEmpty().WithMessage("Email is required.")
                     .EmailAddress().WithMessage("Email must be a valid email address.");
-                passenger.RuleFor(p => p.Phone).NotEmpty().WithMessage("Phone is required.");
+                passenger.RuleFor(p => p.Phone)
+                    .NotEmpty().WithMessage("Phone is required.")
+                    .Matches("^[0-9]{8,15}$").WithMessage("Phone must contain only digits (8 to 15).");
             });
         }
     }

@@ -147,6 +147,14 @@ public class CreateTripCommandHandlerTests
         public Task UpdateAsync(Trip trip, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
 
+        public HashSet<string> ExistingSlugs { get; set; } = [];
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => Task.FromResult(ExistingSlugs.Contains(slug));
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
+
         public Task<IReadOnlyList<Trip>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
 
@@ -361,7 +369,7 @@ public class CreateTripCommandHandlerTests
             VehicleRepository = new FakeVehicleRepository(vehicle),
             UserRepository = new FakeUserRepository(driver),
             EventRepository = new FakeEventRepository(CreateEvent()),
-            TripRepository = new FakeTripRepository { VehicleOverlaps = [new Trip { Id = Guid.NewGuid(), OrganizationId = OrganizationId, DriverId = Guid.NewGuid(), VehicleId = vehicle.Id, EventId = Guid.NewGuid(), DepartureDate = DateTime.UtcNow, ArrivalDate = DateTime.UtcNow }] }
+            TripRepository = new FakeTripRepository { VehicleOverlaps = [new Trip { Id = Guid.NewGuid(), OrganizationId = OrganizationId, DriverId = Guid.NewGuid(), VehicleId = vehicle.Id, EventId = Guid.NewGuid(), Slug = Guid.NewGuid().ToString(), DepartureDate = DateTime.UtcNow, ArrivalDate = DateTime.UtcNow }] }
         };
 
         await Assert.ThrowsAsync<TripNotEligibleException>(() =>
@@ -416,7 +424,7 @@ public class CreateTripCommandHandlerTests
             VehicleRepository = new FakeVehicleRepository(vehicle),
             UserRepository = new FakeUserRepository(driver),
             EventRepository = new FakeEventRepository(CreateEvent()),
-            TripRepository = new FakeTripRepository { DriverOverlaps = [new Trip { Id = Guid.NewGuid(), OrganizationId = OrganizationId, DriverId = driver.Id, VehicleId = Guid.NewGuid(), EventId = Guid.NewGuid(), DepartureDate = DateTime.UtcNow, ArrivalDate = DateTime.UtcNow }] }
+            TripRepository = new FakeTripRepository { DriverOverlaps = [new Trip { Id = Guid.NewGuid(), OrganizationId = OrganizationId, DriverId = driver.Id, VehicleId = Guid.NewGuid(), EventId = Guid.NewGuid(), Slug = Guid.NewGuid().ToString(), DepartureDate = DateTime.UtcNow, ArrivalDate = DateTime.UtcNow }] }
         };
 
         await Assert.ThrowsAsync<TripNotEligibleException>(() =>
@@ -539,6 +547,72 @@ public class CreateTripCommandHandlerTests
         Assert.Equal(trip.Id, result.Id);
         Assert.Equal(42, result.Capacity);
         Assert.Equal(@event.Name, result.EventName);
+    }
+
+    [Fact]
+    public async Task Handle_StopsCarryDurationAndBoardingPointFlags_PersistsThemAsGiven()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var @event = CreateEvent();
+        var command = CreateCommand(vehicle.Id, driver.Id, @event.Id);
+        command.Stops[0].StopDurationMinutes = 15;
+        command.Stops[0].IsBoardingPoint = true;
+        command.Stops[1].StopDurationMinutes = 0;
+        command.Stops[1].IsBoardingPoint = false;
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(@event)
+        };
+
+        await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
+
+        var stops = harness.TripRepository.AddedStops.OrderBy(s => s.Order).ToList();
+        Assert.Equal(15, stops[0].StopDurationMinutes);
+        Assert.True(stops[0].IsBoardingPoint);
+        Assert.Equal(0, stops[1].StopDurationMinutes);
+        Assert.False(stops[1].IsBoardingPoint);
+    }
+
+    [Fact]
+    public async Task Handle_AllChecksPass_GeneratesSlugFromEventNameAndDepartureDate()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var @event = CreateEvent();
+        var command = CreateCommand(vehicle.Id, driver.Id, @event.Id);
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(@event)
+        };
+
+        await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal("final-copa-argentina-20260501", harness.TripRepository.AddedTrip!.Slug);
+    }
+
+    [Fact]
+    public async Task Handle_SlugAlreadyExistsInOrganization_AppendsDisambiguatingSuffix()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var @event = CreateEvent();
+        var command = CreateCommand(vehicle.Id, driver.Id, @event.Id);
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(@event),
+            TripRepository = new FakeTripRepository { ExistingSlugs = ["final-copa-argentina-20260501"] }
+        };
+
+        await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal("final-copa-argentina-20260501-2", harness.TripRepository.AddedTrip!.Slug);
     }
 
     [Fact]

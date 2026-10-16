@@ -38,6 +38,12 @@ public class GetTripQueryHandlerTests
         public Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(Guid organizationId, string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository
@@ -142,6 +148,7 @@ public class GetTripQueryHandlerTests
             DriverId = driver.Id,
             VehicleId = vehicle.Id,
             EventId = @event.Id,
+            Slug = Guid.NewGuid().ToString(),
             DepartureDate = DateTime.UtcNow,
             ArrivalDate = DateTime.UtcNow.AddHours(8),
             Capacity = 45,
@@ -198,6 +205,7 @@ public class GetTripQueryHandlerTests
             DriverId = Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
             EventId = Guid.NewGuid(),
+            Slug = Guid.NewGuid().ToString(),
             DepartureDate = DateTime.UtcNow,
             ArrivalDate = DateTime.UtcNow.AddHours(8)
         };

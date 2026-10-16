@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Queries;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Boarding;
 using MediatR;
 
@@ -36,6 +37,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             // distinguishable from one that genuinely doesn't exist.
             await GetTripBoardingListQueryHandler.AuthorizeDriverOwnsTripAsync(
                 reservation.TripId, _tripRepository, _currentUser, cancellationToken);
+
+            // CU-12: the BoardingRecord alone doesn't know about cancellation — a Cancelada
+            // reservation (or one still PendientePago) must never be markable Abordado.
+            if (reservation.Status != ReservationStatus.Confirmada)
+            {
+                throw new ReservationNotEligibleForBoardingException();
+            }
 
             await _boardingRecordRepository.ValidateAsync(request.ReservationId, request.Method, cancellationToken);
         }

@@ -8,9 +8,17 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
-            Embarque
-        </MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+            <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
+                Embarque
+            </MudText>
+            @if (!isLoading)
+            {
+                <MudChip T="string" Color="Color.Primary" Size="Size.Medium">
+                    @BoardedCount/@allPassengers.Count pasajeros abordados
+                </MudChip>
+            }
+        </MudStack>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Error"
                    Disabled="@(isLoading || isClosing)"
@@ -115,6 +123,9 @@
     private bool isClosing;
     private readonly HashSet<Guid> validatingReservationIds = [];
     private string? errorMessage;
+
+    // Computed client-side from the already-loaded list — no new backend query needed.
+    private int BoardedCount => allPassengers.Count(p => p.Status == WebBoardingStatus.Abordado);
 
     protected override async Task OnInitializedAsync()
     {

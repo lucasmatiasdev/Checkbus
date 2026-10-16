@@ -222,4 +222,37 @@ public class ValidateBoardingCommandHandlerTests
                 new ValidateBoardingCommand { ReservationId = reservation.Id, Method = ValidationMethod.Busqueda },
                 TestContext.Current.CancellationToken));
     }
+
+    [Theory]
+    [InlineData(ReservationStatus.Cancelada)]
+    [InlineData(ReservationStatus.PendientePago)]
+    public async Task Handle_ReservationNotConfirmada_ThrowsReservationNotEligibleForBoarding(ReservationStatus status)
+    {
+        var organizationId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var trip = CreateTrip(organizationId, driverId);
+        var reservation = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TripId = trip.Id,
+            SeatId = Guid.NewGuid(),
+            PassengerId = Guid.NewGuid(),
+            Price = trip.Price,
+            Status = status
+        };
+        var boardingRecordRepository = new FakeBoardingRecordRepository();
+
+        var handler = new ValidateBoardingCommandHandler(
+            new FakeReservationRepository(reservation),
+            new FakeTripRepository(trip),
+            boardingRecordRepository,
+            new FakeCurrentUserService(organizationId, driverId));
+
+        await Assert.ThrowsAsync<ReservationNotEligibleForBoardingException>(() =>
+            handler.Handle(
+                new ValidateBoardingCommand { ReservationId = reservation.Id, Method = ValidationMethod.Codigo },
+                TestContext.Current.CancellationToken));
+
+        Assert.Null(boardingRecordRepository.ValidatedReservationId);
+    }
 }

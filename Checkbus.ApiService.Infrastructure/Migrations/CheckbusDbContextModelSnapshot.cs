@@ -579,6 +579,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.Property<DateTime?>("DepartureTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsBoardingPoint")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("LocationId")
                         .HasColumnType("uuid");
 
@@ -587,6 +590,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
 
                     b.Property<Guid>("RouteId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("StopDurationMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Type")
                         .IsRequired()

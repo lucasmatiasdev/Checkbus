@@ -183,6 +183,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     Order = i,
                     Type = type,
                     DepartureTime = cumulativeDepartureTime,
+                    StopDurationMinutes = request.Stops[i].StopDurationMinutes,
+                    IsBoardingPoint = request.Stops[i].IsBoardingPoint,
                     CreatedAt = createdAt,
                     UpdatedAt = createdAt
                 });

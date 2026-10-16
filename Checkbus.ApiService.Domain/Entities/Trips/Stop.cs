@@ -21,6 +21,16 @@ namespace Checkbus.ApiService.Domain.Entities.Trips
         // Trip.DepartureDate.
         public DateTime? DepartureTime { get; set; }
 
+        // CU-13: how long the vehicle idles at this stop, caller-provided at Trip creation
+        // (CreateTripCommandHandler) — 0 means no extra stop time, not "unspecified".
+        public int StopDurationMinutes { get; set; }
+
+        // CU-13: whether passengers may board/alight at this stop — distinct from StopType
+        // (Origen/Intermedia/Destino is the stop's position in the route; this is a caller
+        // decision about whether it's actually usable for boarding, e.g. a fuel/rest stop with
+        // no boarding).
+        public bool IsBoardingPoint { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

@@ -546,6 +546,33 @@ public class CreateTripCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_StopsCarryDurationAndBoardingPointFlags_PersistsThemAsGiven()
+    {
+        var vehicle = CreateVehicle();
+        var driver = CreateDriver();
+        var @event = CreateEvent();
+        var command = CreateCommand(vehicle.Id, driver.Id, @event.Id);
+        command.Stops[0].StopDurationMinutes = 15;
+        command.Stops[0].IsBoardingPoint = true;
+        command.Stops[1].StopDurationMinutes = 0;
+        command.Stops[1].IsBoardingPoint = false;
+        var harness = new Harness
+        {
+            VehicleRepository = new FakeVehicleRepository(vehicle),
+            UserRepository = new FakeUserRepository(driver),
+            EventRepository = new FakeEventRepository(@event)
+        };
+
+        await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
+
+        var stops = harness.TripRepository.AddedStops.OrderBy(s => s.Order).ToList();
+        Assert.Equal(15, stops[0].StopDurationMinutes);
+        Assert.True(stops[0].IsBoardingPoint);
+        Assert.Equal(0, stops[1].StopDurationMinutes);
+        Assert.False(stops[1].IsBoardingPoint);
+    }
+
+    [Fact]
     public async Task Handle_AllChecksPass_GeneratesSlugFromEventNameAndDepartureDate()
     {
         var vehicle = CreateVehicle();

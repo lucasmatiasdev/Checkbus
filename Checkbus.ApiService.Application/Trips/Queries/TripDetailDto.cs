@@ -17,6 +17,8 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         public int AvailableSeats { get; set; }
         public decimal Price { get; set; }
         public TripStatus Status { get; set; }
+        public DateTime? ActualArrivalDate { get; set; }
+        public string? Observations { get; set; }
 
         public string? VehiclePatent { get; set; }
         public string? VehicleBrand { get; set; }

@@ -69,6 +69,33 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
+        // CU-08: admin-initiated, same narrow-status-transition shape as Publish above.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpPost("{id:guid}/start")]
+        public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(new StartTripCommand { Id = id }, cancellationToken);
+            return NoContent();
+        }
+
+        // CU-08: admin-initiated, same narrow-status-transition shape as Start above, but with
+        // a small body carrying the real arrival time/observations.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpPost("{id:guid}/finish")]
+        public async Task<IActionResult> Finish(
+            Guid id, [FromBody] FinishTripRequest request, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(
+                new FinishTripCommand
+                {
+                    Id = id,
+                    ActualArrivalDate = request.ActualArrivalDate,
+                    Observations = request.Observations
+                },
+                cancellationToken);
+            return NoContent();
+        }
+
         // Narrow update of the Route's Stops, not the whole Trip resource — same PUT-with-204
         // shape idea the project doesn't have a prior precedent for on this controller, but
         // matches a plain partial-update convention. TripId comes exclusively from the route

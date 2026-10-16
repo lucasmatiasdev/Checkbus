@@ -84,6 +84,8 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                 AvailableSeats = trip.AvailableSeats,
                 Price = trip.Price,
                 Status = trip.Status,
+                ActualArrivalDate = trip.ActualArrivalDate,
+                Observations = trip.Observations,
                 VehiclePatent = vehicle?.Patent,
                 VehicleBrand = vehicle?.Brand,
                 VehicleModel = vehicle?.Model,

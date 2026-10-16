@@ -610,6 +610,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ActualArrivalDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("ArrivalDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -630,6 +633,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Observations")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");

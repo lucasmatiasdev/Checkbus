@@ -18,6 +18,8 @@ public sealed record TripDetailResponse
     public int AvailableSeats { get; init; }
     public decimal Price { get; init; }
     public required WebTripStatus Status { get; init; }
+    public DateTime? ActualArrivalDate { get; init; }
+    public string? Observations { get; init; }
 
     public string? VehiclePatent { get; init; }
     public string? VehicleBrand { get; init; }

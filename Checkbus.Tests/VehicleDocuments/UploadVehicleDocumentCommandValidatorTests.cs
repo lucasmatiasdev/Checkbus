@@ -16,6 +16,7 @@ public class UploadVehicleDocumentCommandValidatorTests
         ContentType = "application/pdf",
         FileSizeBytes = 1024,
         OriginalFileName = "seguro.pdf",
+        DocumentNumber = "POL-12345",
         ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30)
     };
 
@@ -98,6 +99,30 @@ public class UploadVehicleDocumentCommandValidatorTests
         var result = _validator.TestValidate(command);
 
         result.ShouldNotHaveValidationErrorFor(c => c.FileSizeBytes);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void DocumentNumber_EmptyOrWhitespace_IsRejected(string documentNumber)
+    {
+        var command = ValidCommand();
+        command.DocumentNumber = documentNumber;
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
+    }
+
+    [Fact]
+    public void DocumentNumber_ExceedsFiftyCharacters_IsRejected()
+    {
+        var command = ValidCommand();
+        command.DocumentNumber = new string('9', 51);
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(c => c.DocumentNumber);
     }
 
     [Fact]

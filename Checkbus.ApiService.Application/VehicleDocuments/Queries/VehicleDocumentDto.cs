@@ -14,5 +14,6 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
         public DateOnly? IssueDate { get; set; }
         public DateOnly? ExpirationDate { get; set; }
         public bool DocumentPresent { get; set; }
+        public string? DocumentNumber { get; set; }
     }
 }

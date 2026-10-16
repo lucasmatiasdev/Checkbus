@@ -42,7 +42,8 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
                     Status = d.Status,
                     IssueDate = d.IssueDate,
                     ExpirationDate = d.ExpirationDate,
-                    DocumentPresent = d.DocumentPresent
+                    DocumentPresent = d.DocumentPresent,
+                    DocumentNumber = d.DocumentNumber
                 })
                 .ToList();
         }

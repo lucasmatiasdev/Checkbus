@@ -145,6 +145,7 @@ public class VehicleDocumentsClientTests
             fileStream,
             "seguro.pdf",
             "application/pdf",
+            "POL-12345",
             new DateOnly(2027, 1, 1),
             issueDate,
             TestContext.Current.CancellationToken);
@@ -248,6 +249,7 @@ public class VehicleDocumentsClientTests
             p.Headers.ContentDisposition?.Name?.Trim('"') == name);
 
         Assert.True(HasField("File"), "Expected a 'File' part in the multipart request.");
+        Assert.True(HasField("DocumentNumber"), "Expected a 'DocumentNumber' part in the multipart request.");
         Assert.True(HasField("ExpirationDate"), "Expected an 'ExpirationDate' part in the multipart request.");
         Assert.True(HasField("IssueDate"), "Expected an 'IssueDate' part in the multipart request.");
 

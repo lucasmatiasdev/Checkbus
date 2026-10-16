@@ -48,6 +48,10 @@ public class CreateTripCommandHandlerTests
         public Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreateTripCommandHandler.");
     }
 
     private sealed class FakeUserRepository(User? driver) : IUserRepository

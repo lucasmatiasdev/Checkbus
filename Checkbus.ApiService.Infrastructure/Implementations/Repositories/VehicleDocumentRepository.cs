@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,6 +55,28 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                     && d.ExpirationDate != null
                     && d.ExpirationDate <= expiringThresholdDate)
                 .CountAsync(cancellationToken);
+        }
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId,
+            VehicleDocumentType type,
+            string documentNumber,
+            Guid excludeVehicleId,
+            CancellationToken cancellationToken)
+        {
+            // Same subquery-over-Vehicles pattern as GetExpiringOrExpiredCountByOrganizationAsync:
+            // VehicleDocument has no navigation back to Vehicle, so the organization scope is
+            // applied via a subquery rather than a join through a navigation property.
+            var organizationVehicleIds = _context.Vehicles
+                .Where(v => v.OrganizationId == organizationId)
+                .Select(v => v.Id);
+
+            return _context.VehicleDocuments.AnyAsync(
+                d => d.VehicleId != excludeVehicleId
+                    && organizationVehicleIds.Contains(d.VehicleId)
+                    && d.Type == type
+                    && d.DocumentNumber == documentNumber,
+                cancellationToken);
         }
     }
 }

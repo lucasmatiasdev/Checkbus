@@ -61,6 +61,11 @@
                     }
                 </MudStack>
 
+                @if (document?.DocumentNumber is not null)
+                {
+                    <MudText Typo="Typo.body2">@($"Número de documento: {document.DocumentNumber}")</MudText>
+                }
+
                 @if (document?.IssueDate is not null)
                 {
                     <MudText Typo="Typo.body2">@($"Emitido: {document.IssueDate.Value:dd/MM/yyyy}")</MudText>
@@ -89,13 +94,16 @@
                 }
 
                 <MudGrid>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
                         <InputFile OnChange="@(e => OnFileSelected(type, e))" />
                     </MudItem>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
+                        <MudTextField Label="Número de documento" @bind-Value="documentNumbers[type]" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
                         <MudDatePicker Label="Fecha de vencimiento" @bind-Date="expirationDates[type]" />
                     </MudItem>
-                    <MudItem xs="12" md="4">
+                    <MudItem xs="12" md="3">
                         <MudDatePicker Label="Fecha de emisión (opcional)" @bind-Date="issueDates[type]" />
                     </MudItem>
                 </MudGrid>
@@ -171,6 +179,7 @@
 
     private string headingName = string.Empty;
     private IReadOnlyList<VehicleDocumentResponse> documents = [];
+    private readonly Dictionary<WebVehicleDocumentType, string?> documentNumbers = new();
     private readonly Dictionary<WebVehicleDocumentType, DateTime?> expirationDates = new();
     private readonly Dictionary<WebVehicleDocumentType, DateTime?> issueDates = new();
     private readonly Dictionary<WebVehicleDocumentType, IBrowserFile?> selectedFiles = new();
@@ -192,6 +201,7 @@
 
         foreach (var type in DocumentTypes)
         {
+            documentNumbers.TryAdd(type, null);
             expirationDates.TryAdd(type, null);
             issueDates.TryAdd(type, null);
             selectedFiles.TryAdd(type, null);
@@ -261,6 +271,13 @@
             return;
         }
 
+        var documentNumber = documentNumbers.GetValueOrDefault(type);
+        if (string.IsNullOrWhiteSpace(documentNumber))
+        {
+            uploadErrors[type] = "Ingresá el número de documento.";
+            return;
+        }
+
         var expirationDate = expirationDates.GetValueOrDefault(type);
         if (expirationDate is null)
         {
@@ -280,6 +297,7 @@
                 stream,
                 file.Name,
                 file.ContentType,
+                documentNumber,
                 DateOnly.FromDateTime(expirationDate.Value),
                 issueDate is null ? null : DateOnly.FromDateTime(issueDate.Value));
 
@@ -287,6 +305,7 @@
             {
                 case VehicleDocumentActionOutcome.Success:
                     selectedFiles[type] = null;
+                    documentNumbers[type] = null;
                     expirationDates[type] = null;
                     issueDates[type] = null;
                     Snackbar.Add("Documento subido correctamente.", Severity.Success);

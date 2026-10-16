@@ -11,6 +11,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
         public required string ContentType { get; set; }
         public required long FileSizeBytes { get; set; }
         public required string OriginalFileName { get; set; }
+        public required string DocumentNumber { get; set; }
         public required DateOnly ExpirationDate { get; set; }
         public DateOnly? IssueDate { get; set; }
     }

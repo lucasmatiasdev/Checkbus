@@ -17,6 +17,11 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
                 .InclusiveBetween(1, MaxFileSizeBytes)
                 .WithMessage("File size must be between 1 byte and 5 MB.");
 
+            RuleFor(x => x.DocumentNumber)
+                .NotEmpty()
+                .MaximumLength(50)
+                .WithMessage("Document number is required and must be at most 50 characters.");
+
             RuleFor(x => x.ExpirationDate)
                 .GreaterThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow))
                 .WithMessage("Expiration date cannot be in the past.");

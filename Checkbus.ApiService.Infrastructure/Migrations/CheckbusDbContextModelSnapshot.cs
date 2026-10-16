@@ -845,6 +845,9 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DocumentNumber")
+                        .HasColumnType("text");
+
                     b.Property<bool>("DocumentPresent")
                         .HasColumnType("boolean");
 

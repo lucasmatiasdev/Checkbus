@@ -43,6 +43,10 @@ public class GetVehicleDocumentsQueryHandlerTests
         public Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetVehicleDocumentsQueryHandler.");
+
+        public Task<bool> DocumentNumberExistsAsync(
+            Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetVehicleDocumentsQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

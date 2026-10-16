@@ -44,6 +44,12 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
                 throw new VehicleNotFoundException();
             }
 
+            if (await _vehicleDocumentRepository.DocumentNumberExistsAsync(
+                    callerOrganizationId, request.Type, request.DocumentNumber, request.VehicleId, cancellationToken))
+            {
+                throw new VehicleDocumentNumberAlreadyRegisteredException();
+            }
+
             var documents = await _vehicleDocumentRepository.GetByVehicleIdAsync(request.VehicleId, cancellationToken);
             var document = documents.FirstOrDefault(d => d.Type == request.Type);
 
@@ -80,6 +86,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
             document.FileKey = key;
             document.FileContentType = request.ContentType;
             document.DocumentPresent = true;
+            document.DocumentNumber = request.DocumentNumber;
             document.IssueDate = request.IssueDate;
             document.ExpirationDate = request.ExpirationDate;
             // Always resets to Pendiente on upload/re-upload — Apto/NoApto stays a

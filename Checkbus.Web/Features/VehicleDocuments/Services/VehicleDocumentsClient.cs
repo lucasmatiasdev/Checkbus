@@ -83,6 +83,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
         Stream fileStream,
         string fileName,
         string contentType,
+        string documentNumber,
         DateOnly expirationDate,
         DateOnly? issueDate,
         CancellationToken cancellationToken = default)
@@ -93,6 +94,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         multipartContent.Add(fileContent, "File", fileName);
 
+        multipartContent.Add(new StringContent(documentNumber), "DocumentNumber");
         multipartContent.Add(new StringContent(expirationDate.ToString("yyyy-MM-dd")), "ExpirationDate");
         if (issueDate.HasValue)
             multipartContent.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");

@@ -53,6 +53,10 @@ public class GetDriverTripsQueryHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetDriverTripsQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(IReadOnlyList<Vehicle> vehicles) : IVehicleRepository

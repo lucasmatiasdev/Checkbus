@@ -91,6 +91,9 @@ public class RegisterUserCommandHandlerTests
 
         public Task<string?> GetNameByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

@@ -129,6 +129,10 @@ public class HandlePaymentWebhookCommandHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandlePaymentWebhookCommandHandler.");
     }
 
     private sealed class FakeMercadoPagoSellerTokenResolver(

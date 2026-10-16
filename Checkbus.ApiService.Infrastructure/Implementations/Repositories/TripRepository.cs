@@ -123,5 +123,49 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             return trip?.Id;
         }
+
+        public async Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId,
+            DateTime? dateFrom,
+            DateTime? dateTo,
+            string? eventName,
+            CancellationToken cancellationToken)
+        {
+            var now = DateTime.UtcNow;
+            var query = _context.Trips
+                .Where(t => t.OrganizationId == organizationId
+                    && t.Status == TripStatus.Publicado
+                    && t.DepartureDate >= now);
+
+            if (dateFrom.HasValue)
+            {
+                query = query.Where(t => t.DepartureDate >= dateFrom.Value);
+            }
+
+            if (dateTo.HasValue)
+            {
+                query = query.Where(t => t.DepartureDate <= dateTo.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(eventName))
+            {
+                // Trip has no navigation property to Event — resolve matching EventIds with a
+                // subquery against the Events DbSet instead of a LINQ join on a nonexistent nav
+                // property. ToLower() on both sides keeps the comparison case-insensitive
+                // identically on SQLite (tests) and Npgsql (production), unlike a bare
+                // .Contains(), whose case sensitivity differs between those two providers'
+                // default LIKE translation.
+                var normalizedEventName = eventName.ToLower();
+                var matchingEventIds = _context.Events
+                    .Where(e => e.Name.ToLower().Contains(normalizedEventName))
+                    .Select(e => e.Id);
+
+                query = query.Where(t => matchingEventIds.Contains(t.EventId));
+            }
+
+            return await query
+                .OrderBy(t => t.DepartureDate)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

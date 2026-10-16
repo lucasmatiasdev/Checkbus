@@ -363,4 +363,140 @@ public class TripRepositoryTests
 
         Assert.Empty(result);
     }
+
+    // GetPublicUpcomingByOrganizationIdAsync (odd/tasks/viajes-disponibles-publico.md T1) — the
+    // public "viajes disponibles" listing's repository query. Every trip below is built with
+    // offsets from DateTime.UtcNow (not hardcoded calendar dates) so "past" vs "future" stays
+    // correct no matter when this suite actually runs.
+    [Fact]
+    public async Task GetPublicUpcomingByOrganizationIdAsync_ExcludesNonPublicadoTrips()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var publicadoTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(5), DateTime.UtcNow.AddDays(5).AddHours(4));
+        publicadoTrip.Status = TripStatus.Publicado;
+        var programadoTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(6), DateTime.UtcNow.AddDays(6).AddHours(4));
+        programadoTrip.Status = TripStatus.Programado;
+        await repository.AddAsync(publicadoTrip, CreateRoute(publicadoTrip.Id), [], cancellationToken);
+        await repository.AddAsync(programadoTrip, CreateRoute(programadoTrip.Id), [], cancellationToken);
+
+        var result = await repository.GetPublicUpcomingByOrganizationIdAsync(
+            organization.Id, dateFrom: null, dateTo: null, eventName: null, cancellationToken);
+
+        Assert.Single(result);
+        Assert.Equal(publicadoTrip.Id, result[0].Id);
+    }
+
+    [Fact]
+    public async Task GetPublicUpcomingByOrganizationIdAsync_ExcludesPastDepartureTrips()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var pastTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(-5), DateTime.UtcNow.AddDays(-5).AddHours(4));
+        pastTrip.Status = TripStatus.Publicado;
+        var futureTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(5), DateTime.UtcNow.AddDays(5).AddHours(4));
+        futureTrip.Status = TripStatus.Publicado;
+        await repository.AddAsync(pastTrip, CreateRoute(pastTrip.Id), [], cancellationToken);
+        await repository.AddAsync(futureTrip, CreateRoute(futureTrip.Id), [], cancellationToken);
+
+        var result = await repository.GetPublicUpcomingByOrganizationIdAsync(
+            organization.Id, dateFrom: null, dateTo: null, eventName: null, cancellationToken);
+
+        Assert.Single(result);
+        Assert.Equal(futureTrip.Id, result[0].Id);
+    }
+
+    [Fact]
+    public async Task GetPublicUpcomingByOrganizationIdAsync_FiltersByDateRange()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var tripInRange = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(10), DateTime.UtcNow.AddDays(10).AddHours(4));
+        tripInRange.Status = TripStatus.Publicado;
+        var tripOutsideRange = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(30), DateTime.UtcNow.AddDays(30).AddHours(4));
+        tripOutsideRange.Status = TripStatus.Publicado;
+        await repository.AddAsync(tripInRange, CreateRoute(tripInRange.Id), [], cancellationToken);
+        await repository.AddAsync(tripOutsideRange, CreateRoute(tripOutsideRange.Id), [], cancellationToken);
+
+        var result = await repository.GetPublicUpcomingByOrganizationIdAsync(
+            organization.Id,
+            dateFrom: DateTime.UtcNow.AddDays(5),
+            dateTo: DateTime.UtcNow.AddDays(15),
+            eventName: null,
+            cancellationToken);
+
+        Assert.Single(result);
+        Assert.Equal(tripInRange.Id, result[0].Id);
+    }
+
+    [Fact]
+    public async Task GetPublicUpcomingByOrganizationIdAsync_FiltersByEventNameCaseInsensitivePartialMatch()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        // `@event` ("River vs Boca", seeded by SeedAsync) is the match target; a second,
+        // differently-named Event proves the filter actually excludes non-matching trips rather
+        // than just happening to return everything.
+        var otherEventWithDifferentName = new Event
+        {
+            Id = Guid.NewGuid(),
+            // Deliberately shares no substring with "River vs Boca" (an earlier draft used
+            // "Coldplay en River", which still contains "river" and made this test a false
+            // positive — both events matched).
+            Name = "Lali en Velez",
+            Type = EventType.Partido,
+            Date = new DateTime(2026, 11, 2, 20, 0, 0, DateTimeKind.Utc),
+            LocationId = @event.LocationId,
+            OrganizationId = organization.Id
+        };
+        db.Events.Add(otherEventWithDifferentName);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new TripRepository(db);
+        var matchingTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            DateTime.UtcNow.AddDays(5), DateTime.UtcNow.AddDays(5).AddHours(4));
+        matchingTrip.Status = TripStatus.Publicado;
+        var nonMatchingTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, otherEventWithDifferentName.Id,
+            DateTime.UtcNow.AddDays(6), DateTime.UtcNow.AddDays(6).AddHours(4));
+        nonMatchingTrip.Status = TripStatus.Publicado;
+        await repository.AddAsync(matchingTrip, CreateRoute(matchingTrip.Id), [], cancellationToken);
+        await repository.AddAsync(nonMatchingTrip, CreateRoute(nonMatchingTrip.Id), [], cancellationToken);
+
+        // Deliberately mixed-case and only a partial substring of "River vs Boca" to prove both
+        // case-insensitivity and contains-style matching.
+        var result = await repository.GetPublicUpcomingByOrganizationIdAsync(
+            organization.Id, dateFrom: null, dateTo: null, eventName: "rIVER", cancellationToken);
+
+        Assert.Single(result);
+        Assert.Equal(matchingTrip.Id, result[0].Id);
+    }
 }

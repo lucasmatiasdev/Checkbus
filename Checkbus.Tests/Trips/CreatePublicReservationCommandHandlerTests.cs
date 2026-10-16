@@ -70,6 +70,10 @@ public class CreatePublicReservationCommandHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
     private sealed class FakeSeatRepository(IReadOnlyList<Seat> seats) : ISeatRepository

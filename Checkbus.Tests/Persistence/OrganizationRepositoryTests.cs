@@ -102,6 +102,40 @@ public class OrganizationRepositoryTests
     }
 
     [Fact]
+    public async Task GetIdBySlugAsync_OrganizationExists_ReturnsId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var organization = CreateOrganization("checkbus-demo");
+        db.Organizations.Add(organization);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new OrganizationRepository(db);
+
+        var id = await repository.GetIdBySlugAsync("checkbus-demo", cancellationToken);
+
+        Assert.Equal(organization.Id, id);
+    }
+
+    [Fact]
+    public async Task GetIdBySlugAsync_SlugDoesNotExist_ReturnsNull()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var repository = new OrganizationRepository(db);
+
+        var id = await repository.GetIdBySlugAsync("unknown-slug", cancellationToken);
+
+        Assert.Null(id);
+    }
+
+    [Fact]
     public async Task Slug_DuplicateInsert_IsRejectedByUniqueIndex()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

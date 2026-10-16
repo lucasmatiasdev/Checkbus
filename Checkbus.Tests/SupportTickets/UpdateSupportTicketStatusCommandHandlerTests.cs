@@ -43,6 +43,9 @@ public class UpdateSupportTicketStatusCommandHandlerTests
 
         public Task<string?> GetNameByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

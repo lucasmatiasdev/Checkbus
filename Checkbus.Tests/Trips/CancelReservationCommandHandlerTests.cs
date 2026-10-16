@@ -181,6 +181,10 @@ public class CancelReservationCommandHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelReservationCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository(BoardingRecord? record) : IBoardingRecordRepository

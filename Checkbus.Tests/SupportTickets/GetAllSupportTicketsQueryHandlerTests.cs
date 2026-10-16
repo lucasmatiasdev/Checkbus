@@ -38,6 +38,9 @@ public class GetAllSupportTicketsQueryHandlerTests
 
         public Task<string?> GetNameByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(namesById.TryGetValue(organizationId, out var name) ? name : null);
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

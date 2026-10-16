@@ -46,6 +46,10 @@ public class GetTripsReportQueryHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripsReportQueryHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetTripsReportQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(IReadOnlyList<Vehicle> vehicles) : IVehicleRepository
@@ -161,6 +165,9 @@ public class GetTripsReportQueryHandlerTests
         decimal price = 15000m) => new()
     {
         Id = Guid.NewGuid(),
+        // Pre-existing gap (same discovery as the SlugExistsAsync/GetIdBySlugAsync fix above):
+        // Trip.Slug became a required member for CU-03 and this helper was never updated.
+        Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
         VehicleId = vehicleId,

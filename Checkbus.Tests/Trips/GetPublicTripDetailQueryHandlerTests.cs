@@ -50,6 +50,10 @@ public class GetPublicTripDetailQueryHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 
     private sealed class FakeVehicleRepository(Vehicle? vehicle) : IVehicleRepository
@@ -92,6 +96,9 @@ public class GetPublicTripDetailQueryHandlerTests
 
         public Task<string?> GetNameByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(name);
+
+        public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository

@@ -102,6 +102,28 @@
             </MudGrid>
         </MudPaper>
 
+        @if (trip.Status == WebTripStatus.Cancelado && pendingRefunds.Count > 0)
+        {
+            <MudPaper Elevation="2" Class="pa-6 mb-6">
+                <MudText Typo="Typo.h6" Class="mb-2">Reembolsos pendientes</MudText>
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    Estos pagos no se pudieron reembolsar automáticamente. Revisalos manualmente
+                    en Mercado Pago.
+                </MudAlert>
+                <MudList T="PendingRefundResponse">
+                    @foreach (var refund in pendingRefunds)
+                    {
+                        <MudListItem T="PendingRefundResponse">
+                            <MudText Typo="Typo.body1">
+                                @refund.Amount.ToString("C") — Orden: @(refund.ExternalOrderId ?? "N/A")
+                                (@refund.ReservationIds.Count asiento(s))
+                            </MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        }
+
         <MudPaper Elevation="2" Class="pa-6 mb-6">
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                 <MudText Typo="Typo.h6">Ruta</MudText>
@@ -332,6 +354,7 @@
     private string? cancelTripErrorMessage;
     private WebTripCancellationReason cancelReason = WebTripCancellationReason.ProblemaChofer;
     private string? cancelDescription;
+    private IReadOnlyList<PendingRefundResponse> pendingRefunds = [];
 
     // Fase D — stop times edit dialog (odd/tasks/mejoras-detalle-viaje.md).
     private bool isEditStopTimesDialogOpen;
@@ -372,6 +395,20 @@
         if (trip is not null)
         {
             await LoadSeatMapAsync();
+
+            if (trip.Status == WebTripStatus.Cancelado)
+            {
+                await LoadPendingRefundsAsync();
+            }
+        }
+    }
+
+    private async Task LoadPendingRefundsAsync()
+    {
+        var outcome = await TripsClient.GetPendingRefundsAsync(Id);
+        if (outcome is TripPendingRefundsOutcome.Success success)
+        {
+            pendingRefunds = success.Refunds;
         }
     }
 
@@ -598,6 +635,7 @@
                     trip = trip! with { Status = WebTripStatus.Cancelado };
                     isCancelTripDialogOpen = false;
                     Snackbar.Add("Viaje cancelado correctamente.", Severity.Success);
+                    await LoadPendingRefundsAsync();
                     break;
 
                 case TripCancelOutcome.ValidationFailed validationFailed:

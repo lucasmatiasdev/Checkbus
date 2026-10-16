@@ -181,6 +181,52 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
         }
     }
 
+    public async Task<TripPendingRefundsOutcome> GetPendingRefundsAsync(
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"Trips/{tripId}/pending-refunds", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new TripPendingRefundsOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var refunds = await response.Content
+                            .ReadFromJsonAsync<IReadOnlyList<PendingRefundResponse>>(cancellationToken);
+                        return new TripPendingRefundsOutcome.Success(refunds ?? []);
+
+                    case HttpStatusCode.Unauthorized:
+                    case HttpStatusCode.Forbidden:
+                        return new TripPendingRefundsOutcome.Forbidden();
+
+                    case HttpStatusCode.NotFound:
+                        return new TripPendingRefundsOutcome.NotFound();
+
+                    default:
+                        return new TripPendingRefundsOutcome.TransportError(
+                            "An unexpected error occurred. Please try again.");
+                }
+            }
+            catch (Exception)
+            {
+                return new TripPendingRefundsOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<TripsListOutcome> GetListAsync(CancellationToken cancellationToken = default)
     {
         HttpResponseMessage response;
@@ -404,6 +450,29 @@ public abstract record TripCancelOutcome
 
     /// <summary>Any transport-level failure, short and user-presentable.</summary>
     public sealed record TransportError(string Message) : TripCancelOutcome;
+}
+
+/// <summary>
+/// Closed outcome of a <c>GET api/Trips/{id}/pending-refunds</c> call (CU-05). Mirrors
+/// <see cref="TripOutcome"/>'s shape.
+/// </summary>
+public abstract record TripPendingRefundsOutcome
+{
+    private TripPendingRefundsOutcome()
+    {
+    }
+
+    /// <summary>200 OK — the pending-refunds list was fetched successfully (possibly empty).</summary>
+    public sealed record Success(IReadOnlyList<PendingRefundResponse> Refunds) : TripPendingRefundsOutcome;
+
+    /// <summary>404 Not Found — the trip doesn't exist or is outside the caller's organization.</summary>
+    public sealed record NotFound : TripPendingRefundsOutcome;
+
+    /// <summary>401 Unauthorized or 403 Forbidden — no reliable body to parse for either.</summary>
+    public sealed record Forbidden : TripPendingRefundsOutcome;
+
+    /// <summary>Any transport-level failure, short and user-presentable.</summary>
+    public sealed record TransportError(string Message) : TripPendingRefundsOutcome;
 }
 
 /// <summary>

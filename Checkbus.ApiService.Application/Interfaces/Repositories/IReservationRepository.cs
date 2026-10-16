@@ -102,5 +102,14 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // path need to override it.
         Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
             => throw new NotSupportedException("ReleaseExpiredHoldsAsync is not implemented by this IReservationRepository.");
+
+        // Added for CU-05's pending-refunds report: unlike GetByTripIdAsync, this does NOT
+        // exclude Cancelada rows — after a trip cancellation every Reservation on it IS
+        // Cancelada, and the report needs exactly those to find Payments whose refund never
+        // completed. Same default-body/NotSupportedException convention as
+        // GetByPaymentIdAsync/ConfirmAsync above, so existing Fake test doubles that never
+        // exercise this path don't need to be touched.
+        Task<IReadOnlyList<Reservation>> GetAllByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("GetAllByTripIdAsync is not implemented by this IReservationRepository.");
     }
 }

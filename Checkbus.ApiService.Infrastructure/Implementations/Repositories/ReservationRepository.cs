@@ -111,5 +111,14 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        // CU-05's pending-refunds report — see IReservationRepository's doc comment for why this
+        // does NOT exclude Cancelada (unlike GetByTripIdAsync).
+        public async Task<IReadOnlyList<Reservation>> GetAllByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
+        {
+            return await _context.Reservations
+                .Where(r => r.TripId == tripId)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

@@ -90,6 +90,16 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
+        // CU-05: Payments whose refund never reached the gateway after a trip cancellation, for
+        // Checkbus staff to follow up on manually.
+        [Authorize(Roles = "Planificador,Administrador")]
+        [HttpGet("{id:guid}/pending-refunds")]
+        public async Task<IActionResult> GetPendingRefunds(Guid id, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetTripPendingRefundsQuery { TripId = id }, cancellationToken);
+            return Ok(result);
+        }
+
         // New authenticated, org-scoped seat-map surface for the Planificador
         // (odd/tasks/mejoras-detalle-viaje.md Fase E1) — same occupancy computation as the
         // public GetPublicTripSeatMapQuery, no Trip.Status == Publicado gate.

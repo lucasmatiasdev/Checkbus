@@ -14,6 +14,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             RuleFor(x => x.DriverId).NotEmpty().WithMessage("DriverId is required.");
             RuleFor(x => x.EventId).NotEmpty().WithMessage("EventId is required.");
 
+            RuleFor(x => x.DepartureDate)
+                .GreaterThan(_ => DateTime.UtcNow)
+                .WithMessage("DepartureDate must be in the future.");
+
             RuleFor(x => x.ArrivalDate)
                 .GreaterThan(x => x.DepartureDate)
                 .WithMessage("ArrivalDate must be after DepartureDate.");

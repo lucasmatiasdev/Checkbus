@@ -64,6 +64,53 @@
                     </MudItem>
                 </MudGrid>
 
+                @if (reservation.Status == ConfirmadaStatus)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Estado del viaje</MudText>
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption">Estado</MudText>
+                            <MudText Typo="Typo.body1">@reservation.TripStatus</MudText>
+                        </MudItem>
+                        @if (reservation.ActualArrivalDate is not null)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.caption">Llegada real</MudText>
+                                <MudText Typo="Typo.body1">@reservation.ActualArrivalDate.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
+                            </MudItem>
+                        }
+                        @if (reservation.DriverName is not null)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.caption">Chofer</MudText>
+                                <MudText Typo="Typo.body1">@reservation.DriverName @reservation.DriverSurname</MudText>
+                            </MudItem>
+                        }
+                        @if (reservation.VehiclePatent is not null)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.caption">Vehículo</MudText>
+                                <MudText Typo="Typo.body1">@reservation.VehiclePatent</MudText>
+                            </MudItem>
+                        }
+                        @if (reservation.EstimatedDuration is not null)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.caption">Duración estimada</MudText>
+                                <MudText Typo="Typo.body1">@reservation.EstimatedDuration.Value.ToString(@"hh\:mm")</MudText>
+                            </MudItem>
+                        }
+                        @if (reservation.DistanceKm is not null)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.caption">Distancia estimada</MudText>
+                                <MudText Typo="Typo.body1">@reservation.DistanceKm.Value.ToString("0.#") km</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+
                 @if (CanCancel(reservation.Status))
                 {
                     <MudButton Variant="Variant.Outlined"

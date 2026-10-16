@@ -27,4 +27,13 @@ public sealed record ReservationConfirmation
     public required string Status { get; init; }
     public string? EventName { get; init; }
     public DateTime DepartureDate { get; init; }
+
+    // CU-11 replacement ("Consultar estado y progreso del viaje", no GPS hardware).
+    public required string TripStatus { get; init; }
+    public string? DriverName { get; init; }
+    public string? DriverSurname { get; init; }
+    public string? VehiclePatent { get; init; }
+    public TimeSpan? EstimatedDuration { get; init; }
+    public decimal? DistanceKm { get; init; }
+    public DateTime? ActualArrivalDate { get; init; }
 }

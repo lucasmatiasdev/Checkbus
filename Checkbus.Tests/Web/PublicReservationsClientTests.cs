@@ -46,7 +46,8 @@ public class PublicReservationsClientTests
                 Price = 15000m,
                 Status = "Confirmada",
                 EventName = "Cosquin Rock",
-                DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc)
+                DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
+                TripStatus = "Pendiente"
             }
         ]
     };

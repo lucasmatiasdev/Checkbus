@@ -32,5 +32,18 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         // DepartureDate), no new Trip concept invented here.
         public string? EventName { get; set; }
         public DateTime DepartureDate { get; set; }
+
+        // CU-11 replacement ("Consultar estado y progreso del viaje", no GPS hardware): unlike
+        // PublicTripDetailDto, Driver/Vehicle identity IS safe to expose here — holding a real
+        // Reservation.Id already proves a confirmed booking on this trip, not just anonymous
+        // browsing. EstimatedDuration/DistanceKm are the already-computed Route values from trip
+        // creation (Google Directions), never recalculated live here.
+        public required string TripStatus { get; set; }
+        public string? DriverName { get; set; }
+        public string? DriverSurname { get; set; }
+        public string? VehiclePatent { get; set; }
+        public TimeSpan? EstimatedDuration { get; set; }
+        public decimal? DistanceKm { get; set; }
+        public DateTime? ActualArrivalDate { get; set; }
     }
 }

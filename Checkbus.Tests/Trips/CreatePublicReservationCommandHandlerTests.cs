@@ -2,6 +2,8 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Commands;
+using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Reservations;
@@ -196,6 +198,73 @@ public class CreatePublicReservationCommandHandlerTests
         }
     }
 
+    // CU-14: fake IUserRepository, same NotSupportedException-for-unused style as every other
+    // fake in this file — only GetAllByOrganizationAsync is exercised by the handler's
+    // post-persistence admin-notification step.
+    private sealed class FakeUserRepository(IReadOnlyList<User> users) : IUserRepository
+    {
+        public Guid? ReceivedOrganizationId { get; private set; }
+
+        public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task AddAsync(User user, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task UpdateAsync(User user, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<bool> DocumentNumberExistsInOrganizationAsync(
+            string documentNumber, Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<IReadOnlyList<string>> FindEmailsByLocalPartPrefixAsync(
+            string localPartPrefix, string domain, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
+
+        public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            ReceivedOrganizationId = organizationId;
+            return Task.FromResult<IReadOnlyList<User>>(
+                users.Where(u => u.OrganizationId == organizationId).ToList());
+        }
+    }
+
+    // CU-14: fake IEmailService — same SentMessages-list style as
+    // CloseBoardingCommandHandlerTests/CreateSupportTicketCommandHandlerTests. ThrowFor lets a
+    // single test target exactly one recipient's send without aborting the others, proving the
+    // handler's per-recipient try/catch.
+    private sealed class FakeEmailService(IReadOnlyCollection<string>? throwFor = null) : IEmailService
+    {
+        public List<EmailMessage> SentMessages { get; } = [];
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+        {
+            if (throwFor?.Contains(message.To) == true)
+            {
+                throw new InvalidOperationException("Simulated SMTP failure.");
+            }
+
+            SentMessages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private static User CreateAdmin(Guid organizationId, string email = "admin@checkbus.test") => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = "Ana",
+        Surname = "Admin",
+        Email = email,
+        PasswordHash = "hash",
+        DocumentNumber = "30111222",
+        Role = Role.Administrador,
+        OrganizationId = organizationId
+    };
+
     private static Event CreateEvent(string name = "Cosquin Rock") => new()
     {
         Id = Guid.NewGuid(),
@@ -212,12 +281,19 @@ public class CreatePublicReservationCommandHandlerTests
         FakeReservationRepository reservationRepository,
         FakePaymentService? paymentService = null,
         PublicWebOptions? publicWebOptions = null,
-        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null) => new(
+        FakeMercadoPagoSellerTokenResolver? sellerTokenResolver = null,
+        FakeUserRepository? userRepository = null,
+        FakeEmailService? emailService = null) => new(
             new FakeTripRepository(trip),
             new FakeSeatRepository(seats),
             reservationRepository,
             paymentService ?? new FakePaymentService(),
             sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
+            // No Administrador users by default — every pre-existing test in this file that
+            // doesn't care about CU-14's notification step keeps working unchanged (empty
+            // org user list means NotifyOrganizationAdminsAsync sends nothing).
+            userRepository ?? new FakeUserRepository([]),
+            emailService ?? new FakeEmailService(),
             // Blank BaseUrl by default — matches PublicWebOptions' own permissive/blank-until-
             // provisioned default, and every pre-existing test in this file that doesn't care
             // about back-URLs keeps working unchanged (CreatePublicReservationCommandHandler
@@ -754,5 +830,111 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Null(reservationRepository.SavedPayment);
         Assert.Null(reservationRepository.SavedPassengers);
         Assert.Null(reservationRepository.SavedReservations);
+    }
+
+    // --- CU-14: notify the organization's Administrador users on a new public reservation. ---
+
+    [Fact]
+    public async Task Handle_OneAdministradorInOrganization_SendsOneEmailToThatAdmin()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var admin = CreateAdmin(trip.OrganizationId, "admin1@checkbus.test");
+        var userRepository = new FakeUserRepository([admin]);
+        var emailService = new FakeEmailService();
+
+        var handler = CreateHandler(
+            trip, [seat], new FakeReservationRepository([]),
+            userRepository: userRepository, emailService: emailService);
+
+        await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(trip.OrganizationId, userRepository.ReceivedOrganizationId);
+        Assert.Single(emailService.SentMessages);
+        Assert.Equal("admin1@checkbus.test", emailService.SentMessages[0].To);
+    }
+
+    [Fact]
+    public async Task Handle_MultipleAdministradoresInOrganization_SendsOneEmailEach()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var admin1 = CreateAdmin(trip.OrganizationId, "admin1@checkbus.test");
+        var admin2 = CreateAdmin(trip.OrganizationId, "admin2@checkbus.test");
+        // A Chofer in the same org must never receive this notification.
+        var chofer = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Carlos",
+            Surname = "Chofer",
+            Email = "chofer@checkbus.test",
+            PasswordHash = "hash",
+            DocumentNumber = "30111333",
+            Role = Role.Chofer,
+            OrganizationId = trip.OrganizationId
+        };
+        var userRepository = new FakeUserRepository([admin1, admin2, chofer]);
+        var emailService = new FakeEmailService();
+
+        var handler = CreateHandler(
+            trip, [seat], new FakeReservationRepository([]),
+            userRepository: userRepository, emailService: emailService);
+
+        await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, emailService.SentMessages.Count);
+        Assert.Contains(emailService.SentMessages, m => m.To == "admin1@checkbus.test");
+        Assert.Contains(emailService.SentMessages, m => m.To == "admin2@checkbus.test");
+    }
+
+    [Fact]
+    public async Task Handle_ZeroAdministradoresInOrganization_SendsNothingAndDoesNotThrow()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var emailService = new FakeEmailService();
+
+        var handler = CreateHandler(
+            trip, [seat], new FakeReservationRepository([]),
+            userRepository: new FakeUserRepository([]), emailService: emailService);
+
+        var result = await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Reservations);
+        Assert.Empty(emailService.SentMessages);
+    }
+
+    [Fact]
+    public async Task Handle_EmailServiceThrowsForOneAdmin_LogsAndSwallowsFailure_OtherAdminStillNotified_ResponseStillReturned()
+    {
+        var vehicleId = Guid.NewGuid();
+        var trip = CreateTrip(vehicleId);
+        var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
+        var failingAdmin = CreateAdmin(trip.OrganizationId, "failing@checkbus.test");
+        var healthyAdmin = CreateAdmin(trip.OrganizationId, "healthy@checkbus.test");
+        var userRepository = new FakeUserRepository([failingAdmin, healthyAdmin]);
+        var emailService = new FakeEmailService(throwFor: ["failing@checkbus.test"]);
+
+        var handler = CreateHandler(
+            trip, [seat], new FakeReservationRepository([]),
+            userRepository: userRepository, emailService: emailService);
+
+        var result = await handler.Handle(
+            new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
+            TestContext.Current.CancellationToken);
+
+        // The failure for one recipient must not abort the loop nor the caller's response.
+        Assert.Single(result.Reservations);
+        Assert.Single(emailService.SentMessages);
+        Assert.Equal("healthy@checkbus.test", emailService.SentMessages[0].To);
     }
 }

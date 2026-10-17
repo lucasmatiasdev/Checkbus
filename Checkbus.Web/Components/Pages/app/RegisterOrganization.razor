@@ -1,0 +1,157 @@
+@page "/organizaciones/registrar"
+@attribute [Authorize(Roles = "CheckbusSoporte")]
+@using Checkbus.Web.Components.Dialogs
+@using Checkbus.Web.Features.Organizations.Models
+@using Checkbus.Web.Features.Organizations.Services
+@using Checkbus.Web.Features.Users.Contracts
+
+<PageTitle>Checkbus - Registrar organización</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-2">
+            Registrar organización
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Completá los datos para dar de alta una organización nueva junto con su primera cuenta de
+            Administrador. La contraseña inicial del administrador va a ser su número de documento.
+        </MudText>
+
+        @if (errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <MudTextField T="string"
+                           @bind-Value="model.OrganizationName"
+                           For="@(() => model.OrganizationName)"
+                           Label="Nombre de la organización"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.CUIT"
+                           For="@(() => model.CUIT)"
+                           Label="CUIT"
+                           HelperText="Formato NN-NNNNNNNN-N."
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.AdminName"
+                           For="@(() => model.AdminName)"
+                           Label="Nombre del administrador"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudTextField T="string"
+                           @bind-Value="model.AdminSurname"
+                           For="@(() => model.AdminSurname)"
+                           Label="Apellido del administrador"
+                           Variant="Variant.Outlined"
+                           Class="mb-4" />
+
+            <MudSelect T="WebDocumentType"
+                       @bind-Value="model.AdminDocumentType"
+                       For="@(() => model.AdminDocumentType)"
+                       Label="Tipo de documento del administrador"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.DNI">DNI</MudSelectItem>
+                <MudSelectItem T="WebDocumentType" Value="WebDocumentType.Pasaporte">Pasaporte</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField T="string"
+                           @bind-Value="model.AdminDocumentNumber"
+                           For="@(() => model.AdminDocumentNumber)"
+                           Label="Número de documento del administrador"
+                           HelperText="También va a ser la contraseña inicial del administrador."
+                           Variant="Variant.Outlined"
+                           Class="mb-6" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       DropShadow="false"
+                       FullWidth="true"
+                       Disabled="isSubmitting">
+                @if (isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Registrando...</span>
+                }
+                else
+                {
+                    <span>Registrar organización</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private OrganizationRegistrationClient RegistrationClient { get; set; } = default!;
+
+    [Inject]
+    private IDialogService DialogService { get; set; } = default!;
+
+    private RegisterOrganizationFormModel model = new();
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        try
+        {
+            var outcome = await RegistrationClient.RegisterAsync(model.ToRequest());
+
+            switch (outcome)
+            {
+                case OrganizationRegistrationOutcome.Success success:
+                    errorMessage = null;
+
+                    var dialogParameters = new DialogParameters
+                    {
+                        ["OrganizationName"] = success.Result.OrganizationName,
+                        ["Slug"] = success.Result.Slug,
+                        ["AdminEmail"] = success.Result.AdminEmail,
+                        ["AdminName"] = success.Result.AdminName,
+                        ["AdminSurname"] = success.Result.AdminSurname,
+                        ["InitialPassword"] = model.AdminDocumentNumber
+                    };
+                    await DialogService.ShowAsync<OrganizationRegisteredDialog>("Organización creada", dialogParameters);
+
+                    // Only reset on success — the 4 failure branches below must preserve the
+                    // operator's typed data so they can fix and resubmit without retyping everything.
+                    model = new RegisterOrganizationFormModel();
+                    break;
+
+                case OrganizationRegistrationOutcome.ValidationFailed validationFailed:
+                    errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case OrganizationRegistrationOutcome.Conflict conflict:
+                    errorMessage = conflict.Message;
+                    break;
+
+                case OrganizationRegistrationOutcome.Forbidden:
+                    errorMessage = "No tenés permiso para registrar organizaciones. Iniciá sesión de nuevo con una cuenta de Checkbus Soporte.";
+                    break;
+
+                case OrganizationRegistrationOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

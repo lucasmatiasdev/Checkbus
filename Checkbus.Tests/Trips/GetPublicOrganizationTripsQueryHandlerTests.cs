@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Queries;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Enums;
 
@@ -17,6 +18,9 @@ public class GetPublicOrganizationTripsQueryHandlerTests
     {
         public string? ReceivedSlug { get; private set; }
 
+        public Task AddAsync(Organization organization, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
+
         public Task<string?> GetSlugByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
 
@@ -28,6 +32,12 @@ public class GetPublicOrganizationTripsQueryHandlerTests
             ReceivedSlug = slug;
             return Task.FromResult(organizationId);
         }
+
+        public Task<bool> CuitExistsAsync(string cuit, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
     }
 
     private sealed class FakeTripRepository(IReadOnlyList<Trip> trips) : ITripRepository

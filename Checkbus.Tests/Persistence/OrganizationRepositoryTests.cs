@@ -150,4 +150,100 @@ public class OrganizationRepositoryTests
 
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync(cancellationToken));
     }
+
+    [Fact]
+    public async Task AddAsync_PersistsOrganizationAndIsRetrievableAfterwards()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var repository = new OrganizationRepository(db);
+        var organization = CreateOrganization("checkbus-demo");
+
+        await repository.AddAsync(organization, cancellationToken);
+
+        var slug = await repository.GetSlugByIdAsync(organization.Id, cancellationToken);
+        Assert.Equal("checkbus-demo", slug);
+    }
+
+    [Fact]
+    public async Task CuitExistsAsync_CuitRegistered_ReturnsTrue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        db.Organizations.Add(CreateOrganization("checkbus-demo"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new OrganizationRepository(db);
+
+        Assert.True(await repository.CuitExistsAsync("20-12345678-9", cancellationToken));
+    }
+
+    [Fact]
+    public async Task CuitExistsAsync_CuitNotRegistered_ReturnsFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var repository = new OrganizationRepository(db);
+
+        Assert.False(await repository.CuitExistsAsync("20-12345678-9", cancellationToken));
+    }
+
+    [Fact]
+    public async Task CuitExistsAsync_IsGlobal_NotScopedToAnySingleOrganization()
+    {
+        // A CUIT belongs to exactly one Organization system-wide, unlike Trip.Slug which is
+        // only unique per-organization — this proves the lookup takes no organization scope at
+        // all and still finds a CUIT registered under a different, unrelated organization.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var other = CreateOrganization("another-company");
+        other.CUIT = "30-98765432-1";
+        db.Organizations.Add(other);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new OrganizationRepository(db);
+
+        Assert.True(await repository.CuitExistsAsync("30-98765432-1", cancellationToken));
+    }
+
+    [Fact]
+    public async Task SlugExistsAsync_SlugRegistered_ReturnsTrue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        db.Organizations.Add(CreateOrganization("checkbus-demo"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new OrganizationRepository(db);
+
+        Assert.True(await repository.SlugExistsAsync("checkbus-demo", cancellationToken));
+    }
+
+    [Fact]
+    public async Task SlugExistsAsync_SlugNotRegistered_ReturnsFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var repository = new OrganizationRepository(db);
+
+        Assert.False(await repository.SlugExistsAsync("checkbus-demo", cancellationToken));
+    }
 }

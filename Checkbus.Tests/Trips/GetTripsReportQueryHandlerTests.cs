@@ -172,7 +172,6 @@ public class GetTripsReportQueryHandlerTests
         DriverId = driverId,
         VehicleId = vehicleId,
         EventId = eventId,
-        Slug = Guid.NewGuid().ToString(),
         DepartureDate = departureDate ?? DateTime.UtcNow,
         ArrivalDate = (departureDate ?? DateTime.UtcNow).AddHours(8),
         Capacity = capacity,

@@ -72,6 +72,10 @@ public class FinishTripCommandHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by FinishTripCommandHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by FinishTripCommandHandler.");
     }
 
     private sealed class FakeBoardingRecordRepository : IBoardingRecordRepository

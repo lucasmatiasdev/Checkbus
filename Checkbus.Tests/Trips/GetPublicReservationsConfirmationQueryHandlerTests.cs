@@ -89,6 +89,10 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicReservationsConfirmationQueryHandler.");
     }
 
     private sealed class FakeUserRepository(IReadOnlyList<User> users) : IUserRepository

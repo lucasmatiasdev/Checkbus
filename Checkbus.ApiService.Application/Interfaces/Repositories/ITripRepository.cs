@@ -45,5 +45,20 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // organization scoping since the slug itself carries no sensitive info and the caller
         // has no organization context (anonymous visitor).
         Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken);
+
+        // Public, unauthenticated listing for the "viajes disponibles" screen
+        // (odd/tasks/viajes-disponibles-publico.md T1): only Publicado trips with
+        // DepartureDate >= DateTime.UtcNow (computed internally, same self-contained-clock
+        // convention as ReservationRepository.ReleaseExpiredHoldsAsync's cutoff), optionally
+        // narrowed further by dateFrom/dateTo and by a case-insensitive partial match against the
+        // linked Event's Name. Trip has no navigation property to Event (see Trip's own doc
+        // comment), so eventName filtering is done with a subquery against the Events DbSet
+        // inside the implementation rather than a join on a nonexistent nav property.
+        Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId,
+            DateTime? dateFrom,
+            DateTime? dateTo,
+            string? eventName,
+            CancellationToken cancellationToken);
     }
 }

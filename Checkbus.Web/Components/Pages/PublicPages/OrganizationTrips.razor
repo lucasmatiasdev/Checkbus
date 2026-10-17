@@ -1,0 +1,134 @@
+@page "/viajes/{orgSlug}"
+@layout PublicReservationLayout
+@attribute [AllowAnonymous]
+@using Checkbus.Web.Features.PublicReservations.Contracts
+@using Checkbus.Web.Features.PublicReservations.Services
+
+<PageTitle>Checkbus - Viajes disponibles</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8 px-6">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Viajes disponibles
+    </MudText>
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Desde" @bind-Date="filterDateFrom" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Hasta" @bind-Date="filterDateTo" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" @bind-Value="filterEventName" Label="Evento" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => LoadTripsAsync())">
+                Buscar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilters">
+                Limpiar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    }
+    else if (trips.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No hay viajes disponibles con estos filtros.</MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var trip in trips)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Elevation="2" Class="pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">@trip.EventName</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Salida</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-2">@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Precio</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-4">@trip.Price.ToString("C")</MudText>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Href="@($"/reservar/{trip.TripSlug}")"
+                                   FullWidth="true">
+                            Reservar
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string OrgSlug { get; set; } = string.Empty;
+
+    [Inject]
+    private PublicOrganizationsClient PublicOrganizationsClient { get; set; } = default!;
+
+    private DateTime? filterDateFrom;
+    private DateTime? filterDateTo;
+    private string? filterEventName;
+
+    private IReadOnlyList<PublicOrganizationTripResponse> trips = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTripsAsync();
+    }
+
+    private async Task LoadTripsAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            var outcome = await PublicOrganizationsClient.GetTripsAsync(
+                OrgSlug, filterDateFrom, filterDateTo, filterEventName);
+
+            switch (outcome)
+            {
+                case GetPublicOrganizationTripsOutcome.Success success:
+                    trips = success.Trips;
+                    break;
+
+                case GetPublicOrganizationTripsOutcome.NotFound:
+                    // Not currently returned by the API (an unknown orgSlug resolves to an
+                    // empty Success list instead — see the outcome's own doc comment), kept
+                    // here only for completeness alongside every switch over this outcome type.
+                    trips = [];
+                    break;
+
+                case GetPublicOrganizationTripsOutcome.TransportError transportError:
+                    errorMessage = transportError.Message;
+                    trips = [];
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterEventName = null;
+        await LoadTripsAsync();
+    }
+}

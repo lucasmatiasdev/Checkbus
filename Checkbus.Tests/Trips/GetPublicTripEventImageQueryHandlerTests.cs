@@ -48,6 +48,10 @@ public class GetPublicTripEventImageQueryHandlerTests
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripEventImageQueryHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository

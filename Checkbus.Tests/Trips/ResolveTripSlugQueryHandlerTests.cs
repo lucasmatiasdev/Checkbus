@@ -46,6 +46,10 @@ public class ResolveTripSlugQueryHandlerTests
             ReceivedSlug = slug;
             return Task.FromResult(resolvedId);
         }
+
+        public Task<IReadOnlyList<Trip>> GetPublicUpcomingByOrganizationIdAsync(
+            Guid organizationId, DateTime? dateFrom, DateTime? dateTo, string? eventName, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ResolveTripSlugQueryHandler.");
     }
 
     [Fact]

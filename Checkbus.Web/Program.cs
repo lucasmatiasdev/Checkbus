@@ -67,6 +67,7 @@ builder.Services.AddScoped<EventsClient>();
 builder.Services.AddScoped<TripsClient>();
 builder.Services.AddScoped<TripsReportClient>();
 builder.Services.AddScoped<PublicTripsClient>();
+builder.Services.AddScoped<PublicOrganizationsClient>();
 builder.Services.AddScoped<PublicReservationsClient>();
 builder.Services.AddScoped<BoardingClient>();
 builder.Services.AddScoped<PaymentsClient>();

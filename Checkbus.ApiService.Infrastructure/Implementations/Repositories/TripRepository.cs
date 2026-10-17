@@ -167,5 +167,14 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .OrderBy(t => t.DepartureDate)
                 .ToListAsync(cancellationToken);
         }
+
+        // Every Trip tied to one Event, any status — see ITripRepository's own doc comment for
+        // why status filtering is deliberately NOT done here.
+        public async Task<IReadOnlyList<Trip>> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken)
+        {
+            return await _context.Trips
+                .Where(t => t.EventId == eventId)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

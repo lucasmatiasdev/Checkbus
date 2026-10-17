@@ -2,6 +2,7 @@ using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Documents;
 using Checkbus.ApiService.Domain.Entities.Invoices;
+using Checkbus.ApiService.Domain.Entities.Notifications;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Refunds;
@@ -41,6 +42,10 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Payment> Payments => Set<Payment>();
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<Refund> Refunds => Set<Refund>();
+
+        // CU-04 (odd/tasks/notificaciones-viaje.md) — standalone, manually-triggered
+        // notification audit trail. Not wired into any existing entity's own navigation.
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         // Fase I (odd/tasks/pagos-mercadopago.md) — Marketplace/Split Payments: one connected
         // Mercado Pago seller account per Organization.
@@ -337,6 +342,22 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Organization>()
                     .WithMany()
                     .HasForeignKey(x => x.OrganizationId);
+            });
+
+            modelBuilder.Entity<Notification>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.TargetType).HasConversion<string>();
+                entity.Property(x => x.Reason).HasConversion<string>();
+                // Indexed for GetRelevantToTripAsync's OR-of-two-conditions lookup (both arms
+                // filter by TargetType+TargetId).
+                entity.HasIndex(x => new { x.TargetType, x.TargetId });
+                entity.HasOne<Organization>()
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId);
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(x => x.CreatedByUserId);
             });
         }
     }

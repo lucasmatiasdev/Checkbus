@@ -5,6 +5,7 @@ using Checkbus.Web.Features.Boarding.Services;
 using Checkbus.Web.Features.DriverRequirements.Services;
 using Checkbus.Web.Features.Events.Services;
 using Checkbus.Web.Features.MaintenanceRecords.Services;
+using Checkbus.Web.Features.Notifications.Services;
 using Checkbus.Web.Features.Payments.Services;
 using Checkbus.Web.Features.PublicReservations.Services;
 using Checkbus.Web.Features.SupportTickets.Services;
@@ -71,6 +72,7 @@ builder.Services.AddScoped<PublicOrganizationsClient>();
 builder.Services.AddScoped<PublicReservationsClient>();
 builder.Services.AddScoped<BoardingClient>();
 builder.Services.AddScoped<PaymentsClient>();
+builder.Services.AddScoped<NotificationsClient>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

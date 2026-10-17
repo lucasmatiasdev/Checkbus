@@ -5,6 +5,7 @@ using Checkbus.ApiService.Application.Users.Commands;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Documents;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -86,6 +87,9 @@ public class RegisterUserCommandHandlerTests
 
     private sealed class FakeOrganizationRepository(string? slug) : IOrganizationRepository
     {
+        public Task AddAsync(Organization organization, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
         public Task<string?> GetSlugByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(slug);
 
@@ -93,6 +97,12 @@ public class RegisterUserCommandHandlerTests
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task<bool> CuitExistsAsync(string cuit, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
+
+        public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by RegisterUserCommandHandler.");
     }
 

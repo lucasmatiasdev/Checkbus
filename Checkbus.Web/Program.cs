@@ -6,6 +6,7 @@ using Checkbus.Web.Features.DriverRequirements.Services;
 using Checkbus.Web.Features.Events.Services;
 using Checkbus.Web.Features.MaintenanceRecords.Services;
 using Checkbus.Web.Features.Notifications.Services;
+using Checkbus.Web.Features.Organizations.Services;
 using Checkbus.Web.Features.Payments.Services;
 using Checkbus.Web.Features.PublicReservations.Services;
 using Checkbus.Web.Features.SupportTickets.Services;
@@ -56,6 +57,7 @@ builder.Services.AddHttpClient("apiservice", client =>
     .AddHttpMessageHandler<AuthenticationStateHandler>();
 
 builder.Services.AddScoped<UserRegistrationClient>();
+builder.Services.AddScoped<OrganizationRegistrationClient>();
 builder.Services.AddScoped<UsersClient>();
 builder.Services.AddScoped<DriverRequirementsClient>();
 builder.Services.AddScoped<VehiclesClient>();

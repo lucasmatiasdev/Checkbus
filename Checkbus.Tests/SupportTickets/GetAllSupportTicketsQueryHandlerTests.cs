@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.SupportTickets.Queries;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Support;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.SupportTickets;
 
@@ -33,6 +34,9 @@ public class GetAllSupportTicketsQueryHandlerTests
 
     private sealed class FakeOrganizationRepository(string? callerSlug, IReadOnlyDictionary<Guid, string?> namesById) : IOrganizationRepository
     {
+        public Task AddAsync(Organization organization, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
+
         public Task<string?> GetSlugByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => Task.FromResult(callerSlug);
 
@@ -40,6 +44,12 @@ public class GetAllSupportTicketsQueryHandlerTests
             => Task.FromResult(namesById.TryGetValue(organizationId, out var name) ? name : null);
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
+
+        public Task<bool> CuitExistsAsync(string cuit, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
     }
 

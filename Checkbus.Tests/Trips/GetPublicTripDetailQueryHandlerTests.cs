@@ -2,6 +2,7 @@ using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Queries;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Reservations;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Entities.Trips;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
 using Checkbus.ApiService.Domain.Enums;
@@ -91,6 +92,9 @@ public class GetPublicTripDetailQueryHandlerTests
 
     private sealed class FakeOrganizationRepository(string? name) : IOrganizationRepository
     {
+        public Task AddAsync(Organization organization, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
         public Task<string?> GetSlugByIdAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
 
@@ -98,6 +102,12 @@ public class GetPublicTripDetailQueryHandlerTests
             => Task.FromResult(name);
 
         public Task<Guid?> GetIdBySlugAsync(string slug, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
+        public Task<bool> CuitExistsAsync(string cuit, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
+        public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 

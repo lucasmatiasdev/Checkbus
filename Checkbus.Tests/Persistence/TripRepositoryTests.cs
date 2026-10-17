@@ -499,4 +499,66 @@ public class TripRepositoryTests
         Assert.Single(result);
         Assert.Equal(matchingTrip.Id, result[0].Id);
     }
+
+    // GetByEventIdAsync (odd/tasks/notificaciones-viaje.md T1) — resolves the Event scope for
+    // CU-04's notification audience. Any Trip status counts (status eligibility is the
+    // handler's job, not this query's), and a Trip under a DIFFERENT Event must never leak in.
+    [Fact]
+    public async Task GetByEventIdAsync_ReturnsEveryTripForThatEvent_RegardlessOfStatus()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var repository = new TripRepository(db);
+        var publicadoTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc));
+        publicadoTrip.Status = TripStatus.Publicado;
+        var cancelledTrip = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            new DateTime(2026, 11, 2, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 2, 14, 0, 0, DateTimeKind.Utc));
+        cancelledTrip.Status = TripStatus.Cancelado;
+        await repository.AddAsync(publicadoTrip, CreateRoute(publicadoTrip.Id), [], cancellationToken);
+        await repository.AddAsync(cancelledTrip, CreateRoute(cancelledTrip.Id), [], cancellationToken);
+
+        var result = await repository.GetByEventIdAsync(@event.Id, cancellationToken);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, t => t.Id == publicadoTrip.Id);
+        Assert.Contains(result, t => t.Id == cancelledTrip.Id);
+    }
+
+    [Fact]
+    public async Task GetByEventIdAsync_DoesNotReturnTripsFromAnotherEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
+        using var _ = connection;
+        using var __ = db;
+
+        var otherEvent = CreateEvent(organization.Id, @event.LocationId);
+        db.Events.Add(otherEvent);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var repository = new TripRepository(db);
+        var tripForThisEvent = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, @event.Id,
+            new DateTime(2026, 11, 1, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc));
+        var tripForOtherEvent = CreateTrip(
+            organization.Id, driver.Id, vehicle.Id, otherEvent.Id,
+            new DateTime(2026, 11, 2, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 2, 14, 0, 0, DateTimeKind.Utc));
+        await repository.AddAsync(tripForThisEvent, CreateRoute(tripForThisEvent.Id), [], cancellationToken);
+        await repository.AddAsync(tripForOtherEvent, CreateRoute(tripForOtherEvent.Id), [], cancellationToken);
+
+        var result = await repository.GetByEventIdAsync(@event.Id, cancellationToken);
+
+        Assert.Single(result);
+        Assert.Equal(tripForThisEvent.Id, result[0].Id);
+    }
 }

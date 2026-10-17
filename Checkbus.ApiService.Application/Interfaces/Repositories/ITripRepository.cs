@@ -60,5 +60,16 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
             DateTime? dateTo,
             string? eventName,
             CancellationToken cancellationToken);
+
+        // Added for CU-04 (odd/tasks/notificaciones-viaje.md T1): resolves every Trip tied to
+        // one Event, any status — the Event-scope resolution in
+        // CreateNotificationCommandHandler decides Trip-status eligibility itself, this query
+        // stays thin persistence like every other read here. Default body throws, same
+        // NotSupportedException convention as IReservationRepository's newer methods, so the
+        // ~25 existing Fake ITripRepository test doubles elsewhere in this codebase (none of
+        // which exercise this call path) don't need to be touched just to add a method they
+        // never call.
+        Task<IReadOnlyList<Trip>> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("GetByEventIdAsync is not implemented by this ITripRepository.");
     }
 }

@@ -2,6 +2,8 @@
 @attribute [Authorize(Roles = "Planificador,Administrador")]
 @using Checkbus.Web.Features.Trips.Contracts
 @using Checkbus.Web.Features.Trips.Services
+@using Checkbus.Web.Features.Notifications.Contracts
+@using Checkbus.Web.Features.Notifications.Services
 @using Checkbus.Web.Shared
 @implements IDisposable
 
@@ -71,6 +73,9 @@
                         Cancelar viaje
                     </MudButton>
                 }
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSendNotificationDialog">
+                    Enviar notificación
+                </MudButton>
             </MudStack>
         </MudStack>
 
@@ -245,6 +250,38 @@
                 }
             }
         </MudPaper>
+
+        <MudPaper Elevation="2" Class="pa-6 mt-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Historial de notificaciones</MudText>
+
+            @if (isLoadingNotificationHistory)
+            {
+                <MudProgressCircular Indeterminate="true" Class="my-4" />
+            }
+            else if (notificationHistory.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Todavía no se envió ninguna notificación para este viaje.</MudText>
+            }
+            else
+            {
+                <MudList T="NotificationResponse" Dense="true">
+                    @foreach (var notification in notificationHistory.OrderByDescending(n => n.CreatedAt))
+                    {
+                        <MudListItem T="NotificationResponse">
+                            <MudText Typo="Typo.body1">
+                                <strong>@GetNotificationReasonLabel(notification.Reason)</strong>
+                                — @notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                @if (!string.IsNullOrWhiteSpace(notification.CreatedByName))
+                                {
+                                    <span> — @notification.CreatedByName</span>
+                                }
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@notification.Message</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
     }
 </MudContainer>
 
@@ -396,6 +433,53 @@
             </MudButton>
         </DialogActions>
     </MudDialog>
+
+    <MudDialog Visible="@isSendNotificationDialogOpen" Options="@(new DialogOptions { CloseOnEscapeKey = true })">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Enviar notificación</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (sendNotificationErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@sendNotificationErrorMessage</MudAlert>
+            }
+
+            <MudSelect T="WebNotificationReason"
+                       @bind-Value="notificationReason"
+                       Label="Motivo"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                @foreach (var reason in NotificationReasons)
+                {
+                    <MudSelectItem T="WebNotificationReason" Value="@reason">@GetNotificationReasonLabel(reason)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                           @bind-Value="notificationMessage"
+                           Label="Mensaje"
+                           HelperText="Obligatorio"
+                           Variant="Variant.Outlined"
+                           Lines="3"
+                           Class="mb-4" />
+
+            <MudCheckBox T="bool" @bind-Value="notifyWholeEvent" Label="Aplicar a todo el evento" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton Disabled="@isSendingNotification" OnClick="CloseSendNotificationDialog">Cerrar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSendingNotification" OnClick="ConfirmSendNotificationAsync">
+                @if (isSendingNotification)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Enviando...</span>
+                }
+                else
+                {
+                    <span>Enviar</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
 }
 
 @code {
@@ -404,6 +488,9 @@
 
     [Inject]
     private TripsClient TripsClient { get; set; } = default!;
+
+    [Inject]
+    private NotificationsClient NotificationsClient { get; set; } = default!;
 
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
@@ -464,6 +551,17 @@
     private string? stopTimesSubmitErrorMessage;
     private List<StopTimeEditModel> stopTimeEdits = [];
 
+    // CU-04 — send notification dialog + history.
+    private static readonly WebNotificationReason[] NotificationReasons = Enum.GetValues<WebNotificationReason>();
+    private bool isSendNotificationDialogOpen;
+    private bool isSendingNotification;
+    private string? sendNotificationErrorMessage;
+    private WebNotificationReason notificationReason = WebNotificationReason.CambioHorario;
+    private string? notificationMessage;
+    private bool notifyWholeEvent;
+    private bool isLoadingNotificationHistory;
+    private IReadOnlyList<NotificationResponse> notificationHistory = [];
+
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
@@ -496,6 +594,7 @@
         if (trip is not null)
         {
             await LoadSeatMapAsync();
+            await LoadNotificationHistoryAsync();
 
             if (trip.Status == WebTripStatus.Cancelado)
             {
@@ -874,6 +973,98 @@
             isCancellingTrip = false;
         }
     }
+
+    private void OpenSendNotificationDialog()
+    {
+        isSendNotificationDialogOpen = true;
+        sendNotificationErrorMessage = null;
+        notificationReason = WebNotificationReason.CambioHorario;
+        notificationMessage = null;
+        notifyWholeEvent = false;
+    }
+
+    private void CloseSendNotificationDialog()
+    {
+        isSendNotificationDialogOpen = false;
+    }
+
+    private async Task ConfirmSendNotificationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(notificationMessage))
+        {
+            sendNotificationErrorMessage = "Ingresá un mensaje.";
+            return;
+        }
+
+        sendNotificationErrorMessage = null;
+        isSendingNotification = true;
+        try
+        {
+            var request = new CreateNotificationRequest
+            {
+                TargetType = notifyWholeEvent ? WebNotificationTargetType.Event : WebNotificationTargetType.Trip,
+                TargetId = notifyWholeEvent ? trip!.EventId : trip!.Id,
+                Reason = notificationReason,
+                Message = notificationMessage
+            };
+
+            var outcome = await NotificationsClient.CreateAsync(request);
+
+            switch (outcome)
+            {
+                case NotificationCreateOutcome.Success:
+                    isSendNotificationDialogOpen = false;
+                    Snackbar.Add("Notificación enviada correctamente.", Severity.Success);
+                    await LoadNotificationHistoryAsync();
+                    break;
+
+                case NotificationCreateOutcome.ValidationFailed validationFailed:
+                    sendNotificationErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case NotificationCreateOutcome.NotFound:
+                    sendNotificationErrorMessage = "No encontramos el destino de la notificación.";
+                    break;
+
+                case NotificationCreateOutcome.Forbidden:
+                    sendNotificationErrorMessage = "No tenés permiso para enviar esta notificación.";
+                    break;
+
+                case NotificationCreateOutcome.TransportError transportError:
+                    sendNotificationErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isSendingNotification = false;
+        }
+    }
+
+    private async Task LoadNotificationHistoryAsync()
+    {
+        isLoadingNotificationHistory = true;
+        try
+        {
+            var outcome = await NotificationsClient.GetTripHistoryAsync(Id);
+            if (outcome is NotificationHistoryOutcome.Success success)
+            {
+                notificationHistory = success.Notifications;
+            }
+        }
+        finally
+        {
+            isLoadingNotificationHistory = false;
+        }
+    }
+
+    private static string GetNotificationReasonLabel(WebNotificationReason reason) => reason switch
+    {
+        WebNotificationReason.CambioHorario => "Cambio de horario",
+        WebNotificationReason.CambioVehiculo => "Cambio de vehículo",
+        WebNotificationReason.Otro => "Aviso general",
+        _ => reason.ToString()
+    };
 
     private static string GetCancellationReasonLabel(WebTripCancellationReason reason) => reason switch
     {

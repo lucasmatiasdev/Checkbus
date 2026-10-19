@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Authentication;
+using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,7 +12,13 @@ namespace Checkbus.Tests.Auth;
 
 public class LoginCommandHandlerTests
 {
-    private static User CreateUser(bool isActive = true, Role role = Role.Administrador, bool mustChangePassword = false) => new()
+    private static User CreateUser(
+        bool isActive = true,
+        Role role = Role.Administrador,
+        bool mustChangePassword = false,
+        Organization? organization = null,
+        int failedLoginAttempts = 0,
+        DateTime? lockedUntil = null) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Jane",
@@ -21,12 +28,27 @@ public class LoginCommandHandlerTests
         DocumentNumber = "12345678",
         Role = role,
         OrganizationId = Guid.NewGuid(),
+        Organization = organization,
         IsActive = isActive,
-        MustChangePassword = mustChangePassword
+        MustChangePassword = mustChangePassword,
+        FailedLoginAttempts = failedLoginAttempts,
+        LockedUntil = lockedUntil
+    };
+
+    private static Organization CreateOrganization(bool isActive = true) => new()
+    {
+        Id = Guid.NewGuid(),
+        CUIT = "20-12345678-9",
+        Name = "Checkbus Demo",
+        Slug = "checkbus-demo",
+        LogoUrl = "https://example.com/logo.png",
+        IsActive = isActive
     };
 
     private sealed class FakeUserRepository(User? user) : IUserRepository
     {
+        public List<User> UpdatedUsers { get; } = [];
+
         public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
             => Task.FromResult(user);
 
@@ -43,7 +65,10 @@ public class LoginCommandHandlerTests
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
 
         public Task UpdateAsync(User user, CancellationToken cancellationToken)
-            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+        {
+            UpdatedUsers.Add(user);
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by LoginCommandHandler.");
@@ -127,6 +152,78 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_InactiveOrganization_ThrowsOrganizationInactiveException()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: false));
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_InactiveOrganization_LogsLoginFailedWithUserId()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: false));
+        var logger = new FakeLogger<LoginCommandHandler>();
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            logger);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal("OrganizationInactive", entry.Fields["FailureReason"]);
+        Assert.Equal(user.Id, entry.Fields["UserId"]);
+        Assert.Equal(user.OrganizationId, entry.Fields["OrganizationId"]);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveOrganization_GeneratesTokenAndReturnsResult()
+    {
+        var user = CreateUser(organization: CreateOrganization(isActive: true));
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+    }
+
+    [Fact]
+    public async Task Handle_OrganizationNotLoaded_DoesNotThrowOrganizationInactiveException()
+    {
+        // Organization is null here (not Included) - must never be treated as inactive. In
+        // production UserRepository.FindByEmailAsync always Includes it, so this only guards
+        // against a future repository regression dropping that Include.
+        var user = CreateUser(organization: null);
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+    }
+
+    [Fact]
     public async Task Handle_ValidCredentials_GeneratesTokenAndReturnsResult()
     {
         var user = CreateUser(role: Role.Chofer);
@@ -147,6 +244,184 @@ public class LoginCommandHandlerTests
         Assert.Equal(user.OrganizationId, result.OrganizationId);
         Assert.Equal("Chofer", result.Role);
         Assert.Equal(user.Email, result.Email);
+    }
+
+    [Fact]
+    public async Task Handle_ValidCredentials_SetsLastLoginAtAndPersists()
+    {
+        var user = CreateUser();
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+        var beforeLogin = DateTime.UtcNow;
+
+        await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Same(user, updated);
+        Assert.NotNull(updated.LastLoginAt);
+        Assert.True(updated.LastLoginAt >= beforeLogin);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Handle_WrongPassword_BelowLockoutThreshold_IncrementsCounterAndThrowsInvalidCredentials(int startingAttempts)
+    {
+        var user = CreateUser(failedLoginAttempts: startingAttempts);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(startingAttempts + 1, updated.FailedLoginAttempts);
+        Assert.Null(updated.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_ThirdAttempt_LocksAccountAndThrowsAccountLocked()
+    {
+        var user = CreateUser(failedLoginAttempts: 2);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+        var beforeAttempt = DateTime.UtcNow;
+
+        var exception = await Assert.ThrowsAsync<AccountLockedException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(3, updated.FailedLoginAttempts);
+        Assert.NotNull(updated.LockedUntil);
+        Assert.True(updated.LockedUntil >= beforeAttempt.AddMinutes(15));
+        Assert.Equal(updated.LockedUntil, exception.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Handle_AccountLockedAndStillWithinWindow_ThrowsAccountLockedWithoutCheckingPassword()
+    {
+        var lockedUntil = DateTime.UtcNow.AddMinutes(10);
+        var user = CreateUser(failedLoginAttempts: 3, lockedUntil: lockedUntil);
+        var userRepository = new FakeUserRepository(user);
+        var passwordHasher = new FakePasswordHasher(verifyResult: true);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            passwordHasher,
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var exception = await Assert.ThrowsAsync<AccountLockedException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Equal(lockedUntil, exception.LockedUntil);
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_LockoutWindowExpired_ValidCredentials_LogsInAndResetsCounter()
+    {
+        var lockedUntil = DateTime.UtcNow.AddMinutes(-1);
+        var user = CreateUser(failedLoginAttempts: 3, lockedUntil: lockedUntil);
+        var userRepository = new FakeUserRepository(user);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+        var updated = Assert.Single(userRepository.UpdatedUsers);
+        Assert.Equal(0, updated.FailedLoginAttempts);
+        Assert.Null(updated.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownEmail_DoesNotUpdateAnyUser()
+    {
+        var userRepository = new FakeUserRepository(user: null);
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser());
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        // A wrong password still persists the incremented FailedLoginAttempts counter (see the
+        // lockout tests), but must never touch LastLoginAt - that only happens on success.
+        Assert.All(userRepository.UpdatedUsers, u => Assert.Null(u.LastLoginAt));
+    }
+
+    [Fact]
+    public async Task Handle_InactiveUser_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser(isActive: false));
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
+    }
+
+    [Fact]
+    public async Task Handle_InactiveOrganization_DoesNotUpdateLastLoginAt()
+    {
+        var userRepository = new FakeUserRepository(CreateUser(organization: CreateOrganization(isActive: false)));
+        var handler = new LoginCommandHandler(
+            userRepository,
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<OrganizationInactiveException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        Assert.Empty(userRepository.UpdatedUsers);
     }
 
     [Fact]

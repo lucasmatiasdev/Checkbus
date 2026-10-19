@@ -8,6 +8,9 @@ namespace Checkbus.ApiService.Application.Auth.Commands
 {
     public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginCommandResult>
     {
+        private const int MaxFailedLoginAttempts = 3;
+        private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
         private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IJwtGenerator _jwtGenerator;
@@ -42,8 +45,40 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 throw new UserInactiveException();
             }
 
+            if (user.Organization is { IsActive: false })
+            {
+                _logger.LogWarning(
+                    "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
+                    user.Id, user.OrganizationId, "OrganizationInactive");
+                throw new OrganizationInactiveException();
+            }
+
+            if (user.LockedUntil is { } lockedUntil && lockedUntil > DateTime.UtcNow)
+            {
+                _logger.LogWarning(
+                    "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
+                    user.Id, user.OrganizationId, "AccountLocked");
+                throw new AccountLockedException(lockedUntil);
+            }
+
             if (!_passwordHasher.Verify(user.PasswordHash, request.Password))
             {
+                user.FailedLoginAttempts++;
+
+                if (user.FailedLoginAttempts >= MaxFailedLoginAttempts)
+                {
+                    var lockUntil = DateTime.UtcNow + LockoutDuration;
+                    user.LockedUntil = lockUntil;
+                    await _userRepository.UpdateAsync(user, cancellationToken);
+
+                    _logger.LogWarning(
+                        "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
+                        user.Id, user.OrganizationId, "AccountLocked");
+                    throw new AccountLockedException(lockUntil);
+                }
+
+                await _userRepository.UpdateAsync(user, cancellationToken);
+
                 _logger.LogWarning(
                     "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                     user.Id, user.OrganizationId, "InvalidCredentials");
@@ -51,6 +86,11 @@ namespace Checkbus.ApiService.Application.Auth.Commands
             }
 
             var token = _jwtGenerator.GenerateToken(user);
+
+            user.LastLoginAt = DateTime.UtcNow;
+            user.FailedLoginAttempts = 0;
+            user.LockedUntil = null;
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation(
                 "LoginSucceeded for UserId {UserId} in OrganizationId {OrganizationId} with Role {Role}",

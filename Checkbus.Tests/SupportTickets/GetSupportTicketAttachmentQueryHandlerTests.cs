@@ -43,7 +43,6 @@ public class GetSupportTicketAttachmentQueryHandlerTests
         Category = SupportTicketCategory.ProblemaTecnico,
         Subject = "No puedo ver mis reservas",
         Description = "Descripcion de prueba",
-        Priority = SupportTicketPriority.Media,
         Status = SupportTicketStatus.Abierto,
         AttachmentKey = attachmentKey,
         AttachmentFileName = attachmentKey is not null ? "captura.png" : null,

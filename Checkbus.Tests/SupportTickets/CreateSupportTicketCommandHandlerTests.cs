@@ -73,13 +73,13 @@ public class CreateSupportTicketCommandHandlerTests
         }
     }
 
-    private sealed class FakeCurrentUserService(Guid? organizationId, Guid? userId) : ICurrentUserService
+    private sealed class FakeCurrentUserService(Guid? organizationId, Guid? userId, string? email = "planificador@checkbus-demo.com") : ICurrentUserService
     {
         public bool IsAuthenticated => true;
         public Guid? UserId => userId;
         public Guid? OrganizationId => organizationId;
         public string? Role => "Planificador";
-        public string? Email => "planificador@checkbus-demo.com";
+        public string? Email => email;
     }
 
     private static CreateSupportTicketCommand CreateCommand(
@@ -88,7 +88,6 @@ public class CreateSupportTicketCommandHandlerTests
         Category = SupportTicketCategory.ProblemaTecnico,
         Subject = "No puedo ver mis reservas",
         Description = "El listado de reservas no carga desde ayer.",
-        Priority = SupportTicketPriority.Alta,
         AttachmentStream = attachmentStream,
         AttachmentFileName = attachmentFileName,
         AttachmentContentType = attachmentContentType
@@ -100,14 +99,15 @@ public class CreateSupportTicketCommandHandlerTests
         FakeEmailService emailService,
         SupportOptions supportOptions,
         Guid? organizationId,
-        Guid? userId)
+        Guid? userId,
+        string? authorEmail = "planificador@checkbus-demo.com")
     {
         return new CreateSupportTicketCommandHandler(
             ticketRepository,
             fileStorage,
             emailService,
             supportOptions,
-            new FakeCurrentUserService(organizationId, userId),
+            new FakeCurrentUserService(organizationId, userId, authorEmail),
             NullLogger<CreateSupportTicketCommandHandler>.Instance);
     }
 
@@ -164,7 +164,7 @@ public class CreateSupportTicketCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithNotificationEmailConfigured_SendsEmailOnce()
+    public async Task Handle_WithNotificationEmailConfigured_SendsNotificationAndConfirmationEmails()
     {
         var emailService = new FakeEmailService();
         var handler = CreateHandler(
@@ -173,19 +173,54 @@ public class CreateSupportTicketCommandHandlerTests
 
         await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
-        Assert.Single(emailService.SentMessages);
-        Assert.Equal("soporte@checkbus.com", emailService.SentMessages[0].To);
+        Assert.Equal(2, emailService.SentMessages.Count);
+        Assert.Contains(emailService.SentMessages, m => m.To == "soporte@checkbus.com");
+        Assert.Contains(emailService.SentMessages, m => m.To == "planificador@checkbus-demo.com");
+    }
+
+    [Fact]
+    public async Task Handle_WithNotificationEmailConfigured_EmailBodiesShowShortDisplayId()
+    {
+        var ticketRepository = new FakeSupportTicketRepository();
+        var emailService = new FakeEmailService();
+        var handler = CreateHandler(
+            ticketRepository, new FakeFileStorageService(), emailService,
+            new SupportOptions { NotificationEmail = "soporte@checkbus.com" }, Guid.NewGuid(), Guid.NewGuid());
+
+        await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        var persisted = Assert.Single(ticketRepository.AddedTickets);
+        var expectedDisplayId = $"#TK-{persisted.Id.ToString("N")[..8].ToUpperInvariant()}";
+        Assert.All(emailService.SentMessages, m => Assert.Contains(expectedDisplayId, m.HtmlBody));
+        Assert.All(emailService.SentMessages, m => Assert.DoesNotContain(persisted.Id.ToString(), m.HtmlBody));
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task Handle_WithBlankNotificationEmail_DoesNotSendEmail(string notificationEmail)
+    public async Task Handle_WithBlankNotificationEmail_OnlySendsConfirmationToAuthor(string notificationEmail)
     {
         var emailService = new FakeEmailService();
         var handler = CreateHandler(
             new FakeSupportTicketRepository(), new FakeFileStorageService(), emailService,
             new SupportOptions { NotificationEmail = notificationEmail }, Guid.NewGuid(), Guid.NewGuid());
+
+        await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        Assert.Single(emailService.SentMessages);
+        Assert.Equal("planificador@checkbus-demo.com", emailService.SentMessages[0].To);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WithBlankAuthorEmail_DoesNotSendConfirmationEmail(string? authorEmail)
+    {
+        var emailService = new FakeEmailService();
+        var handler = CreateHandler(
+            new FakeSupportTicketRepository(), new FakeFileStorageService(), emailService,
+            new SupportOptions(), Guid.NewGuid(), Guid.NewGuid(), authorEmail);
 
         await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 

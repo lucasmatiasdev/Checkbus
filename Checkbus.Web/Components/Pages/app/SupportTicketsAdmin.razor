@@ -33,11 +33,6 @@
                             @GetCategoryLabel(context.Item.Category)
                         </CellTemplate>
                     </TemplateColumn>
-                    <TemplateColumn Title="Prioridad">
-                        <CellTemplate>
-                            @GetPriorityLabel(context.Item.Priority)
-                        </CellTemplate>
-                    </TemplateColumn>
                     <TemplateColumn Title="Fecha">
                         <CellTemplate>
                             @context.Item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
@@ -168,15 +163,6 @@
         WebSupportTicketCategory.ConsultaGeneral => "Consulta general",
         WebSupportTicketCategory.Otro => "Otro",
         _ => category.ToString()
-    };
-
-    private static string GetPriorityLabel(WebSupportTicketPriority priority) => priority switch
-    {
-        WebSupportTicketPriority.Baja => "Baja",
-        WebSupportTicketPriority.Media => "Media",
-        WebSupportTicketPriority.Alta => "Alta",
-        WebSupportTicketPriority.Urgente => "Urgente",
-        _ => priority.ToString()
     };
 
     private static string GetStatusLabel(WebSupportTicketStatus status) => status switch

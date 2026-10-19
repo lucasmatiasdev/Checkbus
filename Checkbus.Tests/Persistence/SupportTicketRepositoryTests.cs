@@ -58,7 +58,6 @@ public class SupportTicketRepositoryTests
         Category = SupportTicketCategory.ProblemaTecnico,
         Subject = "No puedo ver mis reservas",
         Description = "El listado de reservas no carga desde ayer.",
-        Priority = SupportTicketPriority.Alta,
         Status = SupportTicketStatus.Abierto,
         CreatedAt = createdAt
     };

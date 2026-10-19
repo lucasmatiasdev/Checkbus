@@ -53,7 +53,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 Category = request.Category,
                 Subject = request.Subject,
                 Description = request.Description,
-                Priority = request.Priority,
                 Status = SupportTicketStatus.Abierto,
                 CreatedAt = DateTime.UtcNow
             };
@@ -93,7 +92,40 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(_currentUser.Email))
+            {
+                try
+                {
+                    var confirmationMessage = BuildConfirmationEmail(ticket, _currentUser.Email);
+                    await _emailService.SendAsync(confirmationMessage, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to send support ticket confirmation email for SupportTicketId {SupportTicketId}",
+                        ticket.Id);
+                }
+            }
+
             return MapToDto(ticket);
+        }
+
+        private static EmailMessage BuildConfirmationEmail(SupportTicket ticket, string authorEmail)
+        {
+            var subject = $"Recibimos tu ticket de soporte: {ticket.Subject}";
+            var body = $"""
+                <h2>Recibimos tu ticket de soporte</h2>
+                <p>Te vamos a contactar a la brevedad. Estos son los datos que registramos:</p>
+                <ul>
+                    <li>Categoria: {ticket.Category}</li>
+                    <li>Asunto: {ticket.Subject}</li>
+                    <li>Descripcion: {ticket.Description}</li>
+                    <li>TicketId: {FormatDisplayId(ticket.Id)}</li>
+                </ul>
+                """;
+
+            return new EmailMessage(authorEmail, subject, body);
         }
 
         private static EmailMessage BuildNotificationEmail(SupportTicket ticket, Guid organizationId, string notificationEmail)
@@ -103,16 +135,20 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 <h2>Nuevo ticket de soporte</h2>
                 <ul>
                     <li>Categoria: {ticket.Category}</li>
-                    <li>Prioridad: {ticket.Priority}</li>
                     <li>Asunto: {ticket.Subject}</li>
                     <li>Descripcion: {ticket.Description}</li>
                     <li>OrganizationId: {organizationId}</li>
-                    <li>TicketId: {ticket.Id}</li>
+                    <li>TicketId: {FormatDisplayId(ticket.Id)}</li>
                 </ul>
                 """;
 
             return new EmailMessage(notificationEmail, subject, body);
         }
+
+        // Display-only label, never stored or used as a lookup key - truncating to 8 hex chars
+        // (32 bits) trades a small, accepted collision risk (~50% past ~65k tickets) for a
+        // human-readable reference. The real Guid in ticket.Id remains the sole source of truth.
+        private static string FormatDisplayId(Guid id) => $"#TK-{id.ToString("N")[..8].ToUpperInvariant()}";
 
         private static SupportTicketDto MapToDto(SupportTicket ticket)
         {
@@ -122,7 +158,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 Category = ticket.Category,
                 Subject = ticket.Subject,
                 Description = ticket.Description,
-                Priority = ticket.Priority,
                 Status = ticket.Status,
                 AttachmentFileName = ticket.AttachmentFileName,
                 CreatedAt = ticket.CreatedAt

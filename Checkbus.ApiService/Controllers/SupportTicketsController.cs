@@ -17,7 +17,6 @@ namespace Checkbus.ApiService.Contracts
         public required SupportTicketCategory Category { get; set; }
         public required string Subject { get; set; }
         public required string Description { get; set; }
-        public required SupportTicketPriority Priority { get; set; }
 
         // Unlike UploadEventImageRequest.File, the attachment here is optional — a ticket may
         // have none at all.
@@ -60,7 +59,6 @@ namespace Checkbus.ApiService.Controllers
                     Category = request.Category,
                     Subject = request.Subject,
                     Description = request.Description,
-                    Priority = request.Priority,
                     AttachmentStream = attachmentStream,
                     AttachmentContentType = request.Attachment?.ContentType,
                     AttachmentFileName = request.Attachment?.FileName
@@ -84,6 +82,16 @@ namespace Checkbus.ApiService.Controllers
         {
             var result = await _mediator.Send(new GetMySupportTicketsQuery(), cancellationToken);
             return Ok(result);
+        }
+
+        [Authorize(Roles = "Administrador,Planificador")]
+        [HttpGet("check-duplicate")]
+        public async Task<IActionResult> CheckDuplicate(
+            [FromQuery] SupportTicketCategory category, CancellationToken cancellationToken)
+        {
+            var hasPossibleDuplicate = await _mediator.Send(
+                new CheckDuplicateSupportTicketQuery { Category = category }, cancellationToken);
+            return Ok(hasPossibleDuplicate);
         }
 
         [Authorize(Roles = "Administrador,Planificador")]

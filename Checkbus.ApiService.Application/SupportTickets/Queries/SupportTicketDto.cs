@@ -8,7 +8,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Queries
         public SupportTicketCategory Category { get; set; }
         public required string Subject { get; set; }
         public required string Description { get; set; }
-        public SupportTicketPriority Priority { get; set; }
         public SupportTicketStatus Status { get; set; }
 
         // Mirrors EventDto's HasImage/VehicleDocumentResponse's never-expose-the-raw-key

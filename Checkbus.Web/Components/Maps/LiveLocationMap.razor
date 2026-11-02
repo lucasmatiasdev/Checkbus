@@ -1,0 +1,10 @@
+@namespace Checkbus.Web.Components.Maps
+@implements IAsyncDisposable
+
+@* DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md S2/S4). Renders nothing at all while
+   tracking is off — no map, no placeholder message — consistent with FA2 of the use case
+   ("sin mensaje adicional"): the passenger simply sees no live-position section. *@
+@if (_liveTrackingEnabled)
+{
+    <div id="@_mapElementId" style="width: 100%; height: 320px; border-radius: 4px;"></div>
+}

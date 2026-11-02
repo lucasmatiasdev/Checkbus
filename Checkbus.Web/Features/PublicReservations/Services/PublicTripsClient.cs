@@ -199,6 +199,49 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
         }
     }
 
+    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md T4) — polled repeatedly by
+    // LiveLocationMap while a trip is in progress. The API action always answers 200 (never
+    // 404 — see GetTripLocationQueryHandler's own doc comment), so this method's outcome only
+    // ever splits on transport success vs. failure, unlike every other method above.
+    public async Task<PublicTripLocationOutcome> GetLocationAsync(
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync($"public/trips/{tripId}/location", cancellationToken);
+        }
+        catch (Exception)
+        {
+            return new PublicTripLocationOutcome.TransportError(
+                "An unexpected error occurred. Please try again.");
+        }
+
+        using (response)
+        {
+            try
+            {
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    return new PublicTripLocationOutcome.TransportError(
+                        "An unexpected error occurred. Please try again.");
+                }
+
+                var location = await response.Content
+                    .ReadFromJsonAsync<TripLocationResponse>(cancellationToken);
+                return new PublicTripLocationOutcome.Success(location!);
+            }
+            catch (Exception)
+            {
+                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
+                // up as an unhandled exception — the caller only ever expects a typed outcome.
+                return new PublicTripLocationOutcome.TransportError(
+                    "An unexpected error occurred. Please try again.");
+            }
+        }
+    }
+
     public async Task<CreateReservationOutcome> CreateReservationAsync(
         Guid tripId,
         CreateReservationRequest request,

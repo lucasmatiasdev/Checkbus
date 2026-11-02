@@ -56,5 +56,28 @@ namespace Checkbus.ApiService.Controllers
             await _mediator.Send(new CloseBoardingCommand { TripId = tripId }, cancellationToken);
             return NoContent();
         }
+
+        // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — the driver's own device toggles
+        // and posts its Geolocation position while the trip is in progress.
+        [Authorize(Roles = nameof(Role.Chofer))]
+        [HttpPost("{tripId:guid}/location/toggle")]
+        public async Task<IActionResult> ToggleLiveTracking(
+            Guid tripId, [FromBody] ToggleTripLiveTrackingRequest request, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(
+                new ToggleTripLiveTrackingCommand { TripId = tripId, Enabled = request.Enabled }, cancellationToken);
+            return NoContent();
+        }
+
+        [Authorize(Roles = nameof(Role.Chofer))]
+        [HttpPost("{tripId:guid}/location")]
+        public async Task<IActionResult> UpdateLocation(
+            Guid tripId, [FromBody] UpdateTripLocationRequest request, CancellationToken cancellationToken)
+        {
+            await _mediator.Send(
+                new UpdateTripLocationCommand { TripId = tripId, Latitude = request.Latitude, Longitude = request.Longitude },
+                cancellationToken);
+            return NoContent();
+        }
     }
 }

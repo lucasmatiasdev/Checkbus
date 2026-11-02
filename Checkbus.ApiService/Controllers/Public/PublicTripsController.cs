@@ -68,6 +68,17 @@ namespace Checkbus.ApiService.Controllers.Public
             return Ok(result);
         }
 
+        // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md T2) — polled repeatedly by the
+        // passenger screen while a trip is in progress; always 200, never 404 (see
+        // GetTripLocationQueryHandler's own doc comment for why).
+        [AllowAnonymous]
+        [HttpGet("{id:guid}/location")]
+        public async Task<IActionResult> GetLocation(Guid id, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetTripLocationQuery { TripId = id }, cancellationToken);
+            return Ok(result);
+        }
+
         // Serves the Step 1 event image anonymously (odd/tasks/detalle-reserva-publica.md T4) —
         // T1's GET api/Events/{id}/image is role-gated, so it can't serve a passenger directly.
         // Resolved through the Trip (not a bare EventId route param) so the same

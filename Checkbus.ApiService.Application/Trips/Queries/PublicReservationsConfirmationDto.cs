@@ -39,6 +39,12 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         // browsing. EstimatedDuration/DistanceKm are the already-computed Route values from trip
         // creation (Google Directions), never recalculated live here.
         public required string TripStatus { get; set; }
+
+        // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md T4) — lets the page poll
+        // GET api/public/trips/{TripId}/location while TripStatus == "En curso". Safe to expose
+        // for the same reason Driver/Vehicle identity already is: holding this Reservation.Id
+        // already proves a confirmed booking on this exact Trip.
+        public Guid TripId { get; set; }
         public string? DriverName { get; set; }
         public string? DriverSurname { get; set; }
         public string? VehiclePatent { get; set; }

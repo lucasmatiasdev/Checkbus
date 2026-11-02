@@ -141,6 +141,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                     EventName = eventName,
                     DepartureDate = trip.DepartureDate,
                     TripStatus = MapTripStatus(trip.Status),
+                    TripId = trip.Id,
                     DriverName = driver?.Name,
                     DriverSurname = driver?.Surname,
                     VehiclePatent = vehicle?.Patent,

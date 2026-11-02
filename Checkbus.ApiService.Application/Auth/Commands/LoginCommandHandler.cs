@@ -1,5 +1,7 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Audit;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -14,17 +16,20 @@ namespace Checkbus.ApiService.Application.Auth.Commands
         private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IJwtGenerator _jwtGenerator;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<LoginCommandHandler> _logger;
 
         public LoginCommandHandler(
             IUserRepository userRepository,
             IPasswordHasher passwordHasher,
             IJwtGenerator jwtGenerator,
+            IAuditLogRepository auditLogRepository,
             ILogger<LoginCommandHandler> logger)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _jwtGenerator = jwtGenerator;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
@@ -34,6 +39,19 @@ namespace Checkbus.ApiService.Application.Auth.Commands
             if (user is null)
             {
                 _logger.LogWarning("LoginFailed with FailureReason {FailureReason}", "UserNotFound");
+
+                // CU-16 (odd/tasks/auditoria-sistema.md S4): asunción — un email que no coincide
+                // con ningún User no tiene una entidad real para referenciar, así que se audita
+                // sin ActorUserId/OrganizationId, dejando solo el email que ingresó el intento.
+                await WriteAuditLogAsync(
+                    AuditAction.LoginFallido,
+                    organizationId: null,
+                    actorUserId: null,
+                    actorEmail: request.Email,
+                    entityId: Guid.Empty,
+                    description: "Intento de inicio de sesión con un email no registrado",
+                    cancellationToken);
+
                 throw new UserNotFoundException();
             }
 
@@ -42,6 +60,11 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 _logger.LogWarning(
                     "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                     user.Id, user.OrganizationId, "UserInactive");
+
+                await WriteAuditLogAsync(
+                    AuditAction.LoginFallido, user.OrganizationId, user.Id, user.Email,
+                    user.Id, "Intento de inicio de sesión con un usuario inactivo", cancellationToken);
+
                 throw new UserInactiveException();
             }
 
@@ -50,6 +73,11 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 _logger.LogWarning(
                     "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                     user.Id, user.OrganizationId, "OrganizationInactive");
+
+                await WriteAuditLogAsync(
+                    AuditAction.LoginFallido, user.OrganizationId, user.Id, user.Email,
+                    user.Id, "Intento de inicio de sesión con la organización inactiva", cancellationToken);
+
                 throw new OrganizationInactiveException();
             }
 
@@ -58,6 +86,11 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 _logger.LogWarning(
                     "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                     user.Id, user.OrganizationId, "AccountLocked");
+
+                await WriteAuditLogAsync(
+                    AuditAction.LoginFallido, user.OrganizationId, user.Id, user.Email,
+                    user.Id, "Intento de inicio de sesión con la cuenta bloqueada", cancellationToken);
+
                 throw new AccountLockedException(lockedUntil);
             }
 
@@ -74,6 +107,12 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                     _logger.LogWarning(
                         "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                         user.Id, user.OrganizationId, "AccountLocked");
+
+                    await WriteAuditLogAsync(
+                        AuditAction.LoginFallido, user.OrganizationId, user.Id, user.Email,
+                        user.Id, "Cuenta bloqueada tras superar el máximo de intentos fallidos de inicio de sesión",
+                        cancellationToken);
+
                     throw new AccountLockedException(lockUntil);
                 }
 
@@ -82,6 +121,11 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 _logger.LogWarning(
                     "LoginFailed for UserId {UserId} in OrganizationId {OrganizationId} with FailureReason {FailureReason}",
                     user.Id, user.OrganizationId, "InvalidCredentials");
+
+                await WriteAuditLogAsync(
+                    AuditAction.LoginFallido, user.OrganizationId, user.Id, user.Email,
+                    user.Id, "Intento de inicio de sesión con contraseña incorrecta", cancellationToken);
+
                 throw new InvalidCredentialsException();
             }
 
@@ -96,6 +140,10 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 "LoginSucceeded for UserId {UserId} in OrganizationId {OrganizationId} with Role {Role}",
                 user.Id, user.OrganizationId, user.Role.ToString());
 
+            await WriteAuditLogAsync(
+                AuditAction.LoginExitoso, user.OrganizationId, user.Id, user.Email,
+                user.Id, "Inicio de sesión exitoso", cancellationToken);
+
             return new LoginCommandResult
             {
                 Token = token,
@@ -105,6 +153,38 @@ namespace Checkbus.ApiService.Application.Auth.Commands
                 Email = user.Email,
                 MustChangePassword = user.MustChangePassword
             };
+        }
+
+        // CU-16: no bloqueante — si falla la escritura del AuditLogEntry, se loguea y el login
+        // (éxito o fallo) sigue su curso normal (odd/tasks/auditoria-sistema.md S5).
+        private async Task WriteAuditLogAsync(
+            AuditAction action,
+            Guid? organizationId,
+            Guid? actorUserId,
+            string actorEmail,
+            Guid entityId,
+            string description,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    ActorUserId = actorUserId,
+                    ActorEmail = actorEmail,
+                    Action = action,
+                    EntityType = "User",
+                    EntityId = entityId,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", action);
+            }
         }
     }
 }

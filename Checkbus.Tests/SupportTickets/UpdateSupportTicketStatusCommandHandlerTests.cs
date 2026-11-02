@@ -2,10 +2,12 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.SupportTickets.Commands;
 using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Support;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.SupportTickets;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.SupportTickets;
 
@@ -58,6 +60,28 @@ public class UpdateSupportTicketStatusCommandHandlerTests
             => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
     }
 
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
+    }
+
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
     {
         public bool IsAuthenticated => true;
@@ -89,7 +113,9 @@ public class UpdateSupportTicketStatusCommandHandlerTests
         var handler = new UpdateSupportTicketStatusCommandHandler(
             ticketRepository,
             new FakeOrganizationRepository(CheckbusInternalOrganization.Slug),
-            new FakeCurrentUserService(Guid.NewGuid()));
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakeAuditLogRepository(),
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
 
         await handler.Handle(
             new UpdateSupportTicketStatusCommand { TicketId = ticket.Id, NewStatus = SupportTicketStatus.Resuelto },
@@ -109,7 +135,9 @@ public class UpdateSupportTicketStatusCommandHandlerTests
         var handler = new UpdateSupportTicketStatusCommandHandler(
             ticketRepository,
             new FakeOrganizationRepository("otra-organizacion"),
-            new FakeCurrentUserService(Guid.NewGuid()));
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakeAuditLogRepository(),
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<SupportTicketAccessDeniedException>(() => handler.Handle(
             new UpdateSupportTicketStatusCommand { TicketId = ticket.Id, NewStatus = SupportTicketStatus.Resuelto },
@@ -130,7 +158,9 @@ public class UpdateSupportTicketStatusCommandHandlerTests
         var handler = new UpdateSupportTicketStatusCommandHandler(
             ticketRepository,
             new FakeOrganizationRepository(CheckbusInternalOrganization.Slug),
-            new FakeCurrentUserService(Guid.NewGuid()));
+            new FakeCurrentUserService(Guid.NewGuid()),
+            new FakeAuditLogRepository(),
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<SupportTicketNotFoundException>(() => handler.Handle(
             new UpdateSupportTicketStatusCommand { TicketId = Guid.NewGuid(), NewStatus = SupportTicketStatus.Resuelto },
@@ -143,10 +173,58 @@ public class UpdateSupportTicketStatusCommandHandlerTests
         var handler = new UpdateSupportTicketStatusCommandHandler(
             new FakeSupportTicketRepository(ticket: null),
             new FakeOrganizationRepository(CheckbusInternalOrganization.Slug),
-            new FakeCurrentUserService(organizationId: null));
+            new FakeCurrentUserService(organizationId: null),
+            new FakeAuditLogRepository(),
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
             new UpdateSupportTicketStatusCommand { TicketId = Guid.NewGuid(), NewStatus = SupportTicketStatus.Resuelto },
             TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_CallerFromSentinelOrganization_WritesEstadoTicketSoporteCambiadoAuditLogEntry()
+    {
+        var ticket = CreateTicket(Guid.NewGuid());
+        var ticketRepository = new FakeSupportTicketRepository(ticket);
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = new UpdateSupportTicketStatusCommandHandler(
+            ticketRepository,
+            new FakeOrganizationRepository(CheckbusInternalOrganization.Slug),
+            new FakeCurrentUserService(Guid.NewGuid()),
+            auditLogRepository,
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
+
+        await handler.Handle(
+            new UpdateSupportTicketStatusCommand { TicketId = ticket.Id, NewStatus = SupportTicketStatus.Resuelto },
+            TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.EstadoTicketSoporteCambiado, entry.Action);
+        Assert.Equal("SupportTicket", entry.EntityType);
+        Assert.Equal(ticket.Id, entry.EntityId);
+        Assert.Equal(ticket.OrganizationId, entry.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_StatusUpdateStillSucceeds()
+    {
+        var ticket = CreateTicket(Guid.NewGuid());
+        var ticketRepository = new FakeSupportTicketRepository(ticket);
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = new UpdateSupportTicketStatusCommandHandler(
+            ticketRepository,
+            new FakeOrganizationRepository(CheckbusInternalOrganization.Slug),
+            new FakeCurrentUserService(Guid.NewGuid()),
+            auditLogRepository,
+            NullLogger<UpdateSupportTicketStatusCommandHandler>.Instance);
+
+        await handler.Handle(
+            new UpdateSupportTicketStatusCommand { TicketId = ticket.Id, NewStatus = SupportTicketStatus.Resuelto },
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ticketRepository.UpdatedTicket);
+        Assert.Equal(SupportTicketStatus.Resuelto, ticketRepository.UpdatedTicket!.Status);
+        Assert.Empty(auditLogRepository.AddedEntries);
     }
 }

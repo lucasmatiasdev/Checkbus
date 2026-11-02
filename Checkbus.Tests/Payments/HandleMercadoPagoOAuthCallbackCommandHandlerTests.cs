@@ -2,7 +2,9 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Payments.Commands;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Payments;
+using Checkbus.ApiService.Domain.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.Payments;
@@ -75,15 +77,39 @@ public class HandleMercadoPagoOAuthCallbackCommandHandlerTests
         }
     }
 
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandleMercadoPagoOAuthCallbackCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by HandleMercadoPagoOAuthCallbackCommandHandler.");
+    }
+
     private static HandleMercadoPagoOAuthCallbackCommandHandler CreateHandler(
         FakeOAuthService oauthService,
         FakeStateService stateService,
         FakeConnectionRepository connectionRepository,
-        PublicWebOptions? publicWebOptions = null) => new(
+        PublicWebOptions? publicWebOptions = null,
+        FakeAuditLogRepository? auditLogRepository = null) => new(
             oauthService,
             stateService,
             connectionRepository,
             publicWebOptions ?? new PublicWebOptions(),
+            auditLogRepository ?? new FakeAuditLogRepository(),
             NullLogger<HandleMercadoPagoOAuthCallbackCommandHandler>.Instance);
 
     [Fact]
@@ -178,5 +204,47 @@ public class HandleMercadoPagoOAuthCallbackCommandHandlerTests
         Assert.False(result.Success);
         Assert.Equal("exchange_failed", result.FailureReason);
         Assert.Equal(0, connectionRepository.UpsertCallCount);
+    }
+
+    [Fact]
+    public async Task Handle_ValidStateAndSuccessfulExchange_WritesMercadoPagoConectadoAuditLogEntry()
+    {
+        var organizationId = Guid.NewGuid();
+        var oauthService = new FakeOAuthService(exchangeResult: new MercadoPagoOAuthTokenResult(
+            "access-token", "refresh-token", "seller-123", DateTime.UtcNow.AddDays(180)));
+        var stateService = new FakeStateService(isValid: true, organizationId);
+        var connectionRepository = new FakeConnectionRepository();
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = CreateHandler(oauthService, stateService, connectionRepository, auditLogRepository: auditLogRepository);
+
+        await handler.Handle(
+            new HandleMercadoPagoOAuthCallbackCommand { Code = "auth-code", State = $"{organizationId}|protected-blob" },
+            TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.MercadoPagoConectado, entry.Action);
+        Assert.Equal("MercadoPagoConnection", entry.EntityType);
+        Assert.Equal(organizationId, entry.OrganizationId);
+        Assert.Equal(connectionRepository.Upserted!.Id, entry.EntityId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_ConnectionStillSucceeds()
+    {
+        var organizationId = Guid.NewGuid();
+        var oauthService = new FakeOAuthService(exchangeResult: new MercadoPagoOAuthTokenResult(
+            "access-token", "refresh-token", "seller-123", DateTime.UtcNow.AddDays(180)));
+        var stateService = new FakeStateService(isValid: true, organizationId);
+        var connectionRepository = new FakeConnectionRepository();
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = CreateHandler(oauthService, stateService, connectionRepository, auditLogRepository: auditLogRepository);
+
+        var result = await handler.Handle(
+            new HandleMercadoPagoOAuthCallbackCommand { Code = "auth-code", State = $"{organizationId}|protected-blob" },
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, connectionRepository.UpsertCallCount);
+        Assert.Empty(auditLogRepository.AddedEntries);
     }
 }

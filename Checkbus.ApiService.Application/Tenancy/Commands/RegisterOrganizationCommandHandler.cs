@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Users;
 using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Enums;
@@ -26,6 +27,7 @@ namespace Checkbus.ApiService.Application.Tenancy.Commands
         private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IEmailService _emailService;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<RegisterOrganizationCommandHandler> _logger;
 
         public RegisterOrganizationCommandHandler(
@@ -33,12 +35,14 @@ namespace Checkbus.ApiService.Application.Tenancy.Commands
             IUserRepository userRepository,
             IPasswordHasher passwordHasher,
             IEmailService emailService,
+            IAuditLogRepository auditLogRepository,
             ILogger<RegisterOrganizationCommandHandler> logger)
         {
             _organizationRepository = organizationRepository;
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _emailService = emailService;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
@@ -114,6 +118,29 @@ namespace Checkbus.ApiService.Application.Tenancy.Commands
             adminUser.PasswordHash = _passwordHasher.Hash(adminUser, request.AdminDocumentNumber);
 
             await _userRepository.AddAsync(adminUser, cancellationToken);
+
+            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y el
+            // registro ya persistido (organización + usuario admin) sigue su curso normal. Es un
+            // registro público sin actor autenticado: el actor es la persona recién registrada.
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organization.Id,
+                    ActorUserId = adminUser.Id,
+                    ActorEmail = adminUser.Email,
+                    Action = AuditAction.OrganizacionRegistrada,
+                    EntityType = "Organization",
+                    EntityId = organization.Id,
+                    Description = "Organización registrada",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", AuditAction.OrganizacionRegistrada);
+            }
 
             // Same defensive posture as RegisterUserCommandHandler (CU-06): a flaky SMTP relay
             // must never fail a registration that's already persisted.

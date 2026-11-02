@@ -1,8 +1,10 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.VehicleDocuments;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
 {
@@ -11,15 +13,21 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
         private readonly IVehicleRepository _vehicleRepository;
         private readonly IVehicleDocumentRepository _vehicleDocumentRepository;
         private readonly ICurrentUserService _currentUser;
+        private readonly IAuditLogRepository _auditLogRepository;
+        private readonly ILogger<ValidateVehicleDocumentCommandHandler> _logger;
 
         public ValidateVehicleDocumentCommandHandler(
             IVehicleRepository vehicleRepository,
             IVehicleDocumentRepository vehicleDocumentRepository,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            IAuditLogRepository auditLogRepository,
+            ILogger<ValidateVehicleDocumentCommandHandler> logger)
         {
             _vehicleRepository = vehicleRepository;
             _vehicleDocumentRepository = vehicleDocumentRepository;
             _currentUser = currentUser;
+            _auditLogRepository = auditLogRepository;
+            _logger = logger;
         }
 
         public async Task Handle(ValidateVehicleDocumentCommand request, CancellationToken cancellationToken)
@@ -49,6 +57,28 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
             document.UpdatedAt = DateTime.UtcNow;
 
             await _vehicleDocumentRepository.UpdateAsync(document, cancellationToken);
+
+            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
+            // validación ya persistida sigue su curso normal.
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = callerOrganizationId,
+                    ActorUserId = _currentUser.UserId,
+                    ActorEmail = _currentUser.Email ?? string.Empty,
+                    Action = AuditAction.DocumentoVehiculoValidado,
+                    EntityType = "VehicleDocument",
+                    EntityId = document.Id,
+                    Description = "Documento de vehículo validado",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", AuditAction.DocumentoVehiculoValidado);
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Tenancy.Commands;
 using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Enums;
@@ -103,6 +104,28 @@ public class RegisterOrganizationCommandHandlerTests
         public bool Verify(string hash, string password) => hash == "hashed:" + password;
     }
 
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterOrganizationCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterOrganizationCommandHandler.");
+    }
+
     private static RegisterOrganizationCommand CreateCommand() => new()
     {
         OrganizationName = "Checkbus Demo",
@@ -117,11 +140,13 @@ public class RegisterOrganizationCommandHandlerTests
         FakeOrganizationRepository? organizationRepository = null,
         FakeUserRepository? userRepository = null,
         FakePasswordHasher? passwordHasher = null,
-        FakeEmailService? emailService = null) => new(
+        FakeEmailService? emailService = null,
+        FakeAuditLogRepository? auditLogRepository = null) => new(
             organizationRepository ?? new FakeOrganizationRepository(),
             userRepository ?? new FakeUserRepository(),
             passwordHasher ?? new FakePasswordHasher(),
             emailService ?? new FakeEmailService(),
+            auditLogRepository ?? new FakeAuditLogRepository(),
             NullLogger<RegisterOrganizationCommandHandler>.Instance);
 
     [Fact]
@@ -302,5 +327,44 @@ public class RegisterOrganizationCommandHandlerTests
         Assert.Equal(user.Email, result.AdminEmail);
         Assert.Equal(user.Name, result.AdminName);
         Assert.Equal(user.Surname, result.AdminSurname);
+    }
+
+    [Fact]
+    public async Task Handle_ValidRequest_WritesOrganizacionRegistradaAuditLogEntry()
+    {
+        var organizationRepository = new FakeOrganizationRepository();
+        var userRepository = new FakeUserRepository();
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = CreateHandler(organizationRepository, userRepository, auditLogRepository: auditLogRepository);
+
+        var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        var organization = Assert.Single(organizationRepository.AddedOrganizations);
+        var user = Assert.Single(userRepository.AddedUsers);
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.OrganizacionRegistrada, entry.Action);
+        Assert.Equal("Organization", entry.EntityType);
+        Assert.Equal(organization.Id, entry.EntityId);
+        Assert.Equal(organization.Id, entry.OrganizationId);
+        Assert.Equal(user.Id, entry.ActorUserId);
+        Assert.Equal(user.Email, entry.ActorEmail);
+        Assert.Equal(result.OrganizationId, entry.EntityId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_RegistrationStillSucceeds()
+    {
+        var organizationRepository = new FakeOrganizationRepository();
+        var userRepository = new FakeUserRepository();
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = CreateHandler(organizationRepository, userRepository, auditLogRepository: auditLogRepository);
+
+        var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(Guid.Empty, result.OrganizationId);
+        Assert.NotEqual(Guid.Empty, result.AdminUserId);
+        Assert.Single(organizationRepository.AddedOrganizations);
+        Assert.Single(userRepository.AddedUsers);
+        Assert.Empty(auditLogRepository.AddedEntries);
     }
 }

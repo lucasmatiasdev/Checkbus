@@ -1,7 +1,9 @@
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Payments;
+using Checkbus.ApiService.Domain.Enums;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +21,7 @@ namespace Checkbus.ApiService.Application.Payments.Commands
         private readonly IMercadoPagoConnectionStateService _stateService;
         private readonly IOrganizationMercadoPagoConnectionRepository _connectionRepository;
         private readonly PublicWebOptions _publicWebOptions;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<HandleMercadoPagoOAuthCallbackCommandHandler> _logger;
 
         public HandleMercadoPagoOAuthCallbackCommandHandler(
@@ -26,12 +29,14 @@ namespace Checkbus.ApiService.Application.Payments.Commands
             IMercadoPagoConnectionStateService stateService,
             IOrganizationMercadoPagoConnectionRepository connectionRepository,
             PublicWebOptions publicWebOptions,
+            IAuditLogRepository auditLogRepository,
             ILogger<HandleMercadoPagoOAuthCallbackCommandHandler> logger)
         {
             _oauthService = oauthService;
             _stateService = stateService;
             _connectionRepository = connectionRepository;
             _publicWebOptions = publicWebOptions;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
@@ -73,7 +78,7 @@ namespace Checkbus.ApiService.Application.Payments.Commands
                 return Failure("exchange_failed");
             }
 
-            await _connectionRepository.UpsertAsync(new MercadoPagoConnection
+            var connection = new MercadoPagoConnection
             {
                 Id = Guid.NewGuid(),
                 OrganizationId = stateResult.OrganizationId,
@@ -82,7 +87,37 @@ namespace Checkbus.ApiService.Application.Payments.Commands
                 RefreshToken = tokenResult.RefreshToken,
                 ExpiresAt = tokenResult.ExpiresAt,
                 ConnectedAt = DateTime.UtcNow
-            }, cancellationToken);
+            };
+            await _connectionRepository.UpsertAsync(connection, cancellationToken);
+
+            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
+            // conexión ya persistida sigue su curso normal. Este callback anónimo de OAuth nunca
+            // conoce qué usuario autenticado inició el flujo (solo la Organización, vía State),
+            // así que no hay ActorUserId/ActorEmail reales para atribuir.
+            // Nota: esta clase no tiene una rama de "desconexión" — hoy no existe en el código
+            // ninguna operación de desconectar Mercado Pago (ni comando ni endpoint), solo
+            // conectar/reconectar vía este mismo callback (ver UpsertAsync de
+            // IOrganizationMercadoPagoConnectionRepository). Por eso solo se audita
+            // MercadoPagoConectado aquí.
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = connection.OrganizationId,
+                    ActorUserId = null,
+                    ActorEmail = string.Empty,
+                    Action = AuditAction.MercadoPagoConectado,
+                    EntityType = "MercadoPagoConnection",
+                    EntityId = connection.Id,
+                    Description = "Mercado Pago conectado",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", AuditAction.MercadoPagoConectado);
+            }
 
             return new MercadoPagoOAuthCallbackResultDto
             {

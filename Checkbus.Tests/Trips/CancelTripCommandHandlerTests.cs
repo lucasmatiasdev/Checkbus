@@ -3,6 +3,7 @@ using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.Trips.Commands;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Passengers;
 using Checkbus.ApiService.Domain.Entities.Payments;
 using Checkbus.ApiService.Domain.Entities.Refunds;
@@ -183,6 +184,28 @@ public class CancelTripCommandHandlerTests
             => throw new NotSupportedException("Not needed by CancelTripCommandHandler.");
     }
 
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelTripCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by CancelTripCommandHandler.");
+    }
+
     private sealed class FakePassengerRepository(IReadOnlyDictionary<Guid, Passenger> passengersById) : IPassengerRepository
     {
         public Task<Passenger?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -274,6 +297,7 @@ public class CancelTripCommandHandlerTests
         FakeTripRepository? tripRepository = null,
         FakeReservationRepository? reservationRepository = null,
         FakePaymentRepository? paymentRepository = null,
+        FakeAuditLogRepository? auditLogRepository = null,
         Guid? callerOrganizationId = null)
     {
         return new CancelTripCommandHandler(
@@ -287,6 +311,7 @@ public class CancelTripCommandHandlerTests
             sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
             refundRepository ?? new FakeRefundRepository(),
             new FakeCurrentUserService(callerOrganizationId ?? trip?.OrganizationId ?? Guid.NewGuid()),
+            auditLogRepository ?? new FakeAuditLogRepository(),
             NullLogger<CancelTripCommandHandler>.Instance);
     }
 
@@ -581,9 +606,40 @@ public class CancelTripCommandHandlerTests
             new FakeMercadoPagoSellerTokenResolver(),
             new FakeRefundRepository(),
             new FakeCurrentUserService(organizationId: null),
+            new FakeAuditLogRepository(),
             NullLogger<CancelTripCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(CreateCommand(trip.Id), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_WritesViajeCanceladoAuditLogEntry()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = CreateHandler(trip, auditLogRepository: auditLogRepository);
+
+        await handler.Handle(CreateCommand(trip.Id), TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.ViajeCancelado, entry.Action);
+        Assert.Equal("Trip", entry.EntityType);
+        Assert.Equal(trip.Id, entry.EntityId);
+        Assert.Equal(trip.OrganizationId, entry.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_CancellationStillSucceeds()
+    {
+        var trip = CreateTrip(DateTime.UtcNow.AddDays(10));
+        var tripRepository = new FakeTripRepository(trip);
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = CreateHandler(trip, tripRepository: tripRepository, auditLogRepository: auditLogRepository);
+
+        await handler.Handle(CreateCommand(trip.Id), TestContext.Current.CancellationToken);
+
+        Assert.Equal(TripStatus.Cancelado, tripRepository.UpdatedTrip?.Status);
+        Assert.Empty(auditLogRepository.AddedEntries);
     }
 }

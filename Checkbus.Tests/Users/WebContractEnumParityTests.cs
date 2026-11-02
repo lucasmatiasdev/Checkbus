@@ -1,5 +1,6 @@
 using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Enums;
+using Checkbus.Web.Features.Audit.Contracts;
 using Checkbus.Web.Features.Boarding.Contracts;
 using Checkbus.Web.Features.DriverRequirements.Contracts;
 using Checkbus.Web.Features.Events.Contracts;
@@ -15,7 +16,7 @@ namespace Checkbus.Tests.Users;
 /// <see cref="WebDocumentType"/>, <see cref="WebDriverRequirementType"/>,
 /// <see cref="WebDriverRequirementStatus"/>, <see cref="WebMaintenanceType"/>,
 /// <see cref="WebMaintenanceStatus"/>, <see cref="WebVehicleComponent"/>,
-/// <see cref="WebComponentCondition"/>). Checkbus.Web never references the API projects, so these
+/// <see cref="WebComponentCondition"/>, <see cref="WebAuditAction"/>). Checkbus.Web never references the API projects, so these
 /// enums are hand-duplicated; this test walks the real domain enums via reflection and asserts
 /// every member has a same-named counterpart with an identical underlying numeric value on the
 /// web side, catching future additions, removals, or renumbering on either side.
@@ -98,6 +99,12 @@ public class WebContractEnumParityTests
     public void WebValidationMethod_StaysNumericallyInSyncWith_RealValidationMethod()
     {
         AssertEnumParity<ValidationMethod, WebValidationMethod>();
+    }
+
+    [Fact]
+    public void WebAuditAction_StaysNumericallyInSyncWith_RealAuditAction()
+    {
+        AssertEnumParity<AuditAction, WebAuditAction>();
     }
 
     private static void AssertEnumParity<TReal, TWeb>()

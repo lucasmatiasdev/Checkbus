@@ -1,6 +1,7 @@
 using Checkbus.Web;
 using Checkbus.Web.Components;
 using Checkbus.Web.Extensions;
+using Checkbus.Web.Features.Audit.Services;
 using Checkbus.Web.Features.Boarding.Services;
 using Checkbus.Web.Features.DriverRequirements.Services;
 using Checkbus.Web.Features.Events.Services;
@@ -64,6 +65,9 @@ builder.Services.AddScoped<VehiclesClient>();
 builder.Services.AddScoped<VehicleDocumentsClient>();
 builder.Services.AddScoped<SupportTicketsClient>();
 builder.Services.AddScoped<SupportTicketsAdminClient>();
+builder.Services.AddScoped<AuditLogClient>();
+builder.Services.AddScoped<OrganizationsClient>();
+builder.Services.AddScoped<UsersByOrganizationClient>();
 builder.Services.AddScoped<MaintenanceRecordsClient>();
 builder.Services.AddScoped<VehicleDiagnosticsClient>();
 builder.Services.AddScoped<EventsClient>();

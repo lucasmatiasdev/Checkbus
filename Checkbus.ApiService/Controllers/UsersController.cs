@@ -36,5 +36,18 @@ namespace Checkbus.ApiService.Controllers
             var result = await _mediator.Send(new GetUsersQuery(), cancellationToken);
             return Ok(result);
         }
+
+        // CU-16 (odd/tasks/auditoria-sistema.md T4) — [Usuario] dropdown for the audit screen
+        // after a CheckbusSoporte caller picks an Organization. Deliberately a separate action/
+        // query from GetUsers above (anti-IDOR): the organizationId here is the TARGET being
+        // browsed, not the caller's own, so it is CheckbusSoporte-only with its own
+        // defense-in-depth re-check in the handler.
+        [Authorize(Roles = "CheckbusSoporte")]
+        [HttpGet("by-organization/{organizationId:guid}")]
+        public async Task<IActionResult> GetUsersByOrganization(Guid organizationId, CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetUsersByOrganizationQuery { OrganizationId = organizationId }, cancellationToken);
+            return Ok(result);
+        }
     }
 }

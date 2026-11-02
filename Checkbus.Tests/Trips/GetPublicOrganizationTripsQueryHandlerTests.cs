@@ -38,6 +38,9 @@ public class GetPublicOrganizationTripsQueryHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicOrganizationTripsQueryHandler.");
     }
 
     private sealed class FakeTripRepository(IReadOnlyList<Trip> trips) : ITripRepository

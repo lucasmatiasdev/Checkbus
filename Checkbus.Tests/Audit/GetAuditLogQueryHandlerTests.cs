@@ -46,6 +46,9 @@ public class GetAuditLogQueryHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetAuditLogQueryHandler.");
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAuditLogQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId, string? role) : ICurrentUserService

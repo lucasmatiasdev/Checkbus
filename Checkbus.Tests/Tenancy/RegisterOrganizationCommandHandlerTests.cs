@@ -89,6 +89,9 @@ public class RegisterOrganizationCommandHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => Task.FromResult(ExistingSlugs.Contains(slug));
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by RegisterOrganizationCommandHandler.");
     }
 
     private sealed class FakePasswordHasher : IPasswordHasher

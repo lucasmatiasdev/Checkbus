@@ -58,6 +58,9 @@ public class UpdateSupportTicketStatusCommandHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by UpdateSupportTicketStatusCommandHandler.");
     }
 
     private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository

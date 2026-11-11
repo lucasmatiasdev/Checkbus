@@ -722,6 +722,12 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<double?>("CurrentLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("CurrentLongitude")
+                        .HasColumnType("double precision");
+
                     b.Property<DateTime>("DepartureDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -730,6 +736,12 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("LiveTrackingEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LocationUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Observations")
                         .HasColumnType("text");

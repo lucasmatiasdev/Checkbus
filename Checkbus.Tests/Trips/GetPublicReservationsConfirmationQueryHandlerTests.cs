@@ -259,6 +259,7 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
         Assert.Equal(nameof(ReservationStatus.Confirmada), dto.Status);
         Assert.Equal(fixture.Event.Name, dto.EventName);
         Assert.Equal(fixture.Trip.DepartureDate, dto.DepartureDate);
+        Assert.Equal(fixture.Trip.Id, dto.TripId);
     }
 
     [Fact]

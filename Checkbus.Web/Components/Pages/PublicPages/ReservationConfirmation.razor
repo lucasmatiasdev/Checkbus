@@ -1,6 +1,7 @@
 @page "/reservas/confirmacion/{reservationIds}"
 @layout LandingLayout
 @attribute [AllowAnonymous]
+@using Checkbus.Web.Components.Maps
 @using Checkbus.Web.Features.PublicReservations.Contracts
 @using Checkbus.Web.Features.PublicReservations.Services
 @* This .razor file's own generated page class is also named "ReservationConfirmation" (same
@@ -109,6 +110,14 @@
                             </MudItem>
                         }
                     </MudGrid>
+
+                    @* DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md S4) — only while the
+                       trip is actually in progress; LiveLocationMap itself still renders nothing
+                       if the driver hasn't turned tracking on. *@
+                    @if (reservation.TripStatus == EnCursoTripStatus)
+                    {
+                        <LiveLocationMap TripId="@reservation.TripId" />
+                    }
                 }
 
                 @if (reservation.Status == ConfirmadaStatus)
@@ -173,6 +182,11 @@
     private const string CanceladaStatus = "Cancelada";
     private const string ConfirmadaStatus = "Confirmada";
     private const string PendientePagoStatus = "PendientePago";
+
+    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md S4) — reservation.TripStatus's plain
+    // string value for Trip.Status == EnProceso (see GetPublicReservationsConfirmationQueryHandler),
+    // gating the live-tracking map below.
+    private const string EnCursoTripStatus = "En curso";
 
     private ReservationsConfirmationResponse? confirmation;
 

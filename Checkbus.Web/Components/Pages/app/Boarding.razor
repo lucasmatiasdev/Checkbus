@@ -1,5 +1,6 @@
 @page "/my-trips/{TripId:guid}/boarding"
 @attribute [Authorize(Roles = "Chofer")]
+@implements IAsyncDisposable
 @using Checkbus.Web.Features.Boarding.Contracts
 @using Checkbus.Web.Features.Boarding.Models
 @using Checkbus.Web.Features.Boarding.Services
@@ -31,6 +32,23 @@
     {
         <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
     }
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <div>
+                <MudText Typo="Typo.h6">Activar seguimiento en tiempo real (demo)</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Comparte la ubicación de este dispositivo en vivo mientras el viaje está en curso.
+                    Funcionalidad de demostración, no es un sistema de GPS de producción.
+                </MudText>
+            </div>
+            <MudSwitch T="bool"
+                       Value="liveTrackingEnabled"
+                       ValueChanged="HandleLiveTrackingToggledAsync"
+                       Color="Color.Primary"
+                       Disabled="@isTogglingLiveTracking" />
+        </MudStack>
+    </MudPaper>
 
     <MudPaper Elevation="2" Class="pa-6 mb-6">
         <MudText Typo="Typo.h6" Class="mb-4">Validar por código</MudText>
@@ -112,6 +130,20 @@
 
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md): client-side floor on how often a
+    // received Geolocation position is relayed to the backend — watchPosition can fire far more
+    // often than this demo needs, and the throttle itself lives in Boarding.razor.js.
+    private const string LiveTrackingModuleImportPath = "./Components/Pages/app/Boarding.razor.js";
+    private const int LiveTrackingMinIntervalMs = 7000;
+
+    private IJSObjectReference? _liveTrackingModule;
+    private DotNetObjectReference<Boarding>? _liveTrackingDotNetRef;
+    private bool liveTrackingEnabled;
+    private bool isTogglingLiveTracking;
 
     private IReadOnlyList<BoardingPassengerResponse> allPassengers = [];
     private IReadOnlyList<BoardingPassengerResponse> filteredPassengers = [];
@@ -282,6 +314,146 @@
         finally
         {
             isClosing = false;
+        }
+    }
+
+    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — the switch calls the toggle
+    // endpoint and, only once the backend confirms it's on, starts the browser's
+    // watchPosition. Any failure (backend rejects the toggle, geolocation permission denied,
+    // a later location POST fails) turns the switch back off instead of leaving it "on" while
+    // nothing is actually being sent.
+    private async Task HandleLiveTrackingToggledAsync(bool enabled)
+    {
+        if (isTogglingLiveTracking)
+        {
+            return;
+        }
+
+        isTogglingLiveTracking = true;
+        try
+        {
+            if (enabled)
+            {
+                var outcome = await BoardingClient.ToggleLiveTrackingAsync(TripId, enabled: true);
+                if (outcome is not BoardingActionOutcome.Success)
+                {
+                    Snackbar.Add(DescribeLiveTrackingError(outcome), Severity.Error);
+                    liveTrackingEnabled = false;
+                    return;
+                }
+
+                liveTrackingEnabled = true;
+
+                _liveTrackingModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", LiveTrackingModuleImportPath);
+                _liveTrackingDotNetRef ??= DotNetObjectReference.Create(this);
+
+                await _liveTrackingModule.InvokeVoidAsync(
+                    "startWatching", _liveTrackingDotNetRef, LiveTrackingMinIntervalMs);
+            }
+            else
+            {
+                await StopLiveTrackingAsync(notifyBackend: true);
+            }
+        }
+        finally
+        {
+            isTogglingLiveTracking = false;
+        }
+    }
+
+    /// <summary>Invoked from JS for every throttled position received from watchPosition.</summary>
+    [JSInvokable]
+    public async Task OnPositionReceived(double latitude, double longitude)
+    {
+        if (!liveTrackingEnabled)
+        {
+            return;
+        }
+
+        var outcome = await BoardingClient.UpdateLocationAsync(TripId, latitude, longitude);
+        if (outcome is not BoardingActionOutcome.Success)
+        {
+            Snackbar.Add(DescribeLiveTrackingError(outcome), Severity.Error);
+            await StopLiveTrackingAsync(notifyBackend: true);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>Invoked from JS when the browser denies/fails the Geolocation permission.</summary>
+    [JSInvokable]
+    public async Task OnGeolocationError(string message)
+    {
+        Snackbar.Add($"Seguimiento en tiempo real desactivado: {message}", Severity.Error);
+        await StopLiveTrackingAsync(notifyBackend: true);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Stops the JS watcher (idempotent, safe even if nothing is being watched) and, best-effort,
+    // turns the backend toggle off. notifyBackend is skipped from DisposeAsync's no-op path (the
+    // switch was already off) but used everywhere else, including the destroy path where the
+    // backend call is genuinely best-effort per S4/T3 — a failure there is not shown to the user,
+    // there is no screen left to show it on.
+    private async Task StopLiveTrackingAsync(bool notifyBackend)
+    {
+        liveTrackingEnabled = false;
+
+        if (_liveTrackingModule is not null)
+        {
+            try
+            {
+                await _liveTrackingModule.InvokeVoidAsync("stopWatching");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already torn down (e.g. the user navigated away) — nothing left to
+                // clean up client-side.
+            }
+        }
+
+        if (notifyBackend)
+        {
+            await BoardingClient.ToggleLiveTrackingAsync(TripId, enabled: false);
+        }
+    }
+
+    private static string DescribeLiveTrackingError(BoardingActionOutcome outcome) => outcome switch
+    {
+        BoardingActionOutcome.ValidationFailed validationFailed =>
+            string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages)),
+        BoardingActionOutcome.NotFound => "Este viaje no existe o no te pertenece.",
+        BoardingActionOutcome.Conflict conflict => conflict.Message,
+        BoardingActionOutcome.TransportError transportError => transportError.Message,
+        _ => "No se pudo actualizar el seguimiento en tiempo real."
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (liveTrackingEnabled)
+        {
+            await StopLiveTrackingAsync(notifyBackend: true);
+        }
+        else if (_liveTrackingModule is not null)
+        {
+            try
+            {
+                await _liveTrackingModule.InvokeVoidAsync("stopWatching");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        _liveTrackingDotNetRef?.Dispose();
+
+        if (_liveTrackingModule is not null)
+        {
+            try
+            {
+                await _liveTrackingModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
         }
     }
 

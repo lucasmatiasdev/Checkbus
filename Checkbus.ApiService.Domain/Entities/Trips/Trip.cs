@@ -36,6 +36,15 @@ namespace Checkbus.ApiService.Domain.Entities.Trips
         public DateTime? ActualArrivalDate { get; set; }
         public string? Observations { get; set; }
 
+        // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — explicit, scoped exception to
+        // the real business decision in notes/casos-de-uso-adaptacion.md ("no se construye GPS
+        // real"). The driver's own device posts its browser Geolocation position while this is
+        // true; only the latest point is kept, never a route history/trail.
+        public bool LiveTrackingEnabled { get; set; }
+        public double? CurrentLatitude { get; set; }
+        public double? CurrentLongitude { get; set; }
+        public DateTime? LocationUpdatedAt { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

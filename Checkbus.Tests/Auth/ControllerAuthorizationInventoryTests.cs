@@ -46,6 +46,6 @@ public class ControllerAuthorizationInventoryTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["AuthController.Login", "MercadoPagoOAuthCallbackController.Callback", "PaymentsWebhookController.Receive", "PublicOrganizationsController.GetTrips", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetSeatMap", "PublicTripsController.ResolveSlug", "SimulatedCheckoutController.Approve", "SimulatedCheckoutController.Reject", "SimulatedCheckoutController.Show"], anonymousActions);
+        Assert.Equal(["AuthController.Login", "MercadoPagoOAuthCallbackController.Callback", "PaymentsWebhookController.Receive", "PublicOrganizationsController.GetTrips", "PublicReservationsController.Cancel", "PublicReservationsController.GetConfirmation", "PublicTripsController.CreateReservation", "PublicTripsController.GetDetails", "PublicTripsController.GetEventImage", "PublicTripsController.GetLocation", "PublicTripsController.GetSeatMap", "PublicTripsController.ResolveSlug", "SimulatedCheckoutController.Approve", "SimulatedCheckoutController.Reject", "SimulatedCheckoutController.Show"], anonymousActions);
     }
 }

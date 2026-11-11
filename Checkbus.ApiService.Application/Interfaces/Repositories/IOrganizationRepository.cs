@@ -28,5 +28,10 @@ namespace Checkbus.ApiService.Application.Interfaces.Repositories
         // per-organization) — a CUIT or Slug belongs to exactly one Organization system-wide.
         Task<bool> CuitExistsAsync(string cuit, CancellationToken cancellationToken);
         Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken);
+
+        // Added for CU-16 (odd/tasks/auditoria-sistema.md T4) — cross-tenant listing for the
+        // audit screen's [Organización] dropdown, callers must verify the sentinel-organization
+        // check in Application before using this, same caveat as ISupportTicketRepository.GetAllAsync.
+        Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken);
     }
 }

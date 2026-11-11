@@ -55,5 +55,12 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         {
             return _context.Organizations.AnyAsync(o => o.Slug == slug, cancellationToken);
         }
+
+        public async Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+        {
+            return await _context.Organizations
+                .OrderBy(o => o.Name)
+                .ToListAsync(cancellationToken);
+        }
     }
 }

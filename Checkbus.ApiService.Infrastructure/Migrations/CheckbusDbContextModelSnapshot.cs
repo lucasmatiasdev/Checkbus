@@ -22,6 +22,51 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Audit.AuditLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("AuditLogEntries");
+                });
+
             modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Authentication.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -970,6 +1015,17 @@ namespace Checkbus.ApiService.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProcessedWebhookEvents");
+                });
+
+            modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Audit.AuditLogEntry", b =>
+                {
+                    b.HasOne("Checkbus.ApiService.Domain.Entities.Authentication.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId");
+
+                    b.HasOne("Checkbus.ApiService.Domain.Entities.Tenancy.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId");
                 });
 
             modelBuilder.Entity("Checkbus.ApiService.Domain.Entities.Authentication.User", b =>

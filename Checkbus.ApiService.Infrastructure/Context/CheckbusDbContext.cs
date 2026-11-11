@@ -1,3 +1,4 @@
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.BoardingRecords;
 using Checkbus.ApiService.Domain.Entities.Documents;
@@ -54,6 +55,9 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         // Fase D (odd/tasks/pagos-mercadopago.md) — Infrastructure-only EF-mapped class with no
         // Domain/business meaning, see its own doc comment for why.
         public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+
+        // CU-16 (odd/tasks/auditoria-sistema.md) — append-only audit trail, never updated.
+        public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -357,6 +361,24 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<User>()
                     .WithMany()
                     .HasForeignKey(x => x.CreatedByUserId);
+            });
+
+            modelBuilder.Entity<AuditLogEntry>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Action).HasConversion<string>();
+                // OrganizationId/ActorUserId are optional FKs (CU-16): a failed login attempt
+                // with an unknown email has no Organization/User row to attribute.
+                entity.HasOne<Organization>()
+                    .WithMany()
+                    .HasForeignKey(x => x.OrganizationId)
+                    .IsRequired(false);
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ActorUserId)
+                    .IsRequired(false);
+                // Every search in the main flow is scoped by date range first.
+                entity.HasIndex(x => x.CreatedAt);
             });
         }
     }

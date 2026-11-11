@@ -74,6 +74,12 @@
                     Registrar organización
                 </MudNavLink>
             </AuthorizeView>
+            <AuthorizeView Roles="Administrador,CheckbusSoporte">
+                <MudNavLink Href="/auditoria" Match="NavLinkMatch.All">
+                    <MudIcon Icon="@Icons.Material.Filled.History" />
+                    Auditoría
+                </MudNavLink>
+            </AuthorizeView>
         </MudNavMenu>
         <form method="post" action="/logout" data-enhance="false" class="mt-auto pa-4">
             <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Logout">

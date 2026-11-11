@@ -51,6 +51,9 @@ public class GetAllSupportTicketsQueryHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetAllSupportTicketsQueryHandler.");
     }
 
     private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService

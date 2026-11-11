@@ -1,0 +1,277 @@
+@page "/auditoria"
+@attribute [Authorize(Roles = "Administrador,CheckbusSoporte")]
+@using Checkbus.Web.Features.Audit.Contracts
+@using Checkbus.Web.Features.Audit.Services
+@using Checkbus.Web.Features.Organizations.Contracts
+@using Checkbus.Web.Features.Organizations.Services
+@using Checkbus.Web.Features.Users.Contracts
+@using Checkbus.Web.Features.Users.Services
+
+<PageTitle>Checkbus - Auditoría</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold mb-6">
+        Auditoría
+    </MudText>
+
+    @if (errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" md="@(isCheckbusSoporte ? 2 : 3)">
+                <MudDatePicker Label="Desde" @bind-Date="filterDateFrom" />
+            </MudItem>
+            <MudItem xs="12" md="@(isCheckbusSoporte ? 2 : 3)">
+                <MudDatePicker Label="Hasta" @bind-Date="filterDateTo" />
+            </MudItem>
+            <MudItem xs="12" md="@(isCheckbusSoporte ? 2 : 3)">
+                <MudSelect T="WebAuditAction?" @bind-Value="filterAction" Label="Acción" Variant="Variant.Outlined">
+                    <MudSelectItem T="WebAuditAction?" Value="@((WebAuditAction?)null)">Todas las acciones</MudSelectItem>
+                    @foreach (var action in ActionValues)
+                    {
+                        <MudSelectItem T="WebAuditAction?" Value="@((WebAuditAction?)action)">@GetActionLabel(action)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            @if (isCheckbusSoporte)
+            {
+                <MudItem xs="12" md="3">
+                    <MudSelect T="Guid?"
+                               Value="filterOrganizationId"
+                               ValueChanged="@((Guid? value) => HandleOrganizationChangedAsync(value))"
+                               Label="Organización"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">Todas las organizaciones</MudSelectItem>
+                        @foreach (var organization in organizations)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)organization.Id)">@organization.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            <MudItem xs="12" md="@(isCheckbusSoporte ? 3 : 3)">
+                <MudSelect T="Guid?"
+                           @bind-Value="filterActorUserId"
+                           Label="Usuario"
+                           Variant="Variant.Outlined"
+                           Disabled="@(isCheckbusSoporte && filterOrganizationId is null)">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Todos los usuarios</MudSelectItem>
+                    @foreach (var user in availableUsers)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)user.Id)">@($"{user.Name} {user.Surname}")</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => LoadAuditLogAsync())">
+                Buscar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFiltersAsync">
+                Limpiar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="my-4" />
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudDataGrid T="AuditLogResponse" Items="@entries">
+                <Columns>
+                    <TemplateColumn Title="Fecha">
+                        <CellTemplate>
+                            @context.Item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.ActorEmail" Title="Usuario" />
+                    <TemplateColumn Title="Acción">
+                        <CellTemplate>
+                            @GetActionLabel(context.Item.Action)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Entidad afectada">
+                        <CellTemplate>
+                            @FormatEntity(context.Item)
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Description" Title="Descripción" />
+                </Columns>
+            </MudDataGrid>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private static readonly WebAuditAction[] ActionValues = Enum.GetValues<WebAuditAction>();
+
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = default!;
+
+    [Inject]
+    private AuditLogClient AuditLogClient { get; set; } = default!;
+
+    [Inject]
+    private OrganizationsClient OrganizationsClient { get; set; } = default!;
+
+    [Inject]
+    private UsersClient UsersClient { get; set; } = default!;
+
+    [Inject]
+    private UsersByOrganizationClient UsersByOrganizationClient { get; set; } = default!;
+
+    private bool isCheckbusSoporte;
+    private IReadOnlyList<AuditLogResponse> entries = [];
+    private IReadOnlyList<OrganizationListItemResponse> organizations = [];
+    private IReadOnlyList<UserListItemResponse> availableUsers = [];
+    private DateTime? filterDateFrom;
+    private DateTime? filterDateTo;
+    private WebAuditAction? filterAction;
+    private Guid? filterActorUserId;
+    private Guid? filterOrganizationId;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Same "auth/me" lookup Dashboard.razor already uses to branch UI by role — CU-16 step 8
+        // only shows [Organización] (and only lets [Usuario] list a chosen organization's users)
+        // when the authenticated caller's role is CheckbusSoporte.
+        var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
+        CurrentUserResponse? currentUser = null;
+        try
+        {
+            currentUser = await httpClient.GetFromJsonAsync<CurrentUserResponse>("auth/me");
+        }
+        catch (Exception)
+        {
+            // Swallowed: a failure here still surfaces to the user below, because the audit log
+            // load that follows unconditionally needs the same "apiservice" connectivity and will
+            // fail the same way, triggering FA1's fixed error message.
+        }
+
+        isCheckbusSoporte = currentUser?.Role == "CheckbusSoporte";
+
+        if (isCheckbusSoporte)
+        {
+            var organizationsOutcome = await OrganizationsClient.GetAllAsync();
+            organizations = organizationsOutcome is OrganizationsListOutcome.Success success
+                ? success.Organizations
+                : [];
+            // [Usuario] has no "every organization's users" endpoint to back it (CU-16 doesn't
+            // ask for one), so it starts disabled/empty until a specific organization is chosen —
+            // see HandleOrganizationChangedAsync.
+        }
+        else
+        {
+            var usersOutcome = await UsersClient.GetUsersAsync();
+            availableUsers = usersOutcome is UsersListOutcome.Success success ? success.Users : [];
+        }
+
+        await LoadAuditLogAsync();
+    }
+
+    private async Task HandleOrganizationChangedAsync(Guid? newOrganizationId)
+    {
+        filterOrganizationId = newOrganizationId;
+
+        if (newOrganizationId is null)
+        {
+            availableUsers = [];
+            filterActorUserId = null;
+            return;
+        }
+
+        var outcome = await UsersByOrganizationClient.GetUsersByOrganizationAsync(newOrganizationId.Value);
+        availableUsers = outcome is UsersListOutcome.Success success ? success.Users : [];
+
+        // CU-16 step 10: if the previously selected [Usuario] doesn't belong to the newly chosen
+        // organization, reset it back to "Todos los usuarios".
+        if (filterActorUserId is not null && !availableUsers.Any(u => u.Id == filterActorUserId))
+        {
+            filterActorUserId = null;
+        }
+    }
+
+    private async Task LoadAuditLogAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // "Hasta" compares directly against AuditLogEntry.CreatedAt (a precise timestamp) on
+            // the API side, not a date-only column, so the date the user picked must be pushed to
+            // the end of that day — otherwise anything after midnight on the selected "Hasta" day
+            // would be silently excluded.
+            var dateToInclusive = filterDateTo?.Date.AddDays(1).AddTicks(-1);
+
+            var outcome = await AuditLogClient.GetAuditLogAsync(
+                filterDateFrom,
+                dateToInclusive,
+                filterAction,
+                filterActorUserId,
+                isCheckbusSoporte ? filterOrganizationId : null);
+
+            switch (outcome)
+            {
+                case AuditLogListOutcome.Success success:
+                    // FA2: an empty result is rendered as-is, no extra message — MudDataGrid
+                    // already renders an empty body for an empty Items list.
+                    entries = success.Entries;
+                    errorMessage = null;
+                    break;
+
+                case AuditLogListOutcome.Forbidden:
+                case AuditLogListOutcome.TransportError:
+                    // FA1: fixed message, regardless of which of the two caused it.
+                    errorMessage = "No pudimos cargar la auditoría.";
+                    break;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        // FA3: empties every filter and reloads the full scope table determined by the caller's
+        // role, same as the initial OnInitializedAsync load.
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterAction = null;
+        filterActorUserId = null;
+
+        if (isCheckbusSoporte)
+        {
+            filterOrganizationId = null;
+            availableUsers = [];
+        }
+
+        await LoadAuditLogAsync();
+    }
+
+    private static string FormatEntity(AuditLogResponse entry)
+        => $"{entry.EntityType} ({entry.EntityId.ToString()[..8]})";
+
+    private static string GetActionLabel(WebAuditAction action) => action switch
+    {
+        WebAuditAction.LoginExitoso => "Inicio de sesión exitoso",
+        WebAuditAction.LoginFallido => "Inicio de sesión fallido",
+        WebAuditAction.ViajeCancelado => "Viaje cancelado",
+        WebAuditAction.ViajeIniciado => "Viaje iniciado",
+        WebAuditAction.ViajeFinalizado => "Viaje finalizado",
+        WebAuditAction.DocumentoVehiculoValidado => "Documento de vehículo validado",
+        WebAuditAction.EstadoTicketSoporteCambiado => "Estado de ticket de soporte cambiado",
+        WebAuditAction.MercadoPagoConectado => "Mercado Pago conectado",
+        WebAuditAction.MercadoPagoDesconectado => "Mercado Pago desconectado",
+        WebAuditAction.OrganizacionRegistrada => "Organización registrada",
+        _ => action.ToString()
+    };
+}

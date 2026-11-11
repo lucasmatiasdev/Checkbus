@@ -1,4 +1,5 @@
 using Checkbus.ApiService.Application.Tenancy.Commands;
+using Checkbus.ApiService.Application.Tenancy.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,16 @@ namespace Checkbus.ApiService.Controllers
         {
             var result = await _mediator.Send(command, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
+        }
+
+        // CU-16 (odd/tasks/auditoria-sistema.md T4) — [Organización] dropdown for the audit
+        // screen, CheckbusSoporte only (defense in depth re-validated in the handler).
+        [Authorize(Roles = "CheckbusSoporte")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+        {
+            var result = await _mediator.Send(new GetOrganizationsQuery(), cancellationToken);
+            return Ok(result);
         }
     }
 }

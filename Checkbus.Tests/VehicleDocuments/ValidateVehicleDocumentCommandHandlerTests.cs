@@ -1,9 +1,11 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Application.VehicleDocuments.Commands;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Vehicles;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.VehicleDocuments;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Checkbus.Tests.VehicleDocuments;
 
@@ -50,6 +52,28 @@ public class ValidateVehicleDocumentCommandHandlerTests
 
         public Task<bool> DocumentNumberExistsAsync(
             Guid organizationId, VehicleDocumentType type, string documentNumber, Guid excludeVehicleId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ValidateVehicleDocumentCommandHandler.");
+    }
+
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by ValidateVehicleDocumentCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by ValidateVehicleDocumentCommandHandler.");
     }
 
@@ -104,7 +128,8 @@ public class ValidateVehicleDocumentCommandHandlerTests
         var document = CreateDocument(vehicle.Id, VehicleDocumentType.Seguro);
         var repository = new FakeVehicleDocumentRepository { Documents = [document] };
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId));
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await handler.Handle(CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved), TestContext.Current.CancellationToken);
 
@@ -121,7 +146,8 @@ public class ValidateVehicleDocumentCommandHandlerTests
         var document = CreateDocument(vehicle.Id, VehicleDocumentType.Seguro);
         var repository = new FakeVehicleDocumentRepository { Documents = [document] };
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId, callerUserId));
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId, callerUserId),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await handler.Handle(
             CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken);
@@ -136,7 +162,8 @@ public class ValidateVehicleDocumentCommandHandlerTests
         var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
         var repository = new FakeVehicleDocumentRepository();
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(Guid.NewGuid()));
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(Guid.NewGuid()),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<VehicleNotFoundException>(() => handler.Handle(
             CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken));
@@ -149,7 +176,8 @@ public class ValidateVehicleDocumentCommandHandlerTests
     {
         var repository = new FakeVehicleDocumentRepository();
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle: null), repository, new FakeCurrentUserService(Guid.NewGuid()));
+            new FakeVehicleRepository(vehicle: null), repository, new FakeCurrentUserService(Guid.NewGuid()),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<VehicleNotFoundException>(() => handler.Handle(
             CreateCommand(Guid.NewGuid(), VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken));
@@ -165,7 +193,8 @@ public class ValidateVehicleDocumentCommandHandlerTests
         var vehicle = CreateVehicle(organizationId);
         var repository = new FakeVehicleDocumentRepository(); // no rows at all
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId));
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<VehicleDocumentNotFoundException>(() => handler.Handle(
             CreateCommand(vehicle.Id, VehicleDocumentType.TituloPropiedad, approved: true), TestContext.Current.CancellationToken));
@@ -178,9 +207,52 @@ public class ValidateVehicleDocumentCommandHandlerTests
     {
         var repository = new FakeVehicleDocumentRepository();
         var handler = new ValidateVehicleDocumentCommandHandler(
-            new FakeVehicleRepository(vehicle: null), repository, new FakeCurrentUserService(organizationId: null));
+            new FakeVehicleRepository(vehicle: null), repository, new FakeCurrentUserService(organizationId: null),
+            new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
             CreateCommand(Guid.NewGuid(), VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_ExistingRow_WritesDocumentoVehiculoValidadoAuditLogEntry()
+    {
+        var organizationId = Guid.NewGuid();
+        var vehicle = CreateVehicle(organizationId);
+        var document = CreateDocument(vehicle.Id, VehicleDocumentType.Seguro);
+        var repository = new FakeVehicleDocumentRepository { Documents = [document] };
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = new ValidateVehicleDocumentCommandHandler(
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId),
+            auditLogRepository, NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
+
+        await handler.Handle(
+            CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.DocumentoVehiculoValidado, entry.Action);
+        Assert.Equal("VehicleDocument", entry.EntityType);
+        Assert.Equal(document.Id, entry.EntityId);
+        Assert.Equal(organizationId, entry.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_ValidationStillSucceeds()
+    {
+        var organizationId = Guid.NewGuid();
+        var vehicle = CreateVehicle(organizationId);
+        var document = CreateDocument(vehicle.Id, VehicleDocumentType.Seguro);
+        var repository = new FakeVehicleDocumentRepository { Documents = [document] };
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = new ValidateVehicleDocumentCommandHandler(
+            new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId),
+            auditLogRepository, NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);
+
+        await handler.Handle(
+            CreateCommand(vehicle.Id, VehicleDocumentType.Seguro, approved: true), TestContext.Current.CancellationToken);
+
+        var updated = Assert.Single(repository.UpdatedDocuments);
+        Assert.Equal(VehicleDocumentStatus.Apto, updated.Status);
+        Assert.Empty(auditLogRepository.AddedEntries);
     }
 }

@@ -2,8 +2,10 @@ using Checkbus.ApiService.Application.Auth.Commands;
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
 using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Authentication;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
+using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -93,6 +95,28 @@ public class LoginCommandHandlerTests
         }
     }
 
+    private sealed class FakeAuditLogRepository(bool throwOnAdd = false) : IAuditLogRepository
+    {
+        public List<AuditLogEntry> AddedEntries { get; } = [];
+
+        public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
+        {
+            if (throwOnAdd)
+            {
+                throw new InvalidOperationException("Simulated audit log write failure.");
+            }
+
+            AddedEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+
+        public Task<IReadOnlyList<AuditLogEntry>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by LoginCommandHandler.");
+    }
+
     private sealed record LogEntry(LogLevel Level, IReadOnlyDictionary<string, object?> Fields);
 
     private sealed class FakeLogger<T> : ILogger<T>
@@ -116,6 +140,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user: null),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
 
@@ -130,6 +155,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(CreateUser()),
             new FakePasswordHasher(verifyResult: false),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
 
@@ -144,6 +170,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(CreateUser(isActive: false)),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -159,6 +186,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -175,6 +203,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -196,6 +225,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -215,6 +245,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -232,6 +263,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             jwtGenerator,
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -255,6 +287,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
         var beforeLogin = DateTime.UtcNow;
@@ -278,6 +311,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: false),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
 
@@ -298,6 +332,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: false),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
         var beforeAttempt = DateTime.UtcNow;
@@ -323,6 +358,7 @@ public class LoginCommandHandlerTests
             userRepository,
             passwordHasher,
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -343,6 +379,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -362,6 +399,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
 
@@ -379,6 +417,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: false),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
 
@@ -398,6 +437,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -415,6 +455,7 @@ public class LoginCommandHandlerTests
             userRepository,
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -434,6 +475,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             jwtGenerator,
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -454,6 +496,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user: null),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
 
@@ -475,6 +518,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -497,6 +541,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: false),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
 
@@ -520,6 +565,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             new FakeJwtGenerator(),
+            new FakeAuditLogRepository(),
             NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -538,6 +584,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(user),
             new FakePasswordHasher(verifyResult: true),
             jwtGenerator,
+            new FakeAuditLogRepository(),
             logger);
         var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
 
@@ -561,5 +608,113 @@ public class LoginCommandHandlerTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public async Task Handle_ValidCredentials_WritesLoginExitosoAuditLogEntry()
+    {
+        var user = CreateUser(organization: CreateOrganization());
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            auditLogRepository,
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.LoginExitoso, entry.Action);
+        Assert.Equal("User", entry.EntityType);
+        Assert.Equal(user.Id, entry.EntityId);
+        Assert.Equal(user.Id, entry.ActorUserId);
+        Assert.Equal(user.Email, entry.ActorEmail);
+        Assert.Equal(user.OrganizationId, entry.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownEmail_WritesLoginFallidoAuditLogEntryWithoutUserOrOrganization()
+    {
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user: null),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            auditLogRepository,
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.LoginFallido, entry.Action);
+        Assert.Equal("User", entry.EntityType);
+        Assert.Equal(Guid.Empty, entry.EntityId);
+        Assert.Null(entry.ActorUserId);
+        Assert.Null(entry.OrganizationId);
+        Assert.Equal(command.Email, entry.ActorEmail);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_WritesLoginFallidoAuditLogEntryWithUserId()
+    {
+        var user = CreateUser();
+        var auditLogRepository = new FakeAuditLogRepository();
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: false),
+            new FakeJwtGenerator(),
+            auditLogRepository,
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "wrong-password" };
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
+
+        var entry = Assert.Single(auditLogRepository.AddedEntries);
+        Assert.Equal(AuditAction.LoginFallido, entry.Action);
+        Assert.Equal(user.Id, entry.ActorUserId);
+        Assert.Equal(user.Email, entry.ActorEmail);
+        Assert.Equal(user.OrganizationId, entry.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_LoginStillSucceeds()
+    {
+        var user = CreateUser(organization: CreateOrganization());
+        var jwtGenerator = new FakeJwtGenerator();
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user),
+            new FakePasswordHasher(verifyResult: true),
+            jwtGenerator,
+            auditLogRepository,
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "jdoe@example.com", Password = "password123" };
+
+        var result = await handler.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(user.Id, result.UserId);
+        Assert.Equal("fake-jwt-token", result.Token);
+        Assert.Empty(auditLogRepository.AddedEntries);
+    }
+
+    [Fact]
+    public async Task Handle_AuditLogWriteFails_UserNotFoundFailureStillThrows()
+    {
+        var auditLogRepository = new FakeAuditLogRepository(throwOnAdd: true);
+        var handler = new LoginCommandHandler(
+            new FakeUserRepository(user: null),
+            new FakePasswordHasher(verifyResult: true),
+            new FakeJwtGenerator(),
+            auditLogRepository,
+            NullLogger<LoginCommandHandler>.Instance);
+        var command = new LoginCommand { Email = "missing@example.com", Password = "password123" };
+
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => handler.Handle(command, TestContext.Current.CancellationToken));
     }
 }

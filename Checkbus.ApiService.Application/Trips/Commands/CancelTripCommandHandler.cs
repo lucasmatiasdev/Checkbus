@@ -2,6 +2,7 @@ using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Payments;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Entities.Refunds;
 using Checkbus.ApiService.Domain.Entities.Reservations;
 using Checkbus.ApiService.Domain.Enums;
@@ -35,6 +36,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly IMercadoPagoSellerTokenResolver _sellerTokenResolver;
         private readonly IRefundRepository _refundRepository;
         private readonly ICurrentUserService _currentUser;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<CancelTripCommandHandler> _logger;
 
         public CancelTripCommandHandler(
@@ -48,6 +50,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             IMercadoPagoSellerTokenResolver sellerTokenResolver,
             IRefundRepository refundRepository,
             ICurrentUserService currentUser,
+            IAuditLogRepository auditLogRepository,
             ILogger<CancelTripCommandHandler> logger)
         {
             _tripRepository = tripRepository;
@@ -60,6 +63,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _sellerTokenResolver = sellerTokenResolver;
             _refundRepository = refundRepository;
             _currentUser = currentUser;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
@@ -100,6 +104,28 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             trip.Status = TripStatus.Cancelado;
             trip.UpdatedAt = DateTime.UtcNow;
             await _tripRepository.UpdateAsync(trip, cancellationToken);
+
+            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
+            // cancelación ya persistida sigue su curso normal.
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = trip.OrganizationId,
+                    ActorUserId = _currentUser.UserId,
+                    ActorEmail = _currentUser.Email ?? string.Empty,
+                    Action = AuditAction.ViajeCancelado,
+                    EntityType = "Trip",
+                    EntityId = trip.Id,
+                    Description = "Viaje cancelado",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", AuditAction.ViajeCancelado);
+            }
 
             // Excludes Cancelada rows already (see IReservationRepository.GetByTripIdAsync's own
             // doc comment) — covers both Confirmada (paid) and PendientePago (in-flight,

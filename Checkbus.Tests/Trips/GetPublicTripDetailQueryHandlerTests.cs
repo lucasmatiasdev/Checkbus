@@ -109,6 +109,9 @@ public class GetPublicTripDetailQueryHandlerTests
 
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
+
+        public Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken cancellationToken)
+            => throw new NotSupportedException("Not needed by GetPublicTripDetailQueryHandler.");
     }
 
     private sealed class FakeEventRepository(Event? @event) : IEventRepository

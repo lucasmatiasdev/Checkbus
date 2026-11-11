@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
 using MediatR;
@@ -22,6 +23,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         private readonly ISeatRepository _seatRepository;
         private readonly IEmailService _emailService;
         private readonly ICurrentUserService _currentUser;
+        private readonly IAuditLogRepository _auditLogRepository;
         private readonly ILogger<StartTripCommandHandler> _logger;
 
         public StartTripCommandHandler(
@@ -31,6 +33,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             ISeatRepository seatRepository,
             IEmailService emailService,
             ICurrentUserService currentUser,
+            IAuditLogRepository auditLogRepository,
             ILogger<StartTripCommandHandler> logger)
         {
             _tripRepository = tripRepository;
@@ -39,6 +42,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             _seatRepository = seatRepository;
             _emailService = emailService;
             _currentUser = currentUser;
+            _auditLogRepository = auditLogRepository;
             _logger = logger;
         }
 
@@ -71,6 +75,28 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             trip.Status = TripStatus.EnProceso;
             trip.UpdatedAt = DateTime.UtcNow;
             await _tripRepository.UpdateAsync(trip, cancellationToken);
+
+            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y el
+            // inicio del viaje ya persistido sigue su curso normal.
+            try
+            {
+                await _auditLogRepository.AddAsync(new AuditLogEntry
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = trip.OrganizationId,
+                    ActorUserId = _currentUser.UserId,
+                    ActorEmail = _currentUser.Email ?? string.Empty,
+                    Action = AuditAction.ViajeIniciado,
+                    EntityType = "Trip",
+                    EntityId = trip.Id,
+                    Description = "Viaje iniciado",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write audit log entry for {Action}", AuditAction.ViajeIniciado);
+            }
 
             var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);
             var seats = await _seatRepository.GetByVehicleIdAsync(trip.VehicleId, cancellationToken);

@@ -4,11 +4,13 @@
 @using Checkbus.Web.Features.Boarding.Contracts
 @using Checkbus.Web.Features.Boarding.Models
 @using Checkbus.Web.Features.Boarding.Services
+@using Checkbus.Web.Features.Trips.Contracts
+@using Checkbus.Web.Features.Trips.Services
 
 <PageTitle>Checkbus - Embarque</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6" Wrap="Wrap.Wrap">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
             <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold">
                 Embarque
@@ -20,12 +22,39 @@
                 </MudChip>
             }
         </MudStack>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Error"
-                   Disabled="@(isLoading || isClosing)"
-                   OnClick="@HandleCloseBoardingAsync">
-            Cerrar embarque
-        </MudButton>
+        <MudStack Row="true" Spacing="2">
+            @if (trip?.Status == WebTripStatus.Publicado)
+            {
+                <MudTooltip Text="@(CanStartTrip ? null : "Se habilita 30 minutos antes de la salida programada.")">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@(isStarting || !CanStartTrip)"
+                               OnClick="HandleStartAsync">
+                        @if (isStarting)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Iniciando...</span>
+                        }
+                        else
+                        {
+                            <span>Iniciar viaje</span>
+                        }
+                    </MudButton>
+                </MudTooltip>
+            }
+            @if (trip?.Status == WebTripStatus.EnProceso)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenFinishTripDialog">
+                    Finalizar viaje
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       Disabled="@(isLoading || isClosing)"
+                       OnClick="@HandleCloseBoardingAsync">
+                Cerrar embarque
+            </MudButton>
+        </MudStack>
     </MudStack>
 
     @if (errorMessage is not null)
@@ -33,10 +62,15 @@
         <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
     }
 
+    @if (startErrorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@startErrorMessage</MudAlert>
+    }
+
     <MudPaper Elevation="2" Class="pa-6 mb-6">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <div>
-                <MudText Typo="Typo.h6">Activar seguimiento en tiempo real (demo)</MudText>
+                <MudText Typo="Typo.h6">Activar seguimiento en tiempo real</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
                     Comparte la ubicación de este dispositivo en vivo mientras el viaje está en curso.
                     Funcionalidad de demostración, no es un sistema de GPS de producción.
@@ -67,6 +101,26 @@
                 Validar
             </MudButton>
         </MudStack>
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-6 mb-6">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+            <MudText Typo="Typo.h6">Validar por QR</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="@(isQrScanning ? Color.Error : Color.Primary)"
+                       Disabled="@isTogglingQrScanning"
+                       OnClick="@HandleToggleQrScanningAsync">
+                @(isQrScanning ? "Detener cámara" : "Activar cámara")
+            </MudButton>
+        </MudStack>
+        @if (qrError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@qrError</MudAlert>
+        }
+        @if (isQrScanning)
+        {
+            <video id="@QrVideoElementId" autoplay muted playsinline style="width: 100%; max-width: 480px; border-radius: 8px;"></video>
+        }
     </MudPaper>
 
     <MudPaper Elevation="2" Class="pa-6">
@@ -116,6 +170,42 @@
             </MudDataGrid>
         }
     </MudPaper>
+
+    <MudDialog Visible="@isFinishTripDialogOpen" Options="@(new DialogOptions { CloseOnEscapeKey = true })">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Finalizar viaje</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (finishTripErrorMessage is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@finishTripErrorMessage</MudAlert>
+            }
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudDatePicker Label="Fecha de llegada" @bind-Date="finishArrivalDate" />
+                <MudTimePicker Label="Hora de llegada" @bind-Time="finishArrivalTime" />
+            </MudStack>
+            <MudTextField T="string"
+                           @bind-Value="finishObservations"
+                           Label="Observaciones"
+                           HelperText="Opcional"
+                           Variant="Variant.Outlined"
+                           Lines="3" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton Disabled="@isFinishingTrip" OnClick="CloseFinishTripDialog">Cerrar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isFinishingTrip" OnClick="ConfirmFinishTripAsync">
+                @if (isFinishingTrip)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Finalizando...</span>
+                }
+                else
+                {
+                    <span>Finalizar viaje</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
 </MudContainer>
 
 @code {
@@ -124,6 +214,9 @@
 
     [Inject]
     private BoardingClient BoardingClient { get; set; } = default!;
+
+    [Inject]
+    private TripsClient TripsClient { get; set; } = default!;
 
     [Inject]
     private IDialogService DialogService { get; set; } = default!;
@@ -137,13 +230,19 @@
     // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md): client-side floor on how often a
     // received Geolocation position is relayed to the backend — watchPosition can fire far more
     // often than this demo needs, and the throttle itself lives in Boarding.razor.js.
-    private const string LiveTrackingModuleImportPath = "./Components/Pages/app/Boarding.razor.js";
+    private const string BoardingJsModuleImportPath = "./Components/Pages/app/Boarding.razor.js";
     private const int LiveTrackingMinIntervalMs = 7000;
+    private const string QrVideoElementId = "qr-scanner-video";
 
-    private IJSObjectReference? _liveTrackingModule;
-    private DotNetObjectReference<Boarding>? _liveTrackingDotNetRef;
+    private IJSObjectReference? _boardingJsModule;
+    private DotNetObjectReference<Boarding>? _boardingJsDotNetRef;
     private bool liveTrackingEnabled;
     private bool isTogglingLiveTracking;
+
+    private bool isQrScanning;
+    private bool isTogglingQrScanning;
+    private bool isValidatingQr;
+    private string? qrError;
 
     private IReadOnlyList<BoardingPassengerResponse> allPassengers = [];
     private IReadOnlyList<BoardingPassengerResponse> filteredPassengers = [];
@@ -159,9 +258,149 @@
     // Computed client-side from the already-loaded list — no new backend query needed.
     private int BoardedCount => allPassengers.Count(p => p.Status == WebBoardingStatus.Abordado);
 
+    // CU-08 — the chofer starts/finishes their OWN trip (api/Trips/{id}/start|finish now also
+    // allow Chofer, ownership-checked server-side). Loaded via BoardingClient.GetMyTripsAsync()
+    // rather than TripsClient.GetByIdAsync, since that endpoint stays Planificador/Administrador
+    // only — this page's audience is the driver themselves.
+    private TripResponse? trip;
+    private static readonly TimeSpan StartWindow = TimeSpan.FromMinutes(30);
+    private bool CanStartTrip =>
+        trip is not null
+        && DateTime.UtcNow >= trip.DepartureDate - StartWindow
+        && DateTime.UtcNow <= trip.DepartureDate + StartWindow;
+    private bool isStarting;
+    private string? startErrorMessage;
+    private System.Threading.Timer? startWindowTimer;
+
+    private bool isFinishTripDialogOpen;
+    private bool isFinishingTrip;
+    private string? finishTripErrorMessage;
+    private DateTime? finishArrivalDate;
+    private TimeSpan? finishArrivalTime;
+    private string? finishObservations;
+
     protected override async Task OnInitializedAsync()
     {
+        await LoadTripAsync();
         await LoadBoardingListAsync();
+    }
+
+    private async Task LoadTripAsync()
+    {
+        var outcome = await BoardingClient.GetMyTripsAsync();
+        if (outcome is DriverTripsOutcome.Success success)
+        {
+            trip = success.Trips.FirstOrDefault(t => t.Id == TripId);
+        }
+
+        if (trip?.Status == WebTripStatus.Publicado)
+        {
+            startWindowTimer = new System.Threading.Timer(
+                _ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+    }
+
+    private async Task HandleStartAsync()
+    {
+        startErrorMessage = null;
+        isStarting = true;
+        try
+        {
+            var outcome = await TripsClient.StartAsync(TripId);
+
+            switch (outcome)
+            {
+                case TripStartOutcome.Success:
+                    trip = trip! with { Status = WebTripStatus.EnProceso };
+                    startWindowTimer?.Dispose();
+                    startWindowTimer = null;
+                    Snackbar.Add("Viaje iniciado correctamente.", Severity.Success);
+                    break;
+
+                case TripStartOutcome.ValidationFailed validationFailed:
+                    startErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripStartOutcome.NotFound:
+                    startErrorMessage = "Este viaje no existe o no te pertenece.";
+                    break;
+
+                case TripStartOutcome.Forbidden:
+                    startErrorMessage = "No tenés permiso para iniciar este viaje.";
+                    break;
+
+                case TripStartOutcome.TransportError transportError:
+                    startErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isStarting = false;
+        }
+    }
+
+    private void OpenFinishTripDialog()
+    {
+        isFinishTripDialogOpen = true;
+        finishTripErrorMessage = null;
+        var now = DateTime.Now;
+        finishArrivalDate = now.Date;
+        finishArrivalTime = now.TimeOfDay;
+        finishObservations = null;
+    }
+
+    private void CloseFinishTripDialog()
+    {
+        isFinishTripDialogOpen = false;
+    }
+
+    private async Task ConfirmFinishTripAsync()
+    {
+        if (finishArrivalDate is null || finishArrivalTime is null)
+        {
+            finishTripErrorMessage = "Ingresá la fecha y hora de llegada.";
+            return;
+        }
+
+        finishTripErrorMessage = null;
+        isFinishingTrip = true;
+        try
+        {
+            var actualArrivalDate = DateTime.SpecifyKind(
+                finishArrivalDate.Value.Date + finishArrivalTime.Value, DateTimeKind.Local).ToUniversalTime();
+            var outcome = await TripsClient.FinishAsync(
+                TripId, new FinishTripRequest { ActualArrivalDate = actualArrivalDate, Observations = finishObservations });
+
+            switch (outcome)
+            {
+                case TripFinishOutcome.Success:
+                    trip = trip! with { Status = WebTripStatus.Completado };
+                    isFinishTripDialogOpen = false;
+                    Snackbar.Add("Viaje finalizado correctamente.", Severity.Success);
+                    break;
+
+                case TripFinishOutcome.ValidationFailed validationFailed:
+                    finishTripErrorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
+                    break;
+
+                case TripFinishOutcome.NotFound:
+                    finishTripErrorMessage = "Este viaje no existe o no te pertenece.";
+                    break;
+
+                case TripFinishOutcome.Forbidden:
+                    finishTripErrorMessage = "No tenés permiso para finalizar este viaje.";
+                    break;
+
+                case TripFinishOutcome.TransportError transportError:
+                    finishTripErrorMessage = transportError.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            isFinishingTrip = false;
+        }
     }
 
     private async Task LoadBoardingListAsync()
@@ -251,6 +490,10 @@
                 if (method == WebValidationMethod.Codigo)
                 {
                     codeError = "Ese código no corresponde a ninguna reserva de este viaje.";
+                }
+                else if (method == WebValidationMethod.Qr)
+                {
+                    qrError = "El QR escaneado no corresponde a ninguna reserva de este viaje.";
                 }
                 else
                 {
@@ -344,11 +587,11 @@
 
                 liveTrackingEnabled = true;
 
-                _liveTrackingModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", LiveTrackingModuleImportPath);
-                _liveTrackingDotNetRef ??= DotNetObjectReference.Create(this);
+                _boardingJsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", BoardingJsModuleImportPath);
+                _boardingJsDotNetRef ??= DotNetObjectReference.Create(this);
 
-                await _liveTrackingModule.InvokeVoidAsync(
-                    "startWatching", _liveTrackingDotNetRef, LiveTrackingMinIntervalMs);
+                await _boardingJsModule.InvokeVoidAsync(
+                    "startWatching", _boardingJsDotNetRef, LiveTrackingMinIntervalMs);
             }
             else
             {
@@ -397,11 +640,11 @@
     {
         liveTrackingEnabled = false;
 
-        if (_liveTrackingModule is not null)
+        if (_boardingJsModule is not null)
         {
             try
             {
-                await _liveTrackingModule.InvokeVoidAsync("stopWatching");
+                await _boardingJsModule.InvokeVoidAsync("stopWatching");
             }
             catch (JSDisconnectedException)
             {
@@ -416,6 +659,102 @@
         }
     }
 
+    // QR boarding-validation camera scanner (odd/tasks/validacion-embarque-qr.md). Toggles the
+    // camera on/off; decoded codes come back via the OnQrCodeScanned JSInvokable below and are
+    // validated automatically (S3: "se valida el embarque automáticamente"), reusing the same
+    // ValidateAsync outcome-handling as the Código/Búsqueda entry points.
+    private async Task HandleToggleQrScanningAsync()
+    {
+        if (isTogglingQrScanning)
+        {
+            return;
+        }
+
+        isTogglingQrScanning = true;
+        try
+        {
+            if (isQrScanning)
+            {
+                await StopQrScanningAsync();
+                return;
+            }
+
+            qrError = null;
+            _boardingJsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", BoardingJsModuleImportPath);
+            _boardingJsDotNetRef ??= DotNetObjectReference.Create(this);
+
+            if (!await _boardingJsModule.InvokeAsync<bool>("isQrScanningSupported"))
+            {
+                qrError = "Este navegador no soporta escaneo de QR por cámara. Usá el código o la búsqueda manual.";
+                return;
+            }
+
+            isQrScanning = true;
+            await _boardingJsModule.InvokeVoidAsync("startQrScanning", _boardingJsDotNetRef, QrVideoElementId);
+        }
+        finally
+        {
+            isTogglingQrScanning = false;
+        }
+    }
+
+    /// <summary>Invoked from JS for every newly decoded QR payload (debounced client-side).</summary>
+    [JSInvokable]
+    public async Task OnQrCodeScanned(string decodedText)
+    {
+        if (isValidatingQr)
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(decodedText, out var reservationId))
+        {
+            qrError = "El QR escaneado no corresponde a un código de reserva válido.";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        isValidatingQr = true;
+        try
+        {
+            await ValidateAsync(reservationId, WebValidationMethod.Qr);
+        }
+        finally
+        {
+            isValidatingQr = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>Invoked from JS when the browser denies/fails camera access.</summary>
+    [JSInvokable]
+    public async Task OnCameraError(string message)
+    {
+        qrError = message;
+        await StopQrScanningAsync();
+    }
+
+    // Idempotent, safe even if the camera was never started (e.g. on component dispose).
+    private async Task StopQrScanningAsync()
+    {
+        isQrScanning = false;
+
+        if (_boardingJsModule is not null)
+        {
+            try
+            {
+                await _boardingJsModule.InvokeVoidAsync("stopQrScanning");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already torn down (e.g. the user navigated away) — nothing left to
+                // clean up client-side.
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
     private static string DescribeLiveTrackingError(BoardingActionOutcome outcome) => outcome switch
     {
         BoardingActionOutcome.ValidationFailed validationFailed =>
@@ -428,28 +767,41 @@
 
     public async ValueTask DisposeAsync()
     {
+        startWindowTimer?.Dispose();
+
         if (liveTrackingEnabled)
         {
             await StopLiveTrackingAsync(notifyBackend: true);
         }
-        else if (_liveTrackingModule is not null)
+        else if (_boardingJsModule is not null)
         {
             try
             {
-                await _liveTrackingModule.InvokeVoidAsync("stopWatching");
+                await _boardingJsModule.InvokeVoidAsync("stopWatching");
             }
             catch (JSDisconnectedException)
             {
             }
         }
 
-        _liveTrackingDotNetRef?.Dispose();
-
-        if (_liveTrackingModule is not null)
+        if (isQrScanning && _boardingJsModule is not null)
         {
             try
             {
-                await _liveTrackingModule.DisposeAsync();
+                await _boardingJsModule.InvokeVoidAsync("stopQrScanning");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        _boardingJsDotNetRef?.Dispose();
+
+        if (_boardingJsModule is not null)
+        {
+            try
+            {
+                await _boardingJsModule.DisposeAsync();
             }
             catch (JSDisconnectedException)
             {

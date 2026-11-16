@@ -1,20 +1,21 @@
 @page "/dashboard"
 @attribute [Authorize]
+@using Checkbus.Web.Features.Audit.Contracts
+@using Checkbus.Web.Features.Audit.Services
+@using Checkbus.Web.Features.Boarding.Services
+@using Checkbus.Web.Features.DriverRequirements.Contracts
 @using Checkbus.Web.Features.DriverRequirements.Services
+@using Checkbus.Web.Features.Trips.Contracts
+@using Checkbus.Web.Features.Trips.Services
+@using Checkbus.Web.Features.MaintenanceRecords.Contracts
+@using Checkbus.Web.Features.MaintenanceRecords.Services
+@using Checkbus.Web.Features.SupportTickets.Contracts
+@using Checkbus.Web.Features.SupportTickets.Services
 @using Checkbus.Web.Features.Users.Contracts
 @using Checkbus.Web.Features.VehicleDocuments.Services
 @using Checkbus.Web.Shared.Services
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
-    <h3>Dashboard</h3>
-
-    @if (currentUser is not null)
-    {
-        <MudText Typo="Typo.body1">Usuario: @currentUser.Email</MudText>
-        <MudText Typo="Typo.body1">Rol: @currentUser.Role</MudText>
-        <MudText Typo="Typo.body1">Organización: @currentUser.OrganizationId</MudText>
-    }
-
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
     @if (isAdministrador)
     {
         <MudGrid Class="mt-4">
@@ -65,11 +66,449 @@
         </MudGrid>
     }
 
-    <form method="post" action="/logout" data-enhance="false">
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
-            Cerrar sesión
-        </MudButton>
-    </form>
+    @if (isCheckbusSoporte)
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingSupportSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">@(totalTicketsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Tickets totales</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingSupportSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Info">@(openTicketsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Abiertos</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingSupportSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Warning">@(inProgressTicketsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">En progreso</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingSupportSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Success">@(resolvedTicketsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Resueltos</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                    <MudText Typo="Typo.h6" Class="mb-2 align-self-start">Tickets por categoría</MudText>
+                    @if (isLoadingSupportSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else if (ticketCategoryCounts.Sum() == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sin tickets registrados.</MudText>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  ChartSeries="@ticketCategorySeries"
+                                  ChartLabels="@ticketCategoryLabels"
+                                  Width="280px"
+                                  Height="280px" />
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Actividad reciente</MudText>
+                    @if (isLoadingRecentAudit)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (recentAuditEntries.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sin actividad registrada.</MudText>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var entry in recentAuditEntries)
+                            {
+                                <MudTimelineItem Size="Size.Small">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@GetActionLabel(entry.Action)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @entry.ActorEmail@(entry.OrganizationName is not null ? $" · {entry.OrganizationName}" : "") · @entry.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")
+                                    </MudText>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @if (isMecanico)
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">@(programadosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Programados</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Info">@(enProcesoCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">En proceso</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Success">@(completadosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Completados</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Error">@(canceladosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Cancelados</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                    <MudText Typo="Typo.h6" Class="mb-2 align-self-start">Mantenimientos por tipo</MudText>
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else if (maintenanceTypeCounts.Sum() == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sin mantenimientos registrados.</MudText>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  ChartSeries="@maintenanceTypeSeries"
+                                  ChartLabels="@maintenanceTypeLabels"
+                                  Width="280px"
+                                  Height="280px" />
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Próximos mantenimientos</MudText>
+                    @if (isLoadingMaintenanceSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (upcomingMaintenance.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No hay mantenimientos programados.</MudText>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var record in upcomingMaintenance)
+                            {
+                                <MudTimelineItem Size="Size.Small">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">
+                                        @(record.VehiclePatent ?? record.VehicleId.ToString()) — @GetTypeLabel(record.Type)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(record.VehicleBrand is not null ? $"{record.VehicleBrand} {record.VehicleModel} · " : "")@record.ScheduledDate.ToString("dd/MM/yyyy")
+                                    </MudText>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @if (isChofer)
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">@(upcomingTripsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Próximos viajes</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Success">@(aptoRequirementsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Documentos aptos</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Warning">@(pendienteRequirementsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Pendientes</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Error">@(noAptoRequirementsCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">No aptos</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                    <MudText Typo="Typo.h6" Class="mb-2 align-self-start">Estado de mis documentos</MudText>
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else if (requirementStatusCounts.Sum() == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sin documentos registrados.</MudText>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  ChartSeries="@requirementStatusSeries"
+                                  ChartLabels="@requirementStatusLabels"
+                                  Width="280px"
+                                  Height="280px" />
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Mis próximos viajes</MudText>
+                    @if (isLoadingDriverSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (upcomingTrips.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No tenés viajes próximos asignados.</MudText>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var trip in upcomingTrips)
+                            {
+                                <MudTimelineItem Size="Size.Small">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@(trip.EventName ?? "Viaje")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(trip.VehiclePatent is not null ? $"{trip.VehiclePatent} · " : "")@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @if (isPlanificador)
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Info">@(publicadosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Publicados</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4">@(tripsProgramadosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Programados</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Warning">@(tripsEnProcesoCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">En proceso</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4">
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Success">@(tripsCompletadosCount?.ToString() ?? "—")</MudText>
+                    }
+                    <MudText Typo="Typo.body2">Completados</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                    <MudText Typo="Typo.h6" Class="mb-2 align-self-start">Viajes por estado</MudText>
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else if (tripStatusCounts.Sum() == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sin viajes registrados.</MudText>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  ChartSeries="@tripStatusSeries"
+                                  ChartLabels="@tripStatusLabels"
+                                  Width="280px"
+                                  Height="280px" />
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Próximos viajes publicados</MudText>
+                    @if (isLoadingTripsSummary)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (upcomingPublishedTrips.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No hay viajes publicados próximamente.</MudText>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var trip in upcomingPublishedTrips)
+                            {
+                                <MudTimelineItem Size="Size.Small">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">
+                                        @(trip.EventName ?? "Viaje") — @(trip.VehiclePatent ?? trip.VehicleId.ToString())
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @trip.DepartureDate.ToString("dd/MM/yyyy HH:mm") · @(trip.Capacity - trip.AvailableSeats)/@trip.Capacity ocupados
+                                    </MudText>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
 </MudContainer>
 
 @code {
@@ -88,6 +527,21 @@
     private VehicleDocumentsClient VehicleDocumentsClient { get; set; } = default!;
 
     [Inject]
+    private SupportTicketsAdminClient SupportTicketsAdminClient { get; set; } = default!;
+
+    [Inject]
+    private AuditLogClient AuditLogClient { get; set; } = default!;
+
+    [Inject]
+    private MaintenanceRecordsClient MaintenanceRecordsClient { get; set; } = default!;
+
+    [Inject]
+    private BoardingClient BoardingClient { get; set; } = default!;
+
+    [Inject]
+    private TripsClient TripsClient { get; set; } = default!;
+
+    [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
 
     private CurrentUserResponse? currentUser;
@@ -97,11 +551,60 @@
     private int? vehicleExpiringCount;
     private bool isLoadingVehicleExpiringCount;
 
+    private bool isCheckbusSoporte;
+    private bool isLoadingSupportSummary;
+    private int? totalTicketsCount;
+    private int? openTicketsCount;
+    private int? inProgressTicketsCount;
+    private int? resolvedTicketsCount;
+    private string[] ticketCategoryLabels = [];
+    private double[] ticketCategoryCounts = [];
+    private List<ChartSeries<double>> ticketCategorySeries = [];
+    private bool isLoadingRecentAudit;
+    private IReadOnlyList<AuditLogResponse> recentAuditEntries = [];
+
+    private bool isMecanico;
+    private bool isLoadingMaintenanceSummary;
+    private int? programadosCount;
+    private int? enProcesoCount;
+    private int? completadosCount;
+    private int? canceladosCount;
+    private string[] maintenanceTypeLabels = [];
+    private double[] maintenanceTypeCounts = [];
+    private List<ChartSeries<double>> maintenanceTypeSeries = [];
+    private IReadOnlyList<MaintenanceRecordResponse> upcomingMaintenance = [];
+
+    private bool isChofer;
+    private bool isLoadingDriverSummary;
+    private int? upcomingTripsCount;
+    private int? aptoRequirementsCount;
+    private int? pendienteRequirementsCount;
+    private int? noAptoRequirementsCount;
+    private string[] requirementStatusLabels = [];
+    private double[] requirementStatusCounts = [];
+    private List<ChartSeries<double>> requirementStatusSeries = [];
+    private IReadOnlyList<TripResponse> upcomingTrips = [];
+
+    private bool isPlanificador;
+    private bool isLoadingTripsSummary;
+    private int? publicadosCount;
+    private int? tripsProgramadosCount;
+    private int? tripsEnProcesoCount;
+    private int? tripsCompletadosCount;
+    private string[] tripStatusLabels = [];
+    private double[] tripStatusCounts = [];
+    private List<ChartSeries<double>> tripStatusSeries = [];
+    private IReadOnlyList<TripResponse> upcomingPublishedTrips = [];
+
     protected override async Task OnInitializedAsync()
     {
         var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
         currentUser = await httpClient.GetFromJsonAsync<CurrentUserResponse>("auth/me");
         isAdministrador = currentUser?.Role == "Administrador";
+        isCheckbusSoporte = currentUser?.Role == "CheckbusSoporte";
+        isMecanico = currentUser?.Role == "Mecanico";
+        isChofer = currentUser?.Role == "Chofer";
+        isPlanificador = currentUser?.Role == "Planificador";
 
         if (isAdministrador)
         {
@@ -141,5 +644,252 @@
                 isLoadingVehicleExpiringCount = false;
             }
         }
+
+        if (isCheckbusSoporte)
+        {
+            isLoadingSupportSummary = true;
+            isLoadingRecentAudit = true;
+            StateHasChanged();
+
+            try
+            {
+                var ticketsOutcome = await SupportTicketsAdminClient.GetAllTicketsAsync();
+                if (ticketsOutcome is SupportTicketsAdminListOutcome.Success success)
+                {
+                    var tickets = success.Tickets;
+                    totalTicketsCount = tickets.Count;
+                    openTicketsCount = tickets.Count(t => t.Status is WebSupportTicketStatus.Abierto or WebSupportTicketStatus.Reabierto);
+                    inProgressTicketsCount = tickets.Count(t => t.Status is WebSupportTicketStatus.EnRevision or WebSupportTicketStatus.EnProgreso or WebSupportTicketStatus.EsperandoCliente);
+                    resolvedTicketsCount = tickets.Count(t => t.Status is WebSupportTicketStatus.Resuelto or WebSupportTicketStatus.Cerrado);
+
+                    var categories = Enum.GetValues<WebSupportTicketCategory>();
+                    ticketCategoryLabels = categories.Select(GetCategoryLabel).ToArray();
+                    ticketCategoryCounts = categories.Select(category => (double)tickets.Count(t => t.Category == category)).ToArray();
+                    ticketCategorySeries = [new ChartSeries<double> { Name = "Tickets", Data = ticketCategoryCounts }];
+                }
+                else
+                {
+                    totalTicketsCount = null;
+                    openTicketsCount = null;
+                    inProgressTicketsCount = null;
+                    resolvedTicketsCount = null;
+                    ticketCategoryLabels = [];
+                    ticketCategoryCounts = [];
+                    ticketCategorySeries = [];
+                }
+            }
+            finally
+            {
+                isLoadingSupportSummary = false;
+            }
+
+            try
+            {
+                // Same cross-tenant GetAuditLogAsync() call Auditoria.razor uses with no filters —
+                // the handler already scopes a CheckbusSoporte caller across every organization.
+                var auditOutcome = await AuditLogClient.GetAuditLogAsync();
+                recentAuditEntries = auditOutcome is AuditLogListOutcome.Success auditSuccess
+                    ? auditSuccess.Entries.OrderByDescending(entry => entry.CreatedAt).Take(8).ToList()
+                    : [];
+            }
+            finally
+            {
+                isLoadingRecentAudit = false;
+            }
+        }
+
+        if (isMecanico)
+        {
+            isLoadingMaintenanceSummary = true;
+            StateHasChanged();
+
+            try
+            {
+                var recordsOutcome = await MaintenanceRecordsClient.GetListAsync();
+                if (recordsOutcome is MaintenanceRecordsListOutcome.Success success)
+                {
+                    var records = success.Records;
+                    programadosCount = records.Count(r => r.Status == WebMaintenanceStatus.Programado);
+                    enProcesoCount = records.Count(r => r.Status == WebMaintenanceStatus.EnProceso);
+                    completadosCount = records.Count(r => r.Status == WebMaintenanceStatus.Completado);
+                    canceladosCount = records.Count(r => r.Status == WebMaintenanceStatus.Cancelado);
+
+                    var types = Enum.GetValues<WebMaintenanceType>();
+                    maintenanceTypeLabels = types.Select(GetTypeLabel).ToArray();
+                    maintenanceTypeCounts = types.Select(type => (double)records.Count(r => r.Type == type)).ToArray();
+                    maintenanceTypeSeries = [new ChartSeries<double> { Name = "Mantenimientos", Data = maintenanceTypeCounts }];
+
+                    upcomingMaintenance = records
+                        .Where(r => r.Status == WebMaintenanceStatus.Programado)
+                        .OrderBy(r => r.ScheduledDate)
+                        .Take(8)
+                        .ToList();
+                }
+                else
+                {
+                    programadosCount = null;
+                    enProcesoCount = null;
+                    completadosCount = null;
+                    canceladosCount = null;
+                    maintenanceTypeLabels = [];
+                    maintenanceTypeCounts = [];
+                    maintenanceTypeSeries = [];
+                    upcomingMaintenance = [];
+                }
+            }
+            finally
+            {
+                isLoadingMaintenanceSummary = false;
+            }
+        }
+
+        if (isChofer && currentUser?.UserId is Guid driverId)
+        {
+            isLoadingDriverSummary = true;
+            StateHasChanged();
+
+            try
+            {
+                var tripsOutcome = await BoardingClient.GetMyTripsAsync();
+                if (tripsOutcome is DriverTripsOutcome.Success tripsSuccess)
+                {
+                    upcomingTripsCount = tripsSuccess.Trips.Count;
+                    upcomingTrips = tripsSuccess.Trips.OrderBy(t => t.DepartureDate).Take(8).ToList();
+                }
+                else
+                {
+                    upcomingTripsCount = null;
+                    upcomingTrips = [];
+                }
+
+                var requirementsOutcome = await DriverRequirementsClient.GetRequirementsAsync(driverId);
+                if (requirementsOutcome is DriverRequirementsListOutcome.Success reqSuccess)
+                {
+                    var requirements = reqSuccess.Requirements;
+                    aptoRequirementsCount = requirements.Count(r => r.Status == WebDriverRequirementStatus.Apto);
+                    pendienteRequirementsCount = requirements.Count(r => r.Status == WebDriverRequirementStatus.Pendiente);
+                    noAptoRequirementsCount = requirements.Count(r => r.Status == WebDriverRequirementStatus.NoApto);
+
+                    var statuses = Enum.GetValues<WebDriverRequirementStatus>();
+                    requirementStatusLabels = statuses.Select(GetRequirementStatusLabel).ToArray();
+                    requirementStatusCounts = statuses.Select(status => (double)requirements.Count(r => r.Status == status)).ToArray();
+                    requirementStatusSeries = [new ChartSeries<double> { Name = "Documentos", Data = requirementStatusCounts }];
+                }
+                else
+                {
+                    aptoRequirementsCount = null;
+                    pendienteRequirementsCount = null;
+                    noAptoRequirementsCount = null;
+                    requirementStatusLabels = [];
+                    requirementStatusCounts = [];
+                    requirementStatusSeries = [];
+                }
+            }
+            finally
+            {
+                isLoadingDriverSummary = false;
+            }
+        }
+
+        if (isPlanificador)
+        {
+            isLoadingTripsSummary = true;
+            StateHasChanged();
+
+            try
+            {
+                var tripsOutcome = await TripsClient.GetListAsync();
+                if (tripsOutcome is TripsListOutcome.Success success)
+                {
+                    var trips = success.Trips;
+                    publicadosCount = trips.Count(t => t.Status == WebTripStatus.Publicado);
+                    tripsProgramadosCount = trips.Count(t => t.Status == WebTripStatus.Programado);
+                    tripsEnProcesoCount = trips.Count(t => t.Status == WebTripStatus.EnProceso);
+                    tripsCompletadosCount = trips.Count(t => t.Status == WebTripStatus.Completado);
+
+                    var statuses = Enum.GetValues<WebTripStatus>();
+                    tripStatusLabels = statuses.Select(GetTripStatusLabel).ToArray();
+                    tripStatusCounts = statuses.Select(status => (double)trips.Count(t => t.Status == status)).ToArray();
+                    tripStatusSeries = [new ChartSeries<double> { Name = "Viajes", Data = tripStatusCounts }];
+
+                    upcomingPublishedTrips = trips
+                        .Where(t => t.Status == WebTripStatus.Publicado)
+                        .OrderBy(t => t.DepartureDate)
+                        .Take(8)
+                        .ToList();
+                }
+                else
+                {
+                    publicadosCount = null;
+                    tripsProgramadosCount = null;
+                    tripsEnProcesoCount = null;
+                    tripsCompletadosCount = null;
+                    tripStatusLabels = [];
+                    tripStatusCounts = [];
+                    tripStatusSeries = [];
+                    upcomingPublishedTrips = [];
+                }
+            }
+            finally
+            {
+                isLoadingTripsSummary = false;
+            }
+        }
     }
+
+    /// <summary>Spanish display label for a ticket category, same mapping SupportTickets.razor uses.</summary>
+    private static string GetCategoryLabel(WebSupportTicketCategory category) => category switch
+    {
+        WebSupportTicketCategory.ProblemaReserva => "Problema de reserva",
+        WebSupportTicketCategory.ProblemaPago => "Problema de pago",
+        WebSupportTicketCategory.ProblemaViaje => "Problema de viaje",
+        WebSupportTicketCategory.ProblemaTecnico => "Problema técnico",
+        WebSupportTicketCategory.ConsultaGeneral => "Consulta general",
+        WebSupportTicketCategory.Otro => "Otro",
+        _ => category.ToString()
+    };
+
+    /// <summary>Spanish display label for an audit action, same mapping Auditoria.razor uses.</summary>
+    private static string GetActionLabel(WebAuditAction action) => action switch
+    {
+        WebAuditAction.LoginExitoso => "Inicio de sesión exitoso",
+        WebAuditAction.LoginFallido => "Inicio de sesión fallido",
+        WebAuditAction.ViajeCancelado => "Viaje cancelado",
+        WebAuditAction.ViajeIniciado => "Viaje iniciado",
+        WebAuditAction.ViajeFinalizado => "Viaje finalizado",
+        WebAuditAction.DocumentoVehiculoValidado => "Documento de vehículo validado",
+        WebAuditAction.EstadoTicketSoporteCambiado => "Estado de ticket de soporte cambiado",
+        WebAuditAction.MercadoPagoConectado => "Mercado Pago conectado",
+        WebAuditAction.MercadoPagoDesconectado => "Mercado Pago desconectado",
+        WebAuditAction.OrganizacionRegistrada => "Organización registrada",
+        _ => action.ToString()
+    };
+
+    /// <summary>Spanish display label for a maintenance type, same mapping Maintenance.razor uses.</summary>
+    private static string GetTypeLabel(WebMaintenanceType type) => type switch
+    {
+        WebMaintenanceType.Preventivo => "Preventivo",
+        WebMaintenanceType.Reactivo => "Reactivo",
+        _ => type.ToString()
+    };
+
+    /// <summary>Spanish display label for a driver requirement status.</summary>
+    private static string GetRequirementStatusLabel(WebDriverRequirementStatus status) => status switch
+    {
+        WebDriverRequirementStatus.Pendiente => "Pendiente",
+        WebDriverRequirementStatus.Apto => "Apto",
+        WebDriverRequirementStatus.NoApto => "No apto",
+        _ => status.ToString()
+    };
+
+    /// <summary>Spanish display label for a trip status, same mapping Trips.razor uses.</summary>
+    private static string GetTripStatusLabel(WebTripStatus status) => status switch
+    {
+        WebTripStatus.Programado => "Programado",
+        WebTripStatus.EnProceso => "En proceso",
+        WebTripStatus.Completado => "Completado",
+        WebTripStatus.Cancelado => "Cancelado",
+        WebTripStatus.Publicado => "Publicado",
+        _ => status.ToString()
+    };
 }

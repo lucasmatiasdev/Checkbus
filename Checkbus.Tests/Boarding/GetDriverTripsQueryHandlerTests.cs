@@ -13,7 +13,7 @@ namespace Checkbus.Tests.Boarding;
 /// Proves <see cref="GetDriverTripsQueryHandler"/> — "Mis viajes" (odd/tasks/reservas-publicas.md
 /// Fase 3 / A2) — scopes exclusively to the caller's own DriverId (confirmed to be the
 /// authenticated Chofer's own User.Id, there is no separate Driver entity) and only returns
-/// Publicado trips, ordered by DepartureDate. Fake-repository style, matching
+/// Publicado or EnProceso trips, ordered by DepartureDate. Fake-repository style, matching
 /// <see cref="GetTripsQueryHandlerTests"/>.
 /// </summary>
 public class GetDriverTripsQueryHandlerTests
@@ -179,7 +179,7 @@ public class GetDriverTripsQueryHandlerTests
     };
 
     [Fact]
-    public async Task Handle_ReturnsOnlyCallersOwnPublicadoTrips_OrderedByDepartureDate()
+    public async Task Handle_ReturnsOnlyCallersOwnPublicadoOrEnProcesoTrips_OrderedByDepartureDate()
     {
         var organizationId = Guid.NewGuid();
         var driver = CreateDriver(Guid.NewGuid(), organizationId);
@@ -188,7 +188,8 @@ public class GetDriverTripsQueryHandlerTests
         var @event = CreateEvent(Guid.NewGuid());
 
         var laterTrip = CreateTrip(organizationId, vehicle.Id, driver.Id, @event.Id, departureDate: DateTime.UtcNow.AddDays(2));
-        var earlierTrip = CreateTrip(organizationId, vehicle.Id, driver.Id, @event.Id, departureDate: DateTime.UtcNow.AddDays(1));
+        var earlierTrip = CreateTrip(
+            organizationId, vehicle.Id, driver.Id, @event.Id, TripStatus.EnProceso, DateTime.UtcNow.AddDays(1));
         var otherDriversTrip = CreateTrip(organizationId, vehicle.Id, otherDriver.Id, @event.Id);
         var notPublishedTrip = CreateTrip(organizationId, vehicle.Id, driver.Id, @event.Id, TripStatus.Programado);
 
@@ -204,6 +205,30 @@ public class GetDriverTripsQueryHandlerTests
         Assert.Equal(2, result.Count);
         Assert.Equal([earlierTrip.Id, laterTrip.Id], result.Select(t => t.Id).ToList());
         Assert.All(result, dto => Assert.Equal(driver.Id, dto.DriverId));
+    }
+
+    [Theory]
+    [InlineData(TripStatus.Programado)]
+    [InlineData(TripStatus.Cancelado)]
+    [InlineData(TripStatus.Completado)]
+    public async Task Handle_ExcludesOwnTripsInOtherStatuses(TripStatus status)
+    {
+        var organizationId = Guid.NewGuid();
+        var driver = CreateDriver(Guid.NewGuid(), organizationId);
+        var vehicle = CreateVehicle(Guid.NewGuid(), organizationId);
+        var @event = CreateEvent(Guid.NewGuid());
+        var trip = CreateTrip(organizationId, vehicle.Id, driver.Id, @event.Id, status);
+
+        var handler = new GetDriverTripsQueryHandler(
+            new FakeTripRepository([trip]),
+            new FakeVehicleRepository([vehicle]),
+            new FakeUserRepository(driver),
+            new FakeEventRepository([@event]),
+            new FakeCurrentUserService(organizationId, driver.Id));
+
+        var result = await handler.Handle(new GetDriverTripsQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Empty(result);
     }
 
     [Fact]

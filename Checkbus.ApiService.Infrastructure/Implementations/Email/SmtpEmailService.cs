@@ -24,7 +24,19 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Email
                 mimeMessage.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
                 mimeMessage.To.Add(MailboxAddress.Parse(message.To));
                 mimeMessage.Subject = message.Subject;
-                mimeMessage.Body = new BodyBuilder { HtmlBody = message.HtmlBody }.ToMessageBody();
+
+                var bodyBuilder = new BodyBuilder { HtmlBody = message.HtmlBody };
+                if (message.InlineImages is { Count: > 0 } inlineImages)
+                {
+                    foreach (var image in inlineImages)
+                    {
+                        var resource = bodyBuilder.LinkedResources.Add(
+                            image.ContentId, image.Content, ContentType.Parse(image.MimeType));
+                        resource.ContentId = image.ContentId;
+                    }
+                }
+
+                mimeMessage.Body = bodyBuilder.ToMessageBody();
 
                 await client.ConnectAsync(
                     options.Host,

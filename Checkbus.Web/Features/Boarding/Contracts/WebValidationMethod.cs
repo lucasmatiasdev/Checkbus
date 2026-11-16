@@ -9,5 +9,6 @@ namespace Checkbus.Web.Features.Boarding.Contracts;
 public enum WebValidationMethod
 {
     Codigo,
-    Busqueda
+    Busqueda,
+    Qr
 }

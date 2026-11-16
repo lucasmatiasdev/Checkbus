@@ -316,8 +316,12 @@
             VehicleId = VehicleId!.Value,
             DriverId = DriverId!.Value,
             EventId = EventId!.Value,
-            DepartureDate = DepartureDate!.Value.Date + DepartureTime!.Value,
-            ArrivalDate = ArrivalDate!.Value.Date + ArrivalTime!.Value,
+            // The date/time pickers capture the user's local wall-clock instant — must convert
+            // to UTC before sending, same as TripDetail.razor's Finalizar-viaje flow, or the
+            // server's "DepartureDate must be in the future" check (compared against a real
+            // DateTime.UtcNow) misreads any local time as hours in the past.
+            DepartureDate = DateTime.SpecifyKind(DepartureDate!.Value.Date + DepartureTime!.Value, DateTimeKind.Local).ToUniversalTime(),
+            ArrivalDate = DateTime.SpecifyKind(ArrivalDate!.Value.Date + ArrivalTime!.Value, DateTimeKind.Local).ToUniversalTime(),
             Price = Price!.Value,
             Stops = Stops
                 .Select(stop => new CreateTripStopRequest

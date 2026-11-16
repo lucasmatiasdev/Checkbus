@@ -260,6 +260,25 @@ public class BoardingRecordRepositoryTests
     }
 
     [Fact]
+    public async Task ValidateAsync_WithQrMethod_RoundTripsThroughHasConversion()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var connection = CreateOpenConnection();
+        using var db = CreateContext(connection);
+        db.Database.EnsureCreated();
+
+        var (trip, reservations) = await SeedTripWithReservationsAsync(db, 1, cancellationToken);
+        var repository = new BoardingRecordRepository(db);
+        await repository.EnsureForTripAsync(trip.Id, cancellationToken);
+
+        await repository.ValidateAsync(reservations[0].Id, ValidationMethod.Qr, cancellationToken);
+
+        var record = await db.BoardingRecords.FirstAsync(b => b.ReservationId == reservations[0].Id, cancellationToken);
+        Assert.Equal(BoardingStatus.Abordado, record.Status);
+        Assert.Equal(ValidationMethod.Qr, record.Method);
+    }
+
+    [Fact]
     public async Task ValidateAsync_AlreadyAbordado_ThrowsBoardingAlreadyValidated()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

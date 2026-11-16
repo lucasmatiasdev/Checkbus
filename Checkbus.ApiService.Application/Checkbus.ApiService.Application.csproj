@@ -21,6 +21,10 @@
          (odd/tasks/reservas-publicas.md R4). No DbContext/provider reference — this layer
          still never talks to the database directly. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <!-- Generates the reservation ticket QR embedded in the confirmation email (same package
+         Checkbus.Web uses for the public confirmation page's own QR — duplicated rather than
+         shared, see ReservationTicketQrCode's doc comment). -->
+    <PackageReference Include="QRCoder" Version="1.8.1" />
   </ItemGroup>
 
 </Project>

@@ -5,13 +5,11 @@ namespace Checkbus.Web.Features.PublicReservations.Services;
 /// <summary>
 /// Generates a scannable PNG rendering of a reservation's boarding code,
 /// deferred CU-14 gap. The QR encodes the raw <c>Reservation.Id</c> GUID as plain text, not a
-/// URL: <c>ValidationMethod.Codigo</c> (see
-/// <c>Checkbus.ApiService.Domain/Enums/ValidationMethod.cs</c>) is literally the driver
-/// typing/pasting that same id to validate boarding, so a QR a driver can scan-and-paste just
-/// saves them typing a 36-character GUID by hand — there is no new backend endpoint, no change
-/// to the boarding flow, and no camera-scanning UI here (CU-12 already decided against that).
-/// Generation runs entirely server-side inside this Blazor Server app, which is why this is a
-/// plain, dependency-free static class rather than an API call: no round trip to
+/// URL: <c>ValidationMethod.Codigo</c>/<c>Qr</c> (see
+/// <c>Checkbus.ApiService.Domain/Enums/ValidationMethod.cs</c>) both resolve the same id, typed
+/// or scanned — the boarding screen's camera scanner (odd/tasks/validacion-embarque-qr.md) reads
+/// this exact PNG. Generation runs entirely server-side inside this Blazor Server app, which is
+/// why this is a plain, dependency-free static class rather than an API call: no round trip to
 /// Checkbus.ApiService is needed to produce an image.
 /// </summary>
 public static class ReservationTicketQrCode

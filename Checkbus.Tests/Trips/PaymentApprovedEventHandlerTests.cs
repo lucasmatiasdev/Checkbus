@@ -188,6 +188,12 @@ public class PaymentApprovedEventHandlerTests
         Assert.Contains("River vs Boca", message.Subject);
         Assert.Contains("12", message.HtmlBody);
         Assert.Contains($"https://checkbus.test/reservas/confirmacion/{reservation.Id}", message.HtmlBody);
+
+        Assert.Contains("cid:ticket-qr", message.HtmlBody);
+        var ticketQr = Assert.Single(message.InlineImages ?? []);
+        Assert.Equal("ticket-qr", ticketQr.ContentId);
+        Assert.Equal("image/png", ticketQr.MimeType);
+        Assert.NotEmpty(ticketQr.Content);
     }
 
     [Fact]

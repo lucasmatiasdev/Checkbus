@@ -22,12 +22,12 @@ namespace Checkbus.Tests.Trips;
 /// </summary>
 public class StartTripCommandHandlerTests
 {
-    private sealed class FakeCurrentUserService(Guid? organizationId) : ICurrentUserService
+    private sealed class FakeCurrentUserService(Guid? organizationId, string role = "Administrador", Guid? userId = null) : ICurrentUserService
     {
         public bool IsAuthenticated => true;
-        public Guid? UserId => Guid.NewGuid();
+        public Guid? UserId { get; } = userId ?? Guid.NewGuid();
         public Guid? OrganizationId => organizationId;
-        public string? Role => "Administrador";
+        public string? Role => role;
         public string? Email => "admin@checkbus-demo.com";
     }
 
@@ -197,7 +197,9 @@ public class StartTripCommandHandlerTests
         IReadOnlyList<Seat>? seats = null,
         FakeEmailService? emailService = null,
         FakeAuditLogRepository? auditLogRepository = null,
-        Guid? callerOrganizationId = null)
+        Guid? callerOrganizationId = null,
+        string callerRole = "Administrador",
+        Guid? callerUserId = null)
     {
         return new StartTripCommandHandler(
             tripRepository ?? new FakeTripRepository(trip),
@@ -205,7 +207,7 @@ public class StartTripCommandHandlerTests
             new FakePassengerRepository(passengersById ?? new Dictionary<Guid, Passenger>()),
             new FakeSeatRepository(seats ?? []),
             emailService ?? new FakeEmailService(),
-            new FakeCurrentUserService(callerOrganizationId ?? trip?.OrganizationId ?? Guid.NewGuid()),
+            new FakeCurrentUserService(callerOrganizationId ?? trip?.OrganizationId ?? Guid.NewGuid(), callerRole, callerUserId),
             auditLogRepository ?? new FakeAuditLogRepository(),
             NullLogger<StartTripCommandHandler>.Instance);
     }
@@ -227,6 +229,34 @@ public class StartTripCommandHandlerTests
 
         await Assert.ThrowsAsync<TripNotFoundException>(() =>
             handler.Handle(new StartTripCommand { Id = trip.Id }, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_ChoferStartsOwnTrip_TransitionsToEnProceso()
+    {
+        var trip = CreateTrip(DateTime.UtcNow);
+        var tripRepository = new FakeTripRepository(trip);
+        var handler = CreateHandler(
+            trip, tripRepository, callerRole: "Chofer", callerUserId: trip.DriverId);
+
+        await handler.Handle(new StartTripCommand { Id = trip.Id }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, tripRepository.UpdateCallCount);
+        Assert.Equal(TripStatus.EnProceso, tripRepository.UpdatedTrip?.Status);
+    }
+
+    [Fact]
+    public async Task Handle_ChoferStartsAnotherDriversTrip_ThrowsTripNotFoundException()
+    {
+        var trip = CreateTrip(DateTime.UtcNow);
+        var tripRepository = new FakeTripRepository(trip);
+        var handler = CreateHandler(
+            trip, tripRepository, callerRole: "Chofer", callerUserId: Guid.NewGuid());
+
+        await Assert.ThrowsAsync<TripNotFoundException>(() =>
+            handler.Handle(new StartTripCommand { Id = trip.Id }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, tripRepository.UpdateCallCount);
     }
 
     [Theory]

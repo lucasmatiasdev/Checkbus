@@ -29,4 +29,27 @@ public class SmtpEmailServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.SendAsync(message, TestContext.Current.CancellationToken));
     }
+
+    [Fact]
+    public async Task SendAsync_WithInlineImages_BlankHost_ThrowsInvalidOperationException()
+    {
+        // Same blank-host fast-fail as above, but with an EmailMessage.InlineImages entry
+        // present — proves the LinkedResources embedding this adds runs to completion (any bug
+        // in it would surface here as some other exception type) before the connect attempt is
+        // what actually fails, same as the no-attachment case.
+        var options = new EmailOptions
+        {
+            Host = string.Empty,
+            Port = 587,
+            FromAddress = "no-reply@checkbus.test",
+            FromName = "Checkbus"
+        };
+        var service = new SmtpEmailService(options);
+        var inlineImage = new EmailInlineImage("ticket-qr", [1, 2, 3], "image/png");
+        var message = new EmailMessage(
+            "passenger@checkbus.test", "Subject", "<p>Body</p><img src=\"cid:ticket-qr\" />", [inlineImage]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.SendAsync(message, TestContext.Current.CancellationToken));
+    }
 }

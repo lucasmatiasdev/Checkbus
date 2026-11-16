@@ -9,7 +9,11 @@ namespace Checkbus.Tests.Trips;
 
 /// <summary>
 /// 401/403/400 coverage for <c>api/trips</c> via <see cref="CheckbusApiFactory"/>. Every action
-/// requires Planificador OR Administrador (odd/tasks/rutas-publicacion.md Constraint 6). Per this
+/// requires Planificador OR Administrador (odd/tasks/rutas-publicacion.md Constraint 6), except
+/// Start/Finish (CU-08) which also allow Chofer — restricted to the trip's own driver inside the
+/// handler, proven in StartTripCommandHandlerTests/FinishTripCommandHandlerTests rather than
+/// here (this harness's dummy-Postgres D-13 constraint makes an ownership check hard to drive to
+/// a clean assertion at this level). Per this
 /// harness's documented D-13 constraint (<see cref="CheckbusApiFactory"/> runs with a dummy,
 /// unreachable Postgres connection string), the "allowed role is not rejected at the auth layer"
 /// proof for Create is driven to a 400 via an empty Stops list — this short-circuits inside
@@ -175,7 +179,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
     }
 
     [Theory]
-    [InlineData(Role.Chofer)]
     [InlineData(Role.Mecanico)]
     public async Task Start_DisallowedRole_Returns403(Role role)
     {
@@ -200,7 +203,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
     }
 
     [Theory]
-    [InlineData(Role.Chofer)]
     [InlineData(Role.Mecanico)]
     public async Task Finish_DisallowedRole_Returns403(Role role)
     {

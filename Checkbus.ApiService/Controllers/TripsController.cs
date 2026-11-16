@@ -135,8 +135,10 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // CU-08: admin-initiated, same narrow-status-transition shape as Publish above.
-        [Authorize(Roles = "Planificador,Administrador")]
+        // CU-08: admin-initiated OR the trip's own Chofer, same narrow-status-transition shape
+        // as Publish above. A Chofer caller is further restricted to their own trip inside the
+        // handler (IDOR-safe) — the role claim alone never proves ownership.
+        [Authorize(Roles = "Planificador,Administrador,Chofer")]
         [HttpPost("{id:guid}/start")]
         public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
         {
@@ -144,9 +146,9 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // CU-08: admin-initiated, same narrow-status-transition shape as Start above, but with
-        // a small body carrying the real arrival time/observations.
-        [Authorize(Roles = "Planificador,Administrador")]
+        // CU-08: admin-initiated OR the trip's own Chofer, same narrow-status-transition shape
+        // as Start above, but with a small body carrying the real arrival time/observations.
+        [Authorize(Roles = "Planificador,Administrador,Chofer")]
         [HttpPost("{id:guid}/finish")]
         public async Task<IActionResult> Finish(
             Guid id, [FromBody] FinishTripRequest request, CancellationToken cancellationToken)

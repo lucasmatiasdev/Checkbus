@@ -99,6 +99,10 @@ namespace Checkbus.ApiService.Application.Trips.Events
             await _emailService.SendAsync(message, cancellationToken);
         }
 
+        // Content-Id the HTML body's <img> references via "cid:" and the MIME inline resource
+        // SmtpEmailService attaches must share — see EmailInlineImage's doc comment.
+        private const string TicketQrContentId = "ticket-qr";
+
         private EmailMessage BuildConfirmationEmail(
             string? eventName, Trip trip, Passenger passenger, Reservation reservation, int? seatNumber)
         {
@@ -116,9 +120,14 @@ namespace Checkbus.ApiService.Application.Trips.Events
                 </ul>
                 <p>Podés ver el detalle de tu reserva en el siguiente enlace:</p>
                 <p><a href="{confirmationLink}">{confirmationLink}</a></p>
+                <p>Mostrá este código al chofer para abordar:</p>
+                <p><img src="cid:{TicketQrContentId}" alt="Código QR de la reserva" width="180" height="180" /></p>
                 """;
 
-            return new EmailMessage(passenger.Email, subject, body);
+            var ticketQr = new EmailInlineImage(
+                TicketQrContentId, ReservationTicketQrCode.GeneratePngBytes(reservation.Id), "image/png");
+
+            return new EmailMessage(passenger.Email, subject, body, [ticketQr]);
         }
     }
 }

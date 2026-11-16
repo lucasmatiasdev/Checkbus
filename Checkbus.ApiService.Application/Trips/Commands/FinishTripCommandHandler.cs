@@ -1,6 +1,7 @@
 using Checkbus.ApiService.Application.Interfaces.Authentication;
 using Checkbus.ApiService.Application.Interfaces.Email;
 using Checkbus.ApiService.Application.Interfaces.Repositories;
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Audit;
 using Checkbus.ApiService.Domain.Enums;
 using Checkbus.ApiService.Domain.Exceptions.Trips;
@@ -9,10 +10,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // CU-08: flips an EnProceso trip to Completado. Admin-initiated (Planificador/Administrador),
-    // same tenant-check/role-gate posture as StartTripCommandHandler. Also closes boarding (any
-    // still-Pendiente BoardingRecord becomes Ausente) as part of finishing, instead of requiring
-    // the driver to separately call CloseBoardingCommand.
+    // CU-08: flips an EnProceso trip to Completado. Admin-initiated (Planificador/Administrador)
+    // OR the trip's own Chofer, same tenant-check/role-gate posture as StartTripCommandHandler
+    // (Chofer-only ownership check below — the role claim alone never proves it's THIS driver's
+    // trip). Also closes boarding (any still-Pendiente BoardingRecord becomes Ausente) as part
+    // of finishing, instead of requiring the driver to separately call CloseBoardingCommand.
     public class FinishTripCommandHandler : IRequestHandler<FinishTripCommand>
     {
         private readonly ITripRepository _tripRepository;
@@ -56,6 +58,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
                 // IDOR-safe: cross-tenant existence is never leaked to the caller.
+                throw new TripNotFoundException();
+            }
+
+            if (_currentUser.Role == nameof(Role.Chofer) && trip.DriverId != _currentUser.UserId)
+            {
+                // IDOR-safe: a chofer may only finish their OWN trip — existence of someone
+                // else's trip is never leaked, same as the cross-tenant case above.
                 throw new TripNotFoundException();
             }
 

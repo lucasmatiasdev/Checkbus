@@ -117,10 +117,8 @@
         {
             <MudAlert Severity="Severity.Error" Class="mb-4">@qrError</MudAlert>
         }
-        @if (isQrScanning)
-        {
-            <video id="@QrVideoElementId" autoplay muted playsinline style="width: 100%; max-width: 480px; border-radius: 8px;"></video>
-        }
+        <video id="@QrVideoElementId" autoplay muted playsinline
+               style="width: 100%; max-width: 480px; border-radius: 8px; display: @(isQrScanning ? "block" : "none");"></video>
     </MudPaper>
 
     <MudPaper Elevation="2" Class="pa-6">

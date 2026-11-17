@@ -4,11 +4,14 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-# Pre-create the upload directory and hand it to the non-root app user before any volume gets
-# mounted on it - a named volume mounted on a path that doesn't exist in the image yet is created
-# root-owned, and this container never runs as root.
+# Pre-create the upload directory for the no-volume case. When a Railway Volume IS mounted on
+# /app/App_Data/storage, Railway creates its backing storage root-owned regardless of this
+# chown, so the container must still start as root (no USER here) and let
+# docker-entrypoint.sh re-chown it on every startup before dropping privileges to the
+# non-root "app" user that ships in the .NET 8+ base images.
 RUN mkdir -p /app/App_Data/storage && chown -R $APP_UID:$APP_UID /app/App_Data
-USER $APP_UID
+COPY Checkbus.ApiService/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -38,4 +41,4 @@ RUN dotnet publish "Checkbus.ApiService.csproj" -c $BUILD_CONFIGURATION -o /app/
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Checkbus.ApiService.dll"]
+ENTRYPOINT ["docker-entrypoint.sh"]

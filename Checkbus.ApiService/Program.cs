@@ -263,7 +263,10 @@ builder.AddNpgsqlDbContext<CheckbusDbContext>("checkbusdb", configureDbContextOp
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Runs in every environment, not just Development - Railway (and every other real deploy
+// target) runs in Production, and this is the only thing that ever creates/updates the schema
+// there (odd/tasks/railway-deploy.md T9). MigrateAsync() is idempotent: a no-op once the schema
+// is already current, so running it on every startup is safe.
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<CheckbusDbContext>();

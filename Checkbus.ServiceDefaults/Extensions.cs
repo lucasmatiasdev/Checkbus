@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
@@ -28,8 +29,15 @@ public static class Extensions
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            // Turn on resilience by default
-            http.AddStandardResilienceHandler();
+            // Turn on resilience by default. DisableForUnsafeHttpMethods() is required here:
+            // without it, the retry strategy resends POST/PUT/PATCH/DELETE on a timeout or
+            // transient error even when the first attempt already succeeded server-side
+            // (e.g. CreateReservation/CreateUser), so the caller sees the SECOND attempt's
+            // failure (unique-constraint conflict) for an operation that actually went through.
+            http.AddStandardResilienceHandler(options =>
+            {
+                options.Retry.DisableForUnsafeHttpMethods();
+            });
 
             // Turn on service discovery by default
             http.AddServiceDiscovery();

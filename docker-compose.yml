@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: checkbusdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - checkbus-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  apiservice:
+    build:
+      context: .
+      dockerfile: Checkbus.ApiService/Dockerfile
+    extra_hosts:
+      - "localhost:host-gateway"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__checkbusdb: Host=postgres;Port=5432;Database=checkbusdb;Username=postgres;Password=${POSTGRES_PASSWORD}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+      MercadoPago__ClientId: ${MERCADOPAGO_CLIENT_ID:-}
+      MercadoPago__ClientSecret: ${MERCADOPAGO_CLIENT_SECRET:-}
+      MercadoPago__WebhookSecret: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      MercadoPago__RedirectUri: ${MERCADOPAGO_REDIRECT_URI:-}
+      MercadoPago__Simulated: ${MERCADOPAGO_SIMULATED:-false}
+      Simulation__ApiBaseUrl: ${SIMULATION_API_BASE_URL:-http://localhost:5080}
+      PublicWebBaseUrl: ${PUBLIC_WEB_BASE_URL:-http://localhost:5000}
+      GoogleMaps__ApiKey: ${GOOGLEMAPS_API_KEY_APISERVICE:-}
+    ports:
+      - "5080:8080"
+    volumes:
+      - checkbus-filestorage:/app/App_Data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Checkbus.Web/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      services__apiservice__http__0: apiservice:8080
+      GoogleMaps__ApiKey: ${GOOGLEMAPS_API_KEY_WEB:-}
+    ports:
+      - "5000:8080"
+    depends_on:
+      - apiservice
+
+volumes:
+  checkbus-postgres-data:
+  checkbus-filestorage:

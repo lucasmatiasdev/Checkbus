@@ -25,9 +25,17 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+
+// Checkbus only operates in Argentina (CUIT-based organizations) - pin the currency/number
+// culture explicitly instead of relying on the host OS's ambient locale, which is absent in a
+// container and falls back to the invariant culture's generic "¤" currency symbol.
+var argentineCulture = new CultureInfo("es-AR");
+CultureInfo.DefaultThreadCurrentCulture = argentineCulture;
+CultureInfo.DefaultThreadCurrentUICulture = argentineCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 

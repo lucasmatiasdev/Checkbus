@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/.vs/
+.git/
+.github/
+.codegraph/
+odd/
+Casos de uso/
+**/App_Data/

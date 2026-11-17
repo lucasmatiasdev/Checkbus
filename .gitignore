@@ -31,3 +31,6 @@ notes/
 ## OS
 .DS_Store
 Thumbs.db
+
+## Local docker-compose secrets (copy from .env.example)
+.env

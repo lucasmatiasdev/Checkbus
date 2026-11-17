@@ -25,6 +25,15 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Globalization;
+
+// Checkbus only operates in Argentina - pin the currency/number culture explicitly instead of
+// relying on the host OS's ambient locale, which is absent in a container and falls back to the
+// invariant culture's generic "¤" currency symbol (see Checkbus.ApiService/Program.cs for the
+// same fix on that side).
+var argentineCulture = new CultureInfo("es-AR");
+CultureInfo.DefaultThreadCurrentCulture = argentineCulture;
+CultureInfo.DefaultThreadCurrentUICulture = argentineCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,7 +61,10 @@ builder.Services.AddTransient<AuthenticationStateHandler>();
 
 builder.Services.AddHttpClient("apiservice", client =>
 {
-    client.BaseAddress = new Uri("https+http://apiservice/api/");
+    // "http", not "https+http" - this process never presents a TLS certificate for
+    // container-to-container traffic, so letting service discovery try https first produces
+    // a corrupted-TLS-frame error against ApiService's plaintext port instead of a clean fallback.
+    client.BaseAddress = new Uri("http://apiservice/api/");
 })
     .AddApplicationScopeHandler()
     .AddHttpMessageHandler<AuthenticationStateHandler>();

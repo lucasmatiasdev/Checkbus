@@ -35,11 +35,14 @@ public static class Extensions
             http.AddServiceDiscovery();
         });
 
-        // Uncomment the following to restrict the allowed schemes for service discovery.
-        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
-        // {
-        //     options.AllowedSchemes = ["https"];
-        // });
+        // Containers here never present a TLS certificate (no cert is provisioned for
+        // container-to-container traffic), so a "https+http://" BaseAddress must not let the
+        // resolver attempt https against a plaintext port — that produces a corrupted TLS frame,
+        // not a clean connection failure.
+        builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        {
+            options.AllowedSchemes = ["http"];
+        });
 
         return builder;
     }

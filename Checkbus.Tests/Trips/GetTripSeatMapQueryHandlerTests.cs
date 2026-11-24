@@ -95,9 +95,7 @@ public class GetTripSeatMapQueryHandlerTests
         public bool ReleaseExpiredHoldsCalled { get; private set; }
 
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
-            // Excludes Cancelada, matching ReservationRepository's real contract — needed so a
-            // hold just released by ReleaseExpiredHoldsAsync below correctly stops counting as
-            // occupied in the same Handle() call.
+
             => Task.FromResult<IReadOnlyList<Reservation>>(
                 reservations.Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada).ToList());
 
@@ -114,8 +112,6 @@ public class GetTripSeatMapQueryHandlerTests
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetTripSeatMapQueryHandler.");
 
-        // Fase E: mirrors ReservationRepository.ReleaseExpiredHoldsAsync's real behavior
-        // in-memory — see GetPublicTripSeatMapQueryHandlerTests' identical fake for rationale.
         public Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
         {
             ReleaseExpiredHoldsCalled = true;
@@ -203,8 +199,7 @@ public class GetTripSeatMapQueryHandlerTests
     [InlineData(TripStatus.Publicado)]
     public async Task Handle_TripInOwnOrganization_ReturnsSeatMapRegardlessOfPublishStatus(TripStatus status)
     {
-        // Unlike the public query, no Trip.Status == Publicado gate: the Planificador
-        // legitimately wants to see this before/after publishing too.
+
         var organizationId = Guid.NewGuid();
         var trip = CreateTrip(organizationId, status);
         var vehicle = CreateVehicle(trip.VehicleId, organizationId, capacity: 4);
@@ -219,7 +214,7 @@ public class GetTripSeatMapQueryHandlerTests
         {
             Id = Guid.NewGuid(),
             TripId = trip.Id,
-            SeatId = seats[1].Id, // Number = 2
+            SeatId = seats[1].Id,
             PassengerId = Guid.NewGuid(),
             Price = trip.Price
         };
@@ -240,9 +235,6 @@ public class GetTripSeatMapQueryHandlerTests
         Assert.Equal([2], result.OccupiedSeatNumbers);
     }
 
-    // Fase E (odd/tasks/pagos-mercadopago.md): same release behavior as
-    // GetPublicTripSeatMapQueryHandlerTests, proven here for the authenticated/org-scoped
-    // counterpart handler.
     [Fact]
     public async Task Handle_PendientePagoReservationOlderThanHoldExpiration_IsReleasedAndSeatBecomesAvailable()
     {

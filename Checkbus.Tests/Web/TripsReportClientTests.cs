@@ -44,8 +44,6 @@ public class TripsReportClientTests
         }
     };
 
-    // ----- GetReportAsync -----
-
     [Fact]
     public async Task GetReportAsync_WhenOk_ReturnsSuccessWithDeserializedReport()
     {

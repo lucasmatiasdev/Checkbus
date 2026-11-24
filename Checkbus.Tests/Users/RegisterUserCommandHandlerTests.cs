@@ -143,8 +143,7 @@ public class RegisterUserCommandHandlerTests
     [Fact]
     public async Task Handle_ValidRequest_ResolvesOrganizationFromClaimOnly()
     {
-        // RegisterUserCommand has no OrganizationId field at all, so the only way
-        // the handler can learn the tenant is from ICurrentUserService (anti-IDOR).
+
         var organizationId = Guid.NewGuid();
         var handler = new RegisterUserCommandHandler(
             new FakeUserRepository(),

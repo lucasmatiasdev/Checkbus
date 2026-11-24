@@ -144,8 +144,6 @@ public class CreateVehicleCommandValidatorTests
         result.ShouldNotHaveValidationErrorFor(c => c.Mileage);
     }
 
-    // --- OwnerType = Organizacion: no owner fields accepted ---
-
     [Fact]
     public void Organizacion_WithOwnerUserId_IsRejected()
     {
@@ -178,8 +176,6 @@ public class CreateVehicleCommandValidatorTests
 
         result.ShouldHaveValidationErrorFor(c => c.OwnerDocumentNumber);
     }
-
-    // --- OwnerType = Chofer: OwnerUserId required, Name/DNI must be unset ---
 
     [Fact]
     public void Chofer_MissingOwnerUserId_IsRejected()
@@ -229,8 +225,6 @@ public class CreateVehicleCommandValidatorTests
 
         result.ShouldHaveValidationErrorFor(c => c.OwnerDocumentNumber);
     }
-
-    // --- OwnerType = Otro: Name + DNI required, OwnerUserId must be unset ---
 
     [Fact]
     public void Otro_MissingOwnerNameAndDocumentNumber_IsRejected()

@@ -127,7 +127,7 @@ public class UpdateStopTimesCommandHandlerTests
         var command = new UpdateStopTimesCommand
         {
             TripId = trip.Id,
-            // A StopId that doesn't belong to this Trip's Route — must not be trusted blindly.
+
             Stops = [new StopDepartureTimeUpdate { StopId = Guid.NewGuid(), DepartureTime = DateTime.UtcNow }]
         };
 

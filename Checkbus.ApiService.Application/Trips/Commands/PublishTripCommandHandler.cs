@@ -19,15 +19,14 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
         public async Task Handle(PublishTripCommand request, CancellationToken cancellationToken)
         {
-            // Planificador/Administrador-only is enforced at the controller; this handler only
-            // verifies tenant ownership of the target trip.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var trip = await _tripRepository.GetByIdAsync(request.Id, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 

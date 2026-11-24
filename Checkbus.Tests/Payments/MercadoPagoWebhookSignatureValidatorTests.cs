@@ -46,8 +46,7 @@ public class MercadoPagoWebhookSignatureValidatorTests
     [Fact]
     public void IsValid_TamperedDataId_ReturnsFalse()
     {
-        // Signature was computed for the original DataId; validating against a different one
-        // (e.g. an attacker swapping which order a notification claims to be about) must fail.
+
         var validHex = ComputeValidHex();
         var header = $"ts={Ts},v1={validHex}";
 
@@ -67,8 +66,7 @@ public class MercadoPagoWebhookSignatureValidatorTests
     public void IsValid_TamperedV1Value_ReturnsFalse()
     {
         var validHex = ComputeValidHex();
-        // Flip the last hex character to produce a value of the same length/shape that is
-        // provably not the correct digest.
+
         var tampered = validHex[..^1] + (validHex[^1] == 'a' ? 'b' : 'a');
         var header = $"ts={Ts},v1={tampered}";
 
@@ -101,8 +99,8 @@ public class MercadoPagoWebhookSignatureValidatorTests
     }
 
     [Theory]
-    [InlineData("ts=1700000000")] // missing v1
-    [InlineData("v1=abcd1234")] // missing ts
+    [InlineData("ts=1700000000")]
+    [InlineData("v1=abcd1234")]
     [InlineData("garbage-no-equals-signs")]
     [InlineData("")]
     public void IsValid_MalformedSignatureHeader_ReturnsFalse(string malformedHeader)
@@ -113,8 +111,7 @@ public class MercadoPagoWebhookSignatureValidatorTests
     [Fact]
     public void IsValid_BlankWebhookSecret_ReturnsFalse_EvenIfHeaderLooksWellFormed()
     {
-        // Fail-closed posture: a not-yet-provisioned (blank) secret must never make every
-        // signature "valid" against a meaningless empty HMAC key.
+
         var header = "ts=1700000000,v1=deadbeef";
 
         Assert.False(MercadoPagoWebhookSignatureValidator.IsValid(DataId, RequestId, header, string.Empty));

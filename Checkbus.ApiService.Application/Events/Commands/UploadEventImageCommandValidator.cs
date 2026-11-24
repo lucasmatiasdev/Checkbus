@@ -5,7 +5,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
     public sealed class UploadEventImageCommandValidator : AbstractValidator<UploadEventImageCommand>
     {
         private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
-        private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB, same cap as UploadVehicleDocumentCommandValidator
+        private const long MaxFileSizeBytes = 5 * 1024 * 1024;
 
         public UploadEventImageCommandValidator()
         {

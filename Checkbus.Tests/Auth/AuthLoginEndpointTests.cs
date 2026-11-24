@@ -12,7 +12,6 @@ public class AuthLoginEndpointTests
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    // Matches Checkbus.ApiService.Infrastructure.Context.CheckbusDbSeeder's seeded admin user.
     private const string SeededEmail = "admin@checkbus.dev";
     private const string SeededPassword = "Admin123!";
 
@@ -76,10 +75,7 @@ public class AuthLoginEndpointTests
     [Fact]
     public async Task Login_ShortNonEmptyPassword_Returns401NotValidationError()
     {
-        // The login validator no longer enforces a minimum password length (a
-        // DNI-derived initial password may legitimately be 7 characters). A short
-        // password now reaches IPasswordHasher.Verify and fails authentication
-        // instead of being rejected by FluentValidation.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var app = await CreateApiHostAsync(cancellationToken);
         var httpClient = app.CreateHttpClient("apiservice");

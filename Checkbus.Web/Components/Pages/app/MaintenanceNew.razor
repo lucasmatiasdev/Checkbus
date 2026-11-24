@@ -133,9 +133,7 @@
                 case MaintenanceRecordActionOutcome.Success:
                     errorMessage = null;
                     Snackbar.Add("Mantenimiento registrado.", Severity.Success);
-                    // MaintenanceDetail.razor ("/maintenance/{id}") does not exist yet (that's M6),
-                    // so the created record is shown by returning to the list rather than
-                    // navigating to a detail page that would 404.
+
                     NavigationManager.NavigateTo("/maintenance");
                     break;
 

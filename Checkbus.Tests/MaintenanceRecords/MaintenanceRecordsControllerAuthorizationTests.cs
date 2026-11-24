@@ -44,8 +44,6 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
         return client;
     }
 
-    // ---- Create (POST) ----
-
     [Fact]
     public async Task Create_MissingToken_Returns401()
     {
@@ -77,7 +75,7 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
         var body = new
         {
             VehicleId = Guid.NewGuid(),
-            Type = 999, // invalid MaintenanceType -> FluentValidation 400, never touches the DB
+            Type = 999,
             ScheduledDate = new DateOnly(2026, 1, 1),
             Description = "Cambio de aceite"
         };
@@ -88,8 +86,6 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- Update (PUT {id}) ----
 
     [Fact]
     public async Task Update_MissingToken_Returns401()
@@ -119,7 +115,7 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
     public async Task Update_AllowedRole_IsNotRejectedAtAuthLayer(Role role)
     {
         var client = CreateAuthorizedClient(role);
-        var body = new { Status = 999 }; // invalid MaintenanceStatus -> FluentValidation 400, never touches the DB
+        var body = new { Status = 999 };
 
         var response = await client.PutAsJsonAsync($"{BasePath}/{Guid.NewGuid()}", body, TestContext.Current.CancellationToken);
 
@@ -127,8 +123,6 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- GetMaintenanceRecords (GET, list) ----
 
     [Fact]
     public async Task GetList_MissingToken_Returns401()
@@ -159,16 +153,12 @@ public class MaintenanceRecordsControllerAuthorizationTests : IClassFixture<Chec
     {
         var client = CreateAuthorizedClient(role);
 
-        // Malformed vehicleId fails Guid? model binding -> 400 via [ApiController], before
-        // the action method (and the DB) is ever reached.
         var response = await client.GetAsync($"{BasePath}?vehicleId=not-a-guid", TestContext.Current.CancellationToken);
 
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- GetMaintenanceRecord (GET {id}, single) ----
 
     [Fact]
     public async Task GetSingle_MissingToken_Returns401()

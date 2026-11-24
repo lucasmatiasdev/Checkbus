@@ -124,10 +124,6 @@
     private string? errorMessage;
     private string? actionError;
 
-    // OnParametersSetAsync (not OnInitializedAsync) because UserId is a routed parameter that can
-    // change via client-side routing (e.g. navigating from one Chofer's documents to another's
-    // without a full page reload) — OnInitializedAsync would only run once for the component's
-    // lifetime and would miss that transition.
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -144,8 +140,6 @@
     {
         var outcome = await UsersClient.GetUsersAsync();
 
-        // GetUsersAsync has no single-user-by-id endpoint to call instead — it returns every user
-        // in the org, so the Chofer's name is resolved by filtering the full list client-side.
         headingName = outcome switch
         {
             UsersListOutcome.Success success => BuildHeadingName(success.Users),

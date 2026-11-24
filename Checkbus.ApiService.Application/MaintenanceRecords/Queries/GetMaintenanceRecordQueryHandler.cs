@@ -35,8 +35,7 @@ namespace Checkbus.ApiService.Application.MaintenanceRecords.Queries
             var vehicle = await _vehicleRepository.GetByIdAsync(record.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != organizationId)
             {
-                // IDOR-safe: a record belonging to another organization looks identical to
-                // a missing one — cross-tenant existence is never leaked to the caller.
+
                 throw new MaintenanceRecordNotFoundException();
             }
 

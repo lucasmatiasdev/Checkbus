@@ -161,10 +161,7 @@
 </MudContainer>
 
 @code {
-    // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
-    // OpenReadStream buffer and matching the backend's 10MB cap
-    // (UploadVehicleDocumentCommandValidator.cs). MyDocuments.razor has its own independent
-    // 5MB cap for driver documents, deliberately not raised here.
+
     private const long MaxUploadSizeBytes = 10 * 1024 * 1024;
 
     private static readonly WebVehicleDocumentType[] DocumentTypes = Enum.GetValues<WebVehicleDocumentType>();
@@ -197,10 +194,6 @@
     private bool isLoading = true;
     private string? errorMessage;
 
-    // OnParametersSetAsync (not OnInitializedAsync) because VehicleId is a routed parameter that can
-    // change via client-side routing (e.g. navigating from one vehicle's documents to another's
-    // without a full page reload) — OnInitializedAsync would only run once for the component's
-    // lifetime and would miss that transition. Same reasoning as DriverDocuments.razor.
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -226,9 +219,6 @@
     {
         var outcome = await VehiclesClient.GetVehiclesAsync();
 
-        // GetVehiclesAsync has no single-vehicle-by-id endpoint to call instead — it returns every
-        // vehicle in the org, so the heading is resolved by filtering the full list client-side,
-        // same pattern as DriverDocuments.razor's BuildHeadingName.
         headingName = outcome switch
         {
             VehiclesListOutcome.Success success => BuildHeadingName(success.Vehicles),
@@ -316,10 +306,7 @@
                     expirationDates[type] = null;
                     issueDates[type] = null;
                     Snackbar.Add("Documento subido correctamente.", Severity.Success);
-                    // A fresh upload of a conditional type (never presented before) creates its row
-                    // on the server for the first time — reloading flips this card from the
-                    // no-row/"No cargado" rendering into the normal row rendering with validate
-                    // buttons now available.
+
                     await LoadDocumentsAsync();
                     break;
 
@@ -343,10 +330,6 @@
         }
     }
 
-    // Validate is only ever offered for a type that already has a row (the UI hides the
-    // Aprobar/Rechazar buttons entirely for a never-uploaded conditional type — see the markup
-    // above), matching the backend's ValidateVehicleDocumentCommand, which throws if the
-    // (VehicleId, Type) row doesn't exist yet rather than creating one.
     private async Task HandleValidate(WebVehicleDocumentType type, bool approved)
     {
         validateErrors[type] = null;

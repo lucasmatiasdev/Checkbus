@@ -29,7 +29,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new VehicleNotFoundException();
             }
 

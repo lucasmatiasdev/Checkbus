@@ -8,9 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Contracts
 {
-    // Colocated here rather than its own Contracts file — same convention as
-    // ValidateVehicleDocumentRequest in VehicleDocumentsController.cs. The route supplies
-    // Id; the body only supplies the lifecycle fields being updated.
+
     public sealed record UpdateMaintenanceRecordRequest(
         MaintenanceStatus Status,
         DateOnly? StartDate,
@@ -21,9 +19,7 @@ namespace Checkbus.ApiService.Contracts
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Every action here requires Mecanico OR Administrador — unlike VehicleDocumentsController
-    // (Administrador-only), this module allows two roles together and has no
-    // Chofer/Planificador branch at all (odd/tasks/vehicle-maintenance.md Constraint 6).
+
     [Route("api/[controller]")]
     [ApiController]
     public class MaintenanceRecordsController : ControllerBase

@@ -225,9 +225,6 @@
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = default!;
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md): client-side floor on how often a
-    // received Geolocation position is relayed to the backend — watchPosition can fire far more
-    // often than this demo needs, and the throttle itself lives in Boarding.razor.js.
     private const string BoardingJsModuleImportPath = "./Components/Pages/app/Boarding.razor.js";
     private const int LiveTrackingMinIntervalMs = 7000;
     private const string QrVideoElementId = "qr-scanner-video";
@@ -253,13 +250,8 @@
     private readonly HashSet<Guid> validatingReservationIds = [];
     private string? errorMessage;
 
-    // Computed client-side from the already-loaded list — no new backend query needed.
     private int BoardedCount => allPassengers.Count(p => p.Status == WebBoardingStatus.Abordado);
 
-    // CU-08 — the chofer starts/finishes their OWN trip (api/Trips/{id}/start|finish now also
-    // allow Chofer, ownership-checked server-side). Loaded via BoardingClient.GetMyTripsAsync()
-    // rather than TripsClient.GetByIdAsync, since that endpoint stays Planificador/Administrador
-    // only — this page's audience is the driver themselves.
     private TripResponse? trip;
     private static readonly TimeSpan StartWindow = TimeSpan.FromMinutes(30);
     private bool CanStartTrip =>
@@ -558,11 +550,6 @@
         }
     }
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — the switch calls the toggle
-    // endpoint and, only once the backend confirms it's on, starts the browser's
-    // watchPosition. Any failure (backend rejects the toggle, geolocation permission denied,
-    // a later location POST fails) turns the switch back off instead of leaving it "on" while
-    // nothing is actually being sent.
     private async Task HandleLiveTrackingToggledAsync(bool enabled)
     {
         if (isTogglingLiveTracking)
@@ -629,11 +616,6 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // Stops the JS watcher (idempotent, safe even if nothing is being watched) and, best-effort,
-    // turns the backend toggle off. notifyBackend is skipped from DisposeAsync's no-op path (the
-    // switch was already off) but used everywhere else, including the destroy path where the
-    // backend call is genuinely best-effort per S4/T3 — a failure there is not shown to the user,
-    // there is no screen left to show it on.
     private async Task StopLiveTrackingAsync(bool notifyBackend)
     {
         liveTrackingEnabled = false;
@@ -646,8 +628,7 @@
             }
             catch (JSDisconnectedException)
             {
-                // Circuit already torn down (e.g. the user navigated away) — nothing left to
-                // clean up client-side.
+
             }
         }
 
@@ -657,10 +638,6 @@
         }
     }
 
-    // QR boarding-validation camera scanner (odd/tasks/validacion-embarque-qr.md). Toggles the
-    // camera on/off; decoded codes come back via the OnQrCodeScanned JSInvokable below and are
-    // validated automatically (S3: "se valida el embarque automáticamente"), reusing the same
-    // ValidateAsync outcome-handling as the Código/Búsqueda entry points.
     private async Task HandleToggleQrScanningAsync()
     {
         if (isTogglingQrScanning)
@@ -732,7 +709,6 @@
         await StopQrScanningAsync();
     }
 
-    // Idempotent, safe even if the camera was never started (e.g. on component dispose).
     private async Task StopQrScanningAsync()
     {
         isQrScanning = false;
@@ -745,8 +721,7 @@
             }
             catch (JSDisconnectedException)
             {
-                // Circuit already torn down (e.g. the user navigated away) — nothing left to
-                // clean up client-side.
+
             }
         }
 

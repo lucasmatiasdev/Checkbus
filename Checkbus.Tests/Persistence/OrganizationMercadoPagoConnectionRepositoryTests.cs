@@ -97,8 +97,7 @@ public class OrganizationMercadoPagoConnectionRepositoryTests
     [Fact]
     public async Task UpsertAsync_PersistsCiphertext_NeverThePlaintextTokenInTheRawColumn()
     {
-        // The actual point of I1's encryption requirement: prove the DB column itself is not
-        // readable plaintext, not just that the repository's own round-trip happens to work.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -112,9 +111,6 @@ public class OrganizationMercadoPagoConnectionRepositoryTests
         var original = CreateConnection(organization.Id);
         await repository.UpsertAsync(original, cancellationToken);
 
-        // Bypass the repository entirely and read the raw EF-mapped entity directly off a fresh
-        // DbContext instance sharing the same underlying SQLite connection/data — this is exactly
-        // what "the raw DB column" means here, no decryption step involved.
         using var rawDb = CreateContext(connection);
         var raw = await rawDb.MercadoPagoConnections.FirstAsync(c => c.OrganizationId == organization.Id, cancellationToken);
 
@@ -164,9 +160,7 @@ public class OrganizationMercadoPagoConnectionRepositoryTests
     [Fact]
     public async Task UniqueIndexOnOrganizationId_RejectsASecondRowInsertedDirectly()
     {
-        // The DB itself enforces "at most one connection per Organization", not just the
-        // repository's own find-then-insert-or-update logic — same proof shape as every other
-        // unique-index test in this codebase (e.g. ProcessedWebhookEventRepositoryTests).
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

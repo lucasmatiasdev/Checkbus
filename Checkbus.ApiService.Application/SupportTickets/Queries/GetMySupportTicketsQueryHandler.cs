@@ -20,8 +20,7 @@ namespace Checkbus.ApiService.Application.SupportTickets.Queries
 
         public async Task<IReadOnlyList<SupportTicketDto>> Handle(GetMySupportTicketsQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim - the query has no
-            // OrganizationId field, so no request value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

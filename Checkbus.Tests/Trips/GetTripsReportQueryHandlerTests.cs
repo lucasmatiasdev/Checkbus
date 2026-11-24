@@ -165,8 +165,7 @@ public class GetTripsReportQueryHandlerTests
         decimal price = 15000m) => new()
     {
         Id = Guid.NewGuid(),
-        // Pre-existing gap (same discovery as the SlugExistsAsync/GetIdBySlugAsync fix above):
-        // Trip.Slug became a required member for CU-03 and this helper was never updated.
+
         Slug = Guid.NewGuid().ToString(),
         OrganizationId = organizationId,
         DriverId = driverId,
@@ -209,8 +208,8 @@ public class GetTripsReportQueryHandlerTests
 
         Assert.Equal(2, result.Trips.Count);
         Assert.Equal(2, result.Statistics.TotalTrips);
-        Assert.Equal(5, result.Statistics.TotalPassengers); // (45-40) + (45-45)
-        Assert.Equal(5000m, result.Statistics.EstimatedRevenue); // 5*1000 + 0*500
+        Assert.Equal(5, result.Statistics.TotalPassengers);
+        Assert.Equal(5000m, result.Statistics.EstimatedRevenue);
         Assert.Equal(1, result.Statistics.TripsByStatus[TripStatus.Programado]);
         Assert.Equal(1, result.Statistics.TripsByStatus[TripStatus.Completado]);
     }

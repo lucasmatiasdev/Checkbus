@@ -24,7 +24,6 @@ public class RegisterAccountE2ETests
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
 
-    // Matches Checkbus.ApiService.Infrastructure.Context.CheckbusDbSeeder's seeded admin user.
     private const string SeededAdminEmail = "admin@checkbus.dev";
     private const string SeededAdminPassword = "Admin123!";
 
@@ -72,16 +71,11 @@ public class RegisterAccountE2ETests
         await using var app = await CreateApiHostAsync(cancellationToken);
         var httpClient = app.CreateHttpClient("apiservice");
 
-        // 0. Regression guard, end to end: the seeded admin reports mustChangePassword:
-        //    false (the CLR-default proven at the entity level in task 4.4; here as a
-        //    full HTTP round trip through a real database).
         var (adminLogin, adminToken) = await LoginAsync(
             httpClient, SeededAdminEmail, SeededAdminPassword, cancellationToken);
         Assert.False(adminLogin.GetProperty("mustChangePassword").GetBoolean());
         var organizationId = adminLogin.GetProperty("organizationId").GetGuid();
 
-        // 1. Register "José Díaz" as an Administrador in checkbus-demo — the 201 happy
-        //    path CheckbusApiFactory cannot reach (D-13).
         SetBearer(httpClient, adminToken);
         const string documentNumber = "30999888";
         var registerResponse = await httpClient.PostAsJsonAsync(
@@ -103,17 +97,10 @@ public class RegisterAccountE2ETests
         Assert.Equal(organizationId, registerBody.GetProperty("organizationId").GetGuid());
         Assert.True(registerBody.GetProperty("mustChangePassword").GetBoolean());
 
-        // 2. Log in as the new user with the generated email and DocumentNumber as the
-        //    initial password ("DNI as Initial Password").
         var (firstLogin, firstToken) = await LoginAsync(
             httpClient, "jose.diaz@checkbus-demo.com", documentNumber, cancellationToken);
         Assert.True(firstLogin.GetProperty("mustChangePassword").GetBoolean());
 
-        // 3. The issued JWT is full and normally-scoped: it authorizes a call to an
-        //    ordinary role-gated endpoint (POST api/users is Administrador-only) despite
-        //    MustChangePassword being true. Proves "Login Is Never Blocked by
-        //    MustChangePassword" and the forced-change-bypass anti-IDOR row — by explicit
-        //    design, not by omission.
         SetBearer(httpClient, firstToken);
         var secondRegisterResponse = await httpClient.PostAsJsonAsync(
             "/api/users",
@@ -128,19 +115,15 @@ public class RegisterAccountE2ETests
             cancellationToken);
         Assert.Equal(HttpStatusCode.Created, secondRegisterResponse.StatusCode);
 
-        // 4. Self-service change-password — the 204 happy path ChangePasswordTests could
-        //    not reach either (same D-13 constraint).
         const string newPassword = "NewSecurePassword1";
         var changeResponse = await httpClient.PostAsJsonAsync(
             "/api/auth/change-password", new { NewPassword = newPassword }, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, changeResponse.StatusCode);
 
-        // 5. The next login reports mustChangePassword: false and the new password works.
         var (secondLogin, _) = await LoginAsync(
             httpClient, "jose.diaz@checkbus-demo.com", newPassword, cancellationToken);
         Assert.False(secondLogin.GetProperty("mustChangePassword").GetBoolean());
 
-        // 6. The old DNI-derived password no longer works.
         var oldPasswordResponse = await httpClient.PostAsJsonAsync(
             "/api/auth/login",
             new { Email = "jose.diaz@checkbus-demo.com", Password = documentNumber },

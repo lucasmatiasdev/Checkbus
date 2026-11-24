@@ -41,8 +41,6 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
         return client;
     }
 
-    // ---- Create (POST) ----
-
     [Fact]
     public async Task Create_MissingToken_Returns401()
     {
@@ -74,7 +72,7 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
         var body = new
         {
             Name = "Final Copa Argentina",
-            Type = 999, // invalid EventType -> FluentValidation 400, never touches the DB
+            Type = 999,
             Date = new DateTime(2026, 5, 1, 20, 0, 0, DateTimeKind.Utc),
             LocationName = "Estadio Mario Alberto Kempes",
             Address = "Av. Cardeñosa, Córdoba",
@@ -89,8 +87,6 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- GetAll (GET) ----
 
     [Fact]
     public async Task GetAll_MissingToken_Returns401()
@@ -113,8 +109,6 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- UploadImage (POST {id}/image) ----
 
     [Fact]
     public async Task UploadImage_MissingToken_Returns401()
@@ -141,8 +135,6 @@ public class EventsControllerAuthorizationTests : IClassFixture<CheckbusApiFacto
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- DownloadImage (GET {id}/image) ----
 
     [Fact]
     public async Task DownloadImage_MissingToken_Returns401()

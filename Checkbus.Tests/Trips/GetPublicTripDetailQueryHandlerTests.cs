@@ -225,7 +225,7 @@ public class GetPublicTripDetailQueryHandlerTests
         Assert.Equal("Coldplay en River", result.EventName);
         Assert.True(result.EventHasImage);
         Assert.Equal(trip.Price, result.Price);
-        Assert.Equal(44, result.AvailableSeats); // 45 capacity - 1 reservation
+        Assert.Equal(44, result.AvailableSeats);
         Assert.Equal(trip.DepartureDate, result.DepartureDate);
         Assert.Equal(trip.ArrivalDate, result.ArrivalDate);
         Assert.Single(result.Stops);
@@ -284,8 +284,7 @@ public class GetPublicTripDetailQueryHandlerTests
     [InlineData(TripStatus.Cancelado)]
     public async Task Handle_TripExistsButNotPublicado_ThrowsSameTripNotFound(TripStatus status)
     {
-        // Indistinguishable from "truly doesn't exist" at the exception-type level — same
-        // IDOR-safe rationale as GetPublicTripSeatMapQueryHandler.
+
         var trip = CreateTrip(status);
         var handler = CreateHandler(trip, CreateVehicle(trip.VehicleId, 45));
 

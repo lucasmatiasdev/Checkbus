@@ -40,9 +40,6 @@ namespace Checkbus.ApiService.Application.Auth.Commands
             {
                 _logger.LogWarning("LoginFailed with FailureReason {FailureReason}", "UserNotFound");
 
-                // CU-16 (odd/tasks/auditoria-sistema.md S4): asunción — un email que no coincide
-                // con ningún User no tiene una entidad real para referenciar, así que se audita
-                // sin ActorUserId/OrganizationId, dejando solo el email que ingresó el intento.
                 await WriteAuditLogAsync(
                     AuditAction.LoginFallido,
                     organizationId: null,
@@ -155,8 +152,6 @@ namespace Checkbus.ApiService.Application.Auth.Commands
             };
         }
 
-        // CU-16: no bloqueante — si falla la escritura del AuditLogEntry, se loguea y el login
-        // (éxito o fallo) sigue su curso normal (odd/tasks/auditoria-sistema.md S5).
         private async Task WriteAuditLogAsync(
             AuditAction action,
             Guid? organizationId,

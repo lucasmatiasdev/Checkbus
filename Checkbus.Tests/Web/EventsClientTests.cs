@@ -58,8 +58,6 @@ public class EventsClientTests
         Longitude = -64.2333
     };
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccessWithDeserializedEvent()
     {
@@ -151,8 +149,6 @@ public class EventsClientTests
         Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
         Assert.Contains("Events", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- GetListAsync -----
 
     [Fact]
     public async Task GetListAsync_WhenOk_ReturnsSuccessWithDeserializedList()

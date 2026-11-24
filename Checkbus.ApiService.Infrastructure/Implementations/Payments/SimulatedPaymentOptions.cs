@@ -10,11 +10,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
     /// </summary>
     public class SimulatedPaymentOptions
     {
-        // The API's own externally-reachable base URL (e.g. the tunnel/host serving this app),
-        // used to build the fake checkout_url SimulatedPaymentService.CreateOrderAsync returns
-        // (it must point back at this same app's SimulatedCheckoutController, J2). Blank until
-        // provisioned per-environment (appsettings.Development.json/user-secrets) — a blank value
-        // simply yields a relative checkout_url rather than throwing.
+
         public string ApiBaseUrl { get; set; } = string.Empty;
     }
 }

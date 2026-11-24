@@ -4,8 +4,7 @@ using Checkbus.ApiService.Domain.Interfaces;
 
 namespace Checkbus.ApiService.Domain.Entities.Trips
 {
-    // Private per organization — events are not shared across tenants. FK-only relationship
-    // to Location, no navigation property back.
+
     public class Event : ITenantEntity
     {
         public Guid Id { get; set; }
@@ -16,9 +15,6 @@ namespace Checkbus.ApiService.Domain.Entities.Trips
         public Guid OrganizationId { get; set; }
         public Organization? Organization { get; set; }
 
-        // Opaque storage key for an optional promotional image (ad spot / band photo), same
-        // FileKey/FileContentType shape as VehicleDocument — never a raw URL, served through a
-        // download endpoint that resolves the key via IFileStorageService.
         public string? ImageKey { get; set; }
         public string? ImageContentType { get; set; }
 

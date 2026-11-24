@@ -20,8 +20,7 @@
     }
     else if (confirmation is not null)
     {
-        <!-- R4 inline success view only — the dedicated, persistent/shareable confirmation
-             page keyed by these Reservation ids is explicitly R5's job, not built here. -->
+
         <MudAlert Severity="Severity.Success" Class="mb-4">¡Reserva confirmada!</MudAlert>
         <MudPaper Elevation="2" Class="pa-6 mb-4">
             @foreach (var reservation in confirmation.Reservations.OrderBy(r => r.SeatNumber))
@@ -44,10 +43,7 @@
     }
     else if (!showSeatSelection && detail is not null)
     {
-        <!-- Step 1 — Detalle del viaje (odd/tasks/detalle-reserva-publica.md T4). The image, when
-             present, is its own left-hand page panel — not part of the details card — per the
-             user's explicit split request; scoped to this step only, not the seat-selection or
-             confirmation steps that follow. -->
+
         <MudGrid>
             @if (eventImageDataUri is not null)
             {
@@ -77,11 +73,11 @@
                         </MudItem>
                         <MudItem xs="6">
                             <MudText Typo="Typo.body2" Color="Color.Secondary">Salida</MudText>
-                            <MudText Typo="Typo.body1">@detail.DepartureDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                            <MudText Typo="Typo.body1">@detail.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                         </MudItem>
                         <MudItem xs="6">
                             <MudText Typo="Typo.body2" Color="Color.Secondary">Llegada</MudText>
-                            <MudText Typo="Typo.body1">@detail.ArrivalDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                            <MudText Typo="Typo.body1">@detail.ArrivalDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                         </MudItem>
                     </MudGrid>
                 </MudPaper>
@@ -144,7 +140,7 @@
                         {
                             @if (slot is null)
                             {
-                                <!-- Aisle gap: empty slot between the left and right seat pairs. -->
+
                                 <div style="width: 48px;"></div>
                             }
                             else
@@ -238,9 +234,6 @@
     [Parameter]
     public string Slug { get; set; } = string.Empty;
 
-    // Resolved from Slug in OnInitializedAsync, before any other call on this page — every
-    // method below still takes the real Guid, same as pre-slug. Not a [Parameter]; the route
-    // only ever carries the friendly slug (CU-03, odd/tasks/gaps-reescritura-cu.md T2).
     private Guid tripId;
 
     [Inject]
@@ -249,15 +242,12 @@
     [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
 
-    // Step 1 (detail) state.
     private PublicTripDetailResponse? detail;
     private string? eventImageDataUri;
     private bool isLoading = true;
     private bool notFound;
     private string? errorMessage;
 
-    // Step 2 (seat selection) state — unchanged from before T4, just moved behind
-    // showSeatSelection/isLoadingSeatMap instead of driving the whole page's loading state.
     private bool showSeatSelection;
     private bool isLoadingSeatMap;
     private PublicTripSeatMapResponse? seatMap;
@@ -266,8 +256,6 @@
     private bool isSubmitting;
     private CreateReservationResponse? confirmation;
 
-    // Additive link to R5's dedicated confirmation page, built from the just-created
-    // Reservation ids — does not replace this inline success view.
     private string ConfirmationUrl => confirmation is null
         ? string.Empty
         : $"/reservas/confirmacion/{string.Join(",", confirmation.Reservations.Select(r => r.ReservationId))}";
@@ -276,8 +264,6 @@
     private readonly Dictionary<int, PassengerFormModel> passengerForms = [];
     private readonly Dictionary<int, List<string>> fieldErrors = [];
 
-    // Standard 2+2-with-aisle grid computed from Capacity: each row is
-    // [seatA, seatB, aisle-gap, seatC, seatD]. The null entry marks the aisle gap.
     private List<int?[]> SeatRows { get; set; } = [];
 
     protected override async Task OnInitializedAsync()
@@ -339,8 +325,7 @@
 
     private async Task LoadEventImageAsync()
     {
-        // A missing/broken image is not worth failing the whole detail view over — silently
-        // skip rendering it on NotFound/TransportError rather than surfacing a page-level error.
+
         var outcome = await PublicTripsClient.GetEventImageAsync(tripId);
         if (outcome is PublicTripEventImageOutcome.Success success)
         {
@@ -433,21 +418,14 @@
             switch (outcome)
             {
                 case CreateReservationOutcome.Success success:
-                    // Fase C (odd/tasks/pagos-mercadopago.md): the batch is now a
-                    // payment-pending hold, not a confirmed booking — redirect the browser to
-                    // Mercado Pago to actually pay instead of showing the inline "confirmed"
-                    // view. forceLoad: true because this is a full external navigation away
-                    // from the Blazor app, same as any other off-site redirect.
+
                     if (!string.IsNullOrWhiteSpace(success.Result.CheckoutUrl))
                     {
                         NavigationManager.NavigateTo(success.Result.CheckoutUrl, forceLoad: true);
                     }
                     else
                     {
-                        // Documented-rare fallback (CreateReservationResponse.CheckoutUrl's own
-                        // doc comment): the hold was still created, there is just no redirect
-                        // target — fall back to the inline view so the buyer isn't stranded
-                        // with no feedback at all.
+
                         confirmation = success.Result;
                         selectedSeatNumbers.Clear();
                         passengerForms.Clear();
@@ -455,8 +433,7 @@
                     break;
 
                 case CreateReservationOutcome.Conflict:
-                    // No partial success, no silently dropping just the taken seat — clear
-                    // the whole selection and refetch so the grid reflects current occupancy.
+
                     conflictMessage = "Uno de los asientos elegidos ya fue reservado por otra persona, elegí de nuevo.";
                     selectedSeatNumbers.Clear();
                     passengerForms.Clear();
@@ -482,10 +459,6 @@
         }
     }
 
-    // Minimal client-side gate before hitting the server: every mini-form must have its
-    // required fields filled. The server (CreatePublicReservationCommandValidator) still owns
-    // the authoritative rules (e.g. Email format) — this only avoids an obviously-incomplete
-    // round trip.
     private bool TryBuildClientSideValidForms(out List<Checkbus.Web.Features.PublicReservations.Contracts.PassengerSeatRequest> passengers)
     {
         passengers = [];
@@ -512,8 +485,7 @@
 
             if (!seatIdByNumber.TryGetValue(seatNumber, out var seatId))
             {
-                // Should not happen (the seat map is the source of these numbers), but guard
-                // against a stale client-side selection rather than submitting a bogus id.
+
                 fieldErrors[seatNumber] = ["Este asiento ya no está disponible, elegí otro."];
                 allValid = false;
                 continue;
@@ -534,10 +506,6 @@
         return allValid;
     }
 
-    // Server errors are keyed like "Passengers[1].Email" (FluentValidation's RuleForEach
-    // ChildRules convention) — mapped back to the mini-form at that same position in the
-    // (ordered) selected-seat list. Anything that doesn't parse falls back to a page-level
-    // message instead of being silently dropped.
     private void ApplyValidationErrors(IReadOnlyDictionary<string, string[]> errors)
     {
         var orderedSeatNumbers = selectedSeatNumbers.OrderBy(n => n).ToList();

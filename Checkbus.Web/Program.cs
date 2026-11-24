@@ -27,20 +27,14 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Globalization;
 
-// Checkbus only operates in Argentina - pin the currency/number culture explicitly instead of
-// relying on the host OS's ambient locale, which is absent in a container and falls back to the
-// invariant culture's generic "¤" currency symbol (see Checkbus.ApiService/Program.cs for the
-// same fix on that side).
 var argentineCulture = new CultureInfo("es-AR");
 CultureInfo.DefaultThreadCurrentCulture = argentineCulture;
 CultureInfo.DefaultThreadCurrentUICulture = argentineCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -48,10 +42,6 @@ builder.Services.AddMudServices();
 
 builder.Services.AddOutputCache();
 
-// Browser-exposed Google Maps key for LocationPicker's client-side Maps JavaScript API load —
-// a different key from Checkbus.ApiService's server-side Directions key (see
-// GoogleMapsBrowserOptions's doc comment). Binds permissively like its ApiService counterpart:
-// no key has been provisioned yet, so a missing "GoogleMaps" section must not fail startup.
 var googleMapsBrowserOptions = builder.Configuration.GetSection("GoogleMaps").Get<GoogleMapsBrowserOptions>()
     ?? new GoogleMapsBrowserOptions();
 
@@ -61,9 +51,7 @@ builder.Services.AddTransient<AuthenticationStateHandler>();
 
 builder.Services.AddHttpClient("apiservice", client =>
 {
-    // "http", not "https+http" - this process never presents a TLS certificate for
-    // container-to-container traffic, so letting service discovery try https first produces
-    // a corrupted-TLS-frame error against ApiService's plaintext port instead of a clean fallback.
+
     client.BaseAddress = new Uri("http://apiservice/api/");
 })
     .AddApplicationScopeHandler()
@@ -109,7 +97,7 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+
     app.UseHsts();
 }
 
@@ -163,16 +151,6 @@ app.MapPost("/logout", async (HttpContext httpContext) =>
     return Results.Redirect("/login");
 });
 
-// The browser can't directly hit the API's file-download endpoint — the bearer token normally
-// gets attached via AuthenticationStateHandler on the keyed "apiservice" HttpClient, but that
-// mechanism reads AuthenticationStateProvider.GetAuthenticationStateAsync(), which
-// ServerAuthenticationStateProvider explicitly refuses to run outside a live Razor component's
-// circuit DI scope (throws InvalidOperationException — confirmed via manual smoke test, this is
-// not a theoretical concern). A minimal API endpoint's HTTP request scope is not that circuit, so
-// this handler resolves a plain (non-keyed) "apiservice" HttpClient via IHttpClientFactory — which
-// skips ApplicationScopeHandler entirely, so AuthenticationStateHandler's scope-option check never
-// fires — and attaches the bearer token itself by reading the same "access_token" claim directly
-// off the already-authenticated HttpContext.User, which IS valid in this request scope.
 app.MapGet("/driver-documents/{userId:guid}/{type}", async (
     Guid userId,
     string type,
@@ -198,11 +176,6 @@ app.MapGet("/driver-documents/{userId:guid}/{type}", async (
 })
 .RequireAuthorization();
 
-// Same corrected pattern as the driver-documents proxy above (see its comment for the full
-// rationale): a plain (non-keyed) "apiservice" HttpClient via IHttpClientFactory, with the bearer
-// token attached manually from the already-authenticated HttpContext.User's "access_token" claim —
-// never the keyed client, which depends on a live Razor circuit this minimal-API endpoint does not
-// have.
 app.MapGet("/vehicle-documents/{vehicleId:guid}/{type}", async (
     Guid vehicleId,
     string type,
@@ -228,10 +201,6 @@ app.MapGet("/vehicle-documents/{vehicleId:guid}/{type}", async (
 })
 .RequireAuthorization();
 
-// Same corrected pattern as the other proxies above — a plain (non-keyed) "apiservice"
-// HttpClient via IHttpClientFactory, with the bearer token attached manually. The incoming
-// query string (filters + format) is forwarded as-is rather than re-parsed/rebuilt field by
-// field — this proxy has no business knowing the filter shape, only relaying it.
 app.MapGet("/trips/report/export", async (
     HttpContext httpContext,
     ClaimsPrincipal user,
@@ -259,11 +228,6 @@ app.MapGet("/trips/report/export", async (
 })
 .RequireAuthorization();
 
-// Same corrected pattern as the driver-documents/vehicle-documents proxies above (see the
-// driver-documents comment for the full rationale): a plain (non-keyed) "apiservice" HttpClient
-// via IHttpClientFactory, with the bearer token attached manually from the already-authenticated
-// HttpContext.User's "access_token" claim — never the keyed client, which depends on a live
-// Razor circuit this minimal-API endpoint does not have.
 app.MapGet("/support-tickets/{id:guid}/attachment", async (
     Guid id,
     ClaimsPrincipal user,

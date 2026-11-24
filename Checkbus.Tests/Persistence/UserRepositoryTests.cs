@@ -162,11 +162,7 @@ public class UserRepositoryTests
     [Fact]
     public async Task AddAsync_DuplicateEmailAcrossDifferentOrganizations_IsRejectedByUniqueIndex()
     {
-        // Regression proof for the spec's `user-identity` -> Email Global Uniqueness
-        // requirement (Phase 5, task 5.3 gap closure). The Email unique index itself
-        // pre-dates this change and is untouched by it, but no committed test previously
-        // proved it rejects a duplicate at the database level across two different
-        // organizations — distinct from DocumentNumber, which is scoped per organization.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

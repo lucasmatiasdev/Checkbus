@@ -26,9 +26,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
 
         public async Task Handle(UploadDriverRequirementDocumentCommand request, CancellationToken cancellationToken)
         {
-            // Upload is chofer-self-only: the caller's role must literally be Chofer (an
-            // Administrador must never be able to upload "as" a chofer, even for their own
-            // id — explicit scope cut), AND the caller must be uploading for their own id.
+
             if (_currentUser.Role != nameof(Role.Chofer) || _currentUser.UserId != request.TargetUserId)
             {
                 throw new DriverRequirementAccessDeniedException();
@@ -40,7 +38,6 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
                     $"DriverRequirement row for user {request.TargetUserId} and type {request.Type} is missing. " +
                     "This row must have been auto-created at Chofer registration time.");
 
-            // Avoid orphaned files on re-upload.
             if (requirement.FileKey is not null)
             {
                 await _fileStorageService.DeleteAsync(requirement.FileKey, cancellationToken);
@@ -56,8 +53,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
             requirement.DocumentPresent = true;
             requirement.IssueDate = request.IssueDate;
             requirement.ExpirationDate = request.ExpirationDate;
-            // Always resets to Pendiente on a new upload — a previously-approved document
-            // needs re-review once replaced.
+
             requirement.Status = DriverRequirementStatus.Pendiente;
             requirement.UpdatedAt = DateTime.UtcNow;
 

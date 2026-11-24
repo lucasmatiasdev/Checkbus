@@ -28,12 +28,8 @@ public sealed record ReservationConfirmation
     public string? EventName { get; init; }
     public DateTime DepartureDate { get; init; }
 
-    // CU-11 replacement ("Consultar estado y progreso del viaje", no GPS hardware).
     public required string TripStatus { get; init; }
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md T4) — lets the page poll
-    // GET api/public/trips/{TripId}/location while TripStatus == "En curso". Mirrors the
-    // ReservationConfirmationDto field the API already exposes (see its own doc comment).
     public Guid TripId { get; init; }
     public string? DriverName { get; init; }
     public string? DriverSurname { get; init; }

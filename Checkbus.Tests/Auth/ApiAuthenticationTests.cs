@@ -159,8 +159,7 @@ public class ApiAuthenticationTests : IClassFixture<CheckbusApiFactory>
         var body = await response.Content.ReadFromJsonAsync<CurrentUserResponse>(
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(body);
-        // Anti-IDOR proof: the response must reflect exactly the token's own claims,
-        // never anything else (no client-supplied override is possible here).
+
         Assert.Equal(user.Id, body!.UserId);
         Assert.Equal(user.OrganizationId, body.OrganizationId);
         Assert.Equal(user.Role.ToString(), body.Role);

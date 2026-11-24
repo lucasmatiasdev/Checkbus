@@ -387,7 +387,7 @@
                                 <MudTimelineItem Size="Size.Small">
                                     <MudText Typo="Typo.body2" Class="font-weight-bold">@(trip.EventName ?? "Viaje")</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @(trip.VehiclePatent is not null ? $"{trip.VehiclePatent} · " : "")@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                                        @(trip.VehiclePatent is not null ? $"{trip.VehiclePatent} · " : "")@trip.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                                     </MudText>
                                 </MudTimelineItem>
                             }
@@ -499,7 +499,7 @@
                                         @(trip.EventName ?? "Viaje") — @(trip.VehiclePatent ?? trip.VehicleId.ToString())
                                     </MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @trip.DepartureDate.ToString("dd/MM/yyyy HH:mm") · @(trip.Capacity - trip.AvailableSeats)/@trip.Capacity ocupados
+                                        @trip.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · @(trip.Capacity - trip.AvailableSeats)/@trip.Capacity ocupados
                                     </MudText>
                                 </MudTimelineItem>
                             }
@@ -512,11 +512,7 @@
 </MudContainer>
 
 @code {
-    // Resolved via IServiceProvider.GetRequiredKeyedService, not IHttpClientFactory.CreateClient:
-    // the Application Scope Handler pattern (Phase 5) only attaches the bearer token when the
-    // HttpClient is obtained through the keyed-scoped registration created by
-    // AddApplicationScopeHandler(), so the request carries the circuit's IServiceProvider for
-    // AuthenticationStateHandler to read the "access_token" claim from.
+
     [Inject]
     private IServiceProvider ServiceProvider { get; set; } = default!;
 
@@ -610,9 +606,7 @@
         {
             isLoadingExpiringCount = true;
             isLoadingVehicleExpiringCount = true;
-            // OnInitializedAsync only re-renders once, after the whole method completes — without
-            // this explicit StateHasChanged, isAdministrador becoming true and the spinners turning
-            // on would never reach the DOM before the count fetches below also finish.
+
             StateHasChanged();
             try
             {
@@ -630,8 +624,7 @@
 
             try
             {
-                // Independent card and independent count from the driver-requirements one above —
-                // explicit user decision, never summed into a single combined number.
+
                 var vehicleOutcome = await VehicleDocumentsClient.GetExpiringCountAsync();
                 vehicleExpiringCount = vehicleOutcome switch
                 {
@@ -685,8 +678,7 @@
 
             try
             {
-                // Same cross-tenant GetAuditLogAsync() call Auditoria.razor uses with no filters —
-                // the handler already scopes a CheckbusSoporte caller across every organization.
+
                 var auditOutcome = await AuditLogClient.GetAuditLogAsync();
                 recentAuditEntries = auditOutcome is AuditLogListOutcome.Success auditSuccess
                     ? auditSuccess.Entries.OrderByDescending(entry => entry.CreatedAt).Take(8).ToList()

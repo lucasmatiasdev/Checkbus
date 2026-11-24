@@ -15,8 +15,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         public decimal Price { get; set; }
         public TripStatus Status { get; set; }
 
-        // Display-only join fields — same shape choice as MaintenanceRecordDto's
-        // VehiclePatent/Brand/Model — avoids a second round trip to render the Trips list/detail.
         public string? VehiclePatent { get; set; }
         public string? VehicleBrand { get; set; }
         public string? VehicleModel { get; set; }

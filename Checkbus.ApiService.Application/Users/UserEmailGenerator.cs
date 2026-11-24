@@ -11,11 +11,11 @@ namespace Checkbus.ApiService.Application.Users
     /// </summary>
     public static class UserEmailGenerator
     {
-        public const int MaxLocalPartLength = 64; // RFC 5321 local-part limit
-        public const int MaxBaseLocalPartLength = 62; // reserves 2 chars for a 1..99 suffix
-        public const int MaxSlugLength = 63; // max DNS label length
-        public const int MaxAddressLength = 254; // matches LoginCommandValidator
-        public const int MaxDisambiguationAttempts = 100; // unsuffixed + suffixes 1..99
+        public const int MaxLocalPartLength = 64;
+        public const int MaxBaseLocalPartLength = 62;
+        public const int MaxSlugLength = 63;
+        public const int MaxAddressLength = 254;
+        public const int MaxDisambiguationAttempts = 100;
 
         /// <summary>
         /// Normalizes a name or surname fragment: strips diacritics via NFD decomposition,

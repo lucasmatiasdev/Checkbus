@@ -24,10 +24,7 @@ namespace Checkbus.ApiService.Application.Users.Queries
 
         public async Task<IReadOnlyList<UserListItemDto>> Handle(GetUsersByOrganizationQuery request, CancellationToken cancellationToken)
         {
-            // Role gate (CheckbusSoporte) is enforced at the controller; this handler additionally
-            // verifies the caller's own OrganizationId resolves to the sentinel Checkbus
-            // Organization - defense in depth, same as GetAllSupportTicketsQueryHandler. The
-            // request.OrganizationId is the TARGET organization being browsed, never the caller's.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

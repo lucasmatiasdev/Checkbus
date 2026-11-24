@@ -23,9 +23,7 @@ namespace Checkbus.ApiService.Application.Auth.Commands
 
         public async Task Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
         {
-            // The target is resolved exclusively from the validated JWT claim — the
-            // command carries no user-identifying field, so no request content could
-            // ever redirect this at another user's row (anti-IDOR, D-9).
+
             var userId = _currentUser.UserId;
             var user = userId is null
                 ? null

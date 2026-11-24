@@ -35,8 +35,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             if (existingReservationIds.Count >= reservationIds.Count)
             {
-                // Idempotent no-op read — every Reservation on this Trip already has a
-                // BoardingRecord.
+
                 return;
             }
 

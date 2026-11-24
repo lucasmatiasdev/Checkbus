@@ -37,9 +37,7 @@ public class CurrentUserServiceTests
     [Fact]
     public void UnauthenticatedPrincipal_ReturnsFalseAndAllNull()
     {
-        // An identity built without an authenticationType is, by ClaimsIdentity's own
-        // contract, unauthenticated — even though it carries claims. This proves the
-        // service gates on IsAuthenticated, not merely on claim presence.
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
@@ -79,7 +77,7 @@ public class CurrentUserServiceTests
         Assert.Null(exception);
         Assert.Null(service.UserId);
         Assert.Null(service.OrganizationId);
-        // Unaffected claims still resolve normally — malformed handling is isolated per property.
+
         Assert.Equal("Administrador", service.Role);
         Assert.Equal("jdoe", service.Email);
     }

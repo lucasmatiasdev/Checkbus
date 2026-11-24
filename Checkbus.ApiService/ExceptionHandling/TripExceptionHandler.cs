@@ -35,10 +35,6 @@ namespace Checkbus.ApiService.ExceptionHandling
             }
         }
 
-        // Written as a ValidationProblemDetails (not a plain ProblemDetails) so
-        // Checkbus.Web's TripActionOutcome.ValidationFailed case can parse it exactly like a
-        // FluentValidation 400 and surface the eligibility message directly to the user
-        // (odd/tasks/rutas-publicacion.md: "the message must name which rule failed").
         private static Task WriteEligibilityFailedAsync(HttpContext httpContext, string detail, CancellationToken cancellationToken)
         {
             var problem = new ValidationProblemDetails(new Dictionary<string, string[]>

@@ -40,8 +40,6 @@ public class PublicEndpointsRateLimitingTests : IClassFixture<CheckbusApiFactory
     private const string PublicCreateReservationPathPrefix = "/api/public/trips";
     private const string AuthenticatedTripsPath = "/api/trips";
 
-    // One over the configured PermitLimit (20) in Program.cs's "public-reservations" policy —
-    // enough to deterministically trip the limiter without depending on exact timing.
     private const int BurstCount = 25;
 
     private readonly CheckbusApiFactory _factory;
@@ -57,9 +55,7 @@ public class PublicEndpointsRateLimitingTests : IClassFixture<CheckbusApiFactory
     [Fact]
     public async Task PublicCreateReservation_BurstBeyondConfiguredLimit_EventuallyReturns429()
     {
-        // Empty Passengers list -> CreatePublicReservationCommandValidator's NotEmpty rule
-        // rejects it with 400 before CreatePublicReservationCommandHandler runs, so every
-        // request that gets past the rate limiter fails fast with no DB access.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = _factory.CreateClient();
         var emptyBatchBody = new { Passengers = Array.Empty<object>() };
@@ -83,14 +79,7 @@ public class PublicEndpointsRateLimitingTests : IClassFixture<CheckbusApiFactory
     [Fact]
     public async Task AuthenticatedTripsEndpoint_SameBurstSize_IsNeverRateLimited()
     {
-        // No [EnableRateLimiting] is attached to TripsController (and no global
-        // DefaultRateLimiterPolicy exists in Program.cs), so this authenticated endpoint must
-        // never see a 429 from the public-only policy, no matter how many requests the same
-        // caller/IP sends.
-        //
-        // Posts to Create with an empty Stops list — same "fewer than 2 Stops -> FluentValidation
-        // 400, never touches the DB" shortcut as
-        // TripsControllerAuthorizationTests.Create_AllowedRole_IsNotRejectedAtAuthLayer.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =

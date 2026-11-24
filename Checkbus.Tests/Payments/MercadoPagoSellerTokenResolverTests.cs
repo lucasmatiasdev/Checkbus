@@ -101,8 +101,7 @@ public class MercadoPagoSellerTokenResolverTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var organizationId = Guid.NewGuid();
-        // Inside the resolver's 5-minute buffer, but not yet technically expired — must still
-        // trigger a refresh.
+
         var connection = CreateConnection(organizationId, DateTime.UtcNow.AddMinutes(2));
         var connectionRepository = new FakeConnectionRepository(connection);
         var refreshed = new MercadoPagoOAuthTokenResult(
@@ -124,8 +123,7 @@ public class MercadoPagoSellerTokenResolverTests
         Assert.Equal(connection.Id, persisted.Id);
         Assert.Equal(connection.ConnectedAt, persisted.ConnectedAt);
         Assert.Equal("new-access-token", persisted.AccessToken);
-        // The whole point of Mercado Pago's rotation rule: the OLD refresh token must never be
-        // the one persisted again.
+
         Assert.Equal("new-refresh-token", persisted.RefreshToken);
         Assert.NotEqual("old-refresh-token", persisted.RefreshToken);
     }

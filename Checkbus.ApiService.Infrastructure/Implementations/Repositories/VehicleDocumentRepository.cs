@@ -43,9 +43,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         public async Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
         {
-            // VehicleDocument has no navigation back to Vehicle (FK-only relationship by
-            // design), so the organization scope is applied via a subquery over Vehicles
-            // rather than a join through a navigation property.
+
             var organizationVehicleIds = _context.Vehicles
                 .Where(v => v.OrganizationId == organizationId)
                 .Select(v => v.Id);
@@ -64,9 +62,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             Guid excludeVehicleId,
             CancellationToken cancellationToken)
         {
-            // Same subquery-over-Vehicles pattern as GetExpiringOrExpiredCountByOrganizationAsync:
-            // VehicleDocument has no navigation back to Vehicle, so the organization scope is
-            // applied via a subquery rather than a join through a navigation property.
+
             var organizationVehicleIds = _context.Vehicles
                 .Where(v => v.OrganizationId == organizationId)
                 .Select(v => v.Id);

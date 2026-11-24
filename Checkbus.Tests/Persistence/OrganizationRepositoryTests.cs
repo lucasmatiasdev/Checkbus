@@ -200,9 +200,7 @@ public class OrganizationRepositoryTests
     [Fact]
     public async Task CuitExistsAsync_IsGlobal_NotScopedToAnySingleOrganization()
     {
-        // A CUIT belongs to exactly one Organization system-wide, unlike Trip.Slug which is
-        // only unique per-organization — this proves the lookup takes no organization scope at
-        // all and still finds a CUIT registered under a different, unrelated organization.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

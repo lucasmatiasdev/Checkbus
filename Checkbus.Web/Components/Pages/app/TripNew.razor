@@ -215,10 +215,6 @@
             return;
         }
 
-        // Review-before-create step: nothing is persisted until the user confirms the
-        // MudTimeline in TripReviewDialog. Added specifically because Departure/Arrival dates
-        // typed into the wrong field (e.g. a two-month "trip") previously went unnoticed until
-        // after creation — see odd/tasks/confirmacion-creacion-viaje notes.
         var dialogParameters = new DialogParameters<TripReviewDialog>
         {
             { x => x.EventName, events.FirstOrDefault(e => e.Id == model.EventId)?.Name ?? "" },
@@ -251,8 +247,7 @@
                     break;
 
                 case TripActionOutcome.ValidationFailed validationFailed:
-                    // The eligibility message IS the useful "why" — surface it directly rather
-                    // than replacing it with a generic string.
+
                     errorMessage = string.Join(" ", validationFailed.Errors.Values.SelectMany(messages => messages));
                     break;
 
@@ -316,10 +311,7 @@
             VehicleId = VehicleId!.Value,
             DriverId = DriverId!.Value,
             EventId = EventId!.Value,
-            // The date/time pickers capture the user's local wall-clock instant — must convert
-            // to UTC before sending, same as TripDetail.razor's Finalizar-viaje flow, or the
-            // server's "DepartureDate must be in the future" check (compared against a real
-            // DateTime.UtcNow) misreads any local time as hours in the past.
+
             DepartureDate = DateTime.SpecifyKind(DepartureDate!.Value.Date + DepartureTime!.Value, DateTimeKind.Local).ToUniversalTime(),
             ArrivalDate = DateTime.SpecifyKind(ArrivalDate!.Value.Date + ArrivalTime!.Value, DateTimeKind.Local).ToUniversalTime(),
             Price = Price!.Value,

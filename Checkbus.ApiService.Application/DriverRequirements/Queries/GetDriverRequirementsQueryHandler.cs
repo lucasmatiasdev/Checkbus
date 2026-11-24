@@ -40,16 +40,6 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Queries
                 .ToList();
         }
 
-        // Shared by GetDriverRequirementDocumentQueryHandler ONLY (the download endpoint
-        // needs the exact same self-or-admin-same-organization rule as this read query).
-        // Not promoted to a cross-feature "access guard" abstraction — every other handler
-        // in this slice (upload: chofer-self-only + role gate; validate: admin-only) has a
-        // differently shaped rule and implements its own check inline.
-        //
-        // Rule: an Administrador may act on any Chofer within their own organization;
-        // anyone else may only act on their own id. Cross-tenant existence is never leaked
-        // to an admin caller — targeting a user in another organization throws the same
-        // DriverRequirementNotFoundException as targeting a non-existent id.
         internal static async Task AuthorizeSelfOrAdminAsync(
             Guid targetUserId,
             ICurrentUserService currentUser,

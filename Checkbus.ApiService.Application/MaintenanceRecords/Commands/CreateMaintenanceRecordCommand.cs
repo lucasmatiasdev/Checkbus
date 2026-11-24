@@ -11,8 +11,5 @@ namespace Checkbus.ApiService.Application.MaintenanceRecords.Commands
         public required DateOnly ScheduledDate { get; set; }
         public required string Description { get; set; }
 
-        // Deliberately ABSENT: OrganizationId — tenant scoping is resolved exclusively
-        // from the authenticated caller's token inside the handler (a body-supplied value
-        // would be a cross-tenant IDOR), same pattern as CreateVehicleCommand.
     }
 }

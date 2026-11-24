@@ -8,8 +8,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         public required TripsReportStatisticsDto Statistics { get; set; }
     }
 
-    // Derived only from fields that already exist on Trip (Capacity, AvailableSeats,
-    // Price, Status) — no new Trip columns for this first iteration of CU-07.
     public class TripsReportStatisticsDto
     {
         public int TotalTrips { get; set; }

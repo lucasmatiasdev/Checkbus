@@ -46,8 +46,6 @@ public class SupportTicketsAdminControllerAuthorizationTests : IClassFixture<Che
         return client;
     }
 
-    // ---- GetAll (GET) ----
-
     [Fact]
     public async Task GetAll_MissingToken_Returns401()
     {
@@ -71,8 +69,6 @@ public class SupportTicketsAdminControllerAuthorizationTests : IClassFixture<Che
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- UpdateStatus (PATCH {id}/status) ----
 
     [Fact]
     public async Task UpdateStatus_MissingToken_Returns401()
@@ -107,7 +103,7 @@ public class SupportTicketsAdminControllerAuthorizationTests : IClassFixture<Che
 
         var response = await client.PatchAsync(
             $"{BasePath}/{Guid.NewGuid()}/status",
-            JsonContent.Create(new { NewStatus = 999 }), // invalid SupportTicketStatus -> FluentValidation 400, never touches the DB
+            JsonContent.Create(new { NewStatus = 999 }),
             TestContext.Current.CancellationToken);
 
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);

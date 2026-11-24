@@ -33,10 +33,7 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
         public async Task Handle(UpdateSupportTicketStatusCommand request, CancellationToken cancellationToken)
         {
-            // Role gate (CheckbusSoporte) is enforced at the controller; this handler additionally
-            // verifies the caller's own OrganizationId resolves to the sentinel Checkbus
-            // Organization - defense in depth, never trust the Role claim alone for this
-            // cross-tenant visibility (see CheckbusInternalOrganization's doc comment).
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -46,9 +43,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
                 throw new SupportTicketAccessDeniedException();
             }
 
-            // Staff legitimately sees every organization's tickets, so a missing TicketId is a
-            // genuine 404 - unlike GetSupportTicketAttachmentQueryHandler, there is no cross-tenant
-            // existence to hide here.
             var ticket = await _ticketRepository.GetByIdAsync(request.TicketId, cancellationToken)
                 ?? throw new SupportTicketNotFoundException();
 
@@ -57,16 +51,12 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
             await _ticketRepository.UpdateAsync(ticket, cancellationToken);
 
-            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y el
-            // cambio de estado ya persistido sigue su curso normal.
             try
             {
                 await _auditLogRepository.AddAsync(new AuditLogEntry
                 {
                     Id = Guid.NewGuid(),
-                    // El ticket pertenece a la organización cliente, distinta de la organización
-                    // interna Checkbus del actor (CheckbusSoporte) — así un Administrador de esa
-                    // organización puede ver este evento en su propio alcance (CU-16 S1).
+
                     OrganizationId = ticket.OrganizationId,
                     ActorUserId = _currentUser.UserId,
                     ActorEmail = _currentUser.Email ?? string.Empty,

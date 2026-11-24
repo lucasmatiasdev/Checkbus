@@ -30,19 +30,15 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 
-// Checkbus only operates in Argentina (CUIT-based organizations) - pin the currency/number
-// culture explicitly instead of relying on the host OS's ambient locale, which is absent in a
-// container and falls back to the invariant culture's generic "¤" currency symbol.
 var argentineCulture = new CultureInfo("es-AR");
 CultureInfo.DefaultThreadCurrentCulture = argentineCulture;
 CultureInfo.DefaultThreadCurrentUICulture = argentineCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() 
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
     ?? throw new InvalidOperationException("Missing Jwt configuration section.");
 
 builder.Services.AddSingleton(jwtOptions);
@@ -54,8 +50,6 @@ fileStorageOptions.LocalRootPath =
 
 builder.Services.AddSingleton(fileStorageOptions);
 
-// Unlike Jwt/FileStorage, GoogleMaps binds permissively: no API key has been provisioned yet
-// (added later via dotnet user-secrets), so a missing section/key must not fail startup.
 var googleMapsOptions = builder.Configuration.GetSection("GoogleMaps").Get<GoogleMapsOptions>()
     ?? new GoogleMapsOptions();
 
@@ -65,50 +59,32 @@ builder.Services.AddHttpClient<IDirectionsService, GoogleDirectionsService>(clie
     client.BaseAddress = new Uri("https://maps.googleapis.com/");
 });
 
-// Email binds permissively too: the real Brevo SMTP credentials have not been provisioned yet
-// (added later via dotnet user-secrets), so a missing section/values must not fail startup.
 var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>()
     ?? new EmailOptions();
 
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
-// Support binds permissively too: the real Checkbus notification address may not be
-// provisioned yet, so a missing section/value must not fail startup.
 var supportOptions = builder.Configuration.GetSection("Support").Get<SupportOptions>()
     ?? new SupportOptions();
 
 builder.Services.AddSingleton(supportOptions);
 
-// Mercado Pago binds permissively too, same reason as Email above: real sandbox credentials
-// have not been provisioned yet (G1, odd/tasks/pagos-mercadopago.md) so a missing section/
-// values must not fail startup.
 var mercadoPagoOptions = builder.Configuration.GetSection("MercadoPago").Get<MercadoPagoOptions>()
     ?? new MercadoPagoOptions();
 
 builder.Services.AddSingleton(mercadoPagoOptions);
 
-// Fase J (odd/tasks/pagos-mercadopago.md) — the I10 KYC-blocker workaround: SimulatedPaymentOptions
-// binds permissively too, same reason as MercadoPago/Email above.
 var simulatedPaymentOptions = builder.Configuration.GetSection("Simulation").Get<SimulatedPaymentOptions>()
     ?? new SimulatedPaymentOptions();
 
 builder.Services.AddSingleton(simulatedPaymentOptions);
 
-// J3's named HttpClient for SimulatedCheckoutController's self-POST to this same app's own
-// webhook endpoint (built per-request from Request.Scheme/Host, never a hardcoded base address
-// here — same AddHttpClient<...> registration mechanism as GoogleDirectionsService above, just
-// as a named client since the target is a controller, not a service class).
 builder.Services.AddHttpClient("SimulatedWebhook");
 
 if (mercadoPagoOptions.Simulated)
 {
-    // Deliberate lifetime change from the MercadoPagoPaymentService registration below:
-    // SimulatedPaymentService's in-memory order dictionary must survive across the separate HTTP
-    // requests the simulated flow spans (order creation, checkout-page GET, approve/reject POST,
-    // webhook POST) — a scoped/per-request instance would lose every order immediately. Both
-    // IPaymentService and the narrower ISimulatedOrderStore (SimulatedCheckoutController's own
-    // dependency, J1/J2) resolve to the SAME singleton instance.
+
     builder.Services.AddSingleton<SimulatedPaymentService>();
     builder.Services.AddSingleton<IPaymentService>(sp => sp.GetRequiredService<SimulatedPaymentService>());
     builder.Services.AddSingleton<ISimulatedOrderStore>(sp => sp.GetRequiredService<SimulatedPaymentService>());
@@ -118,19 +94,10 @@ else
     builder.Services.AddScoped<IPaymentService, MercadoPagoPaymentService>();
 }
 
-// Fase I (odd/tasks/pagos-mercadopago.md, Marketplace/Split Payments): encrypts/decrypts
-// MercadoPagoConnection.AccessToken/RefreshToken at rest (OrganizationMercadoPagoConnectionRepository).
-// AddDataProtection() registers IDataProtectionProvider explicitly rather than relying on it
-// being pulled in incidentally by some other ASP.NET Core feature (Antiforgery/cookie auth)
-// that might not always be present.
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<IMercadoPagoOAuthService, MercadoPagoOAuthService>();
 builder.Services.AddScoped<IOrganizationMercadoPagoConnectionRepository, OrganizationMercadoPagoConnectionRepository>();
 
-// Fase J: the real resolver throws OrganizationNotConnectedToMercadoPagoException for every
-// Organization while I10's OAuth connect stays blocked — swap in a dummy resolver alongside the
-// simulated payment service so CreateOrderAsync is actually reached. SimulatedPaymentService
-// ignores sellerAccessToken entirely, so the dummy value is never acted on.
 if (mercadoPagoOptions.Simulated)
 {
     builder.Services.AddSingleton<IMercadoPagoSellerTokenResolver, SimulatedMercadoPagoSellerTokenResolver>();
@@ -139,14 +106,9 @@ else
 {
     builder.Services.AddScoped<IMercadoPagoSellerTokenResolver, MercadoPagoSellerTokenResolver>();
 }
-// I7's own CSRF/account-linking state token — see IMercadoPagoConnectionStateService's own doc
-// comment for why this is a separate Data Protection purpose from
-// OrganizationMercadoPagoConnectionRepository's token encryption.
+
 builder.Services.AddScoped<IMercadoPagoConnectionStateService, MercadoPagoConnectionStateService>();
 
-// The Web app's externally-reachable base URL, used to build links embedded in outgoing
-// emails (odd/tasks/reservas-publicas.md Fase 2) — the API can't infer the frontend's address
-// on its own. Same permissive/blank-until-provisioned shape as GoogleMaps.
 builder.Services.AddSingleton(new PublicWebOptions
 {
     BaseUrl = builder.Configuration["PublicWebBaseUrl"] ?? string.Empty
@@ -207,21 +169,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-// Rate limiting (odd/tasks/reservas-publicas.md R6). Scoped tightly to the project's public,
-// unauthenticated surface only (PublicTripsController/PublicReservationsController, via
-// [EnableRateLimiting] on those controllers) — deliberately NOT a global DefaultPolicy, the
-// same "not a blanket opt-out" principle R3-R5 applied to [AllowAnonymous]. Every authenticated
-// staff endpoint is unaffected: no policy is attached to it, so no limiter ever runs for it.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Partitioned per caller IP, sliding window. 20 requests/minute/IP: generous enough for a
-    // genuine family-of-3 visitor (a few seat-map loads/refreshes while picking seats, plus one
-    // batch submit, well under 20 in a minute) while still shutting down a seat-scraping or
-    // reservation-spam script long before it can meaningfully exhaust seats or data. Not a hard
-    // number from measured traffic (none exists yet for a brand-new public surface) — a
-    // deliberately conservative starting point, easy to retune later from real usage.
     options.AddPolicy("public-reservations", httpContext =>
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -238,7 +189,6 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddControllers(options => options.Filters.Add(new AuthorizeFilter()));
 
-// Add services to the container.
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<AuthExceptionHandler>();
 builder.Services.AddExceptionHandler<UserConflictExceptionHandler>();
@@ -252,7 +202,6 @@ builder.Services.AddExceptionHandler<BoardingExceptionHandler>();
 builder.Services.AddExceptionHandler<SupportTicketExceptionHandler>();
 builder.Services.AddExceptionHandler<OrganizationExceptionHandler>();
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 builder.AddNpgsqlDbContext<CheckbusDbContext>("checkbusdb", configureDbContextOptions: options =>
@@ -263,21 +212,14 @@ builder.AddNpgsqlDbContext<CheckbusDbContext>("checkbusdb", configureDbContextOp
 
 var app = builder.Build();
 
-// Runs in every environment, not just Development - Railway (and every other real deploy
-// target) runs in Production, and this is the only thing that ever creates/updates the schema
-// there (odd/tasks/railway-deploy.md T9). MigrateAsync() is idempotent: a no-op once the schema
-// is already current, so running it on every startup is safe.
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<CheckbusDbContext>();
     var strategy = dbContext.Database.CreateExecutionStrategy();
-    // Any future entity/schema change needs its own `dotnet ef migrations add <Name>
-    // --project Checkbus.ApiService.Infrastructure --startup-project Checkbus.ApiService` —
-    // MigrateAsync() only applies migrations that already exist as files, it does not infer them.
+
     await strategy.ExecuteAsync(() => dbContext.Database.MigrateAsync());
 }
 
-// Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

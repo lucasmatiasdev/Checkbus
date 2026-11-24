@@ -10,11 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Notifications.Commands
 {
-    // CU-04: standalone, manually-triggered notification send. Resolves the audience by scope
-    // (Trip: just that Trip; Event: every Trip tied to it), persists the Notification row FIRST
-    // (it is already real at that point — same "durable truth first, then best-effort notify"
-    // posture as every other handler in this module), then emails every Confirmada passenger
-    // with the same defensive per-recipient catch-and-log loop as StartTripCommandHandler.
+
     public class CreateNotificationCommandHandler : IRequestHandler<CreateNotificationCommand>
     {
         private readonly ITripRepository _tripRepository;
@@ -56,8 +52,6 @@ namespace Checkbus.ApiService.Application.Notifications.Commands
             var affectedTrips = await ResolveAffectedTripsAsync(
                 request.TargetType, request.TargetId, callerOrganizationId, cancellationToken);
 
-            // Already real before anything is sent — mirrors CancelTripCommandHandler's
-            // "flip status first, refund/notify best-effort after" ordering.
             var notification = new Notification
             {
                 Id = Guid.NewGuid(),
@@ -75,9 +69,6 @@ namespace Checkbus.ApiService.Application.Notifications.Commands
             {
                 var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);
 
-                // Only Confirmada reservations: PendientePago is an ephemeral hold, never a real
-                // seat to notify about (see odd/tasks/notificaciones-viaje.md "Decisiones del
-                // usuario").
                 foreach (var reservation in reservations.Where(r => r.Status == ReservationStatus.Confirmada))
                 {
                     try
@@ -111,7 +102,7 @@ namespace Checkbus.ApiService.Application.Notifications.Commands
                 var trip = await _tripRepository.GetByIdAsync(targetId, cancellationToken);
                 if (trip is null || trip.OrganizationId != callerOrganizationId)
                 {
-                    // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                     throw new TripNotFoundException();
                 }
 
@@ -121,7 +112,7 @@ namespace Checkbus.ApiService.Application.Notifications.Commands
             var @event = await _eventRepository.GetByIdAsync(targetId, cancellationToken);
             if (@event is null || @event.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new EventNotFoundException();
             }
 
@@ -142,8 +133,6 @@ namespace Checkbus.ApiService.Application.Notifications.Commands
             return new EmailMessage(passengerEmail, subject, body);
         }
 
-        // Human-readable Spanish label, same style as GetPublicReservationsConfirmationQueryHandler
-        // .MapTripStatus — the raw enum name is not something a passenger-facing email should show.
         private static string GetReasonLabel(NotificationReason reason) => reason switch
         {
             NotificationReason.CambioHorario => "Cambio de horario",

@@ -50,11 +50,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             await NotifyAbsentPassengersAsync(trip.Id, trip.EventId, cancellationToken);
         }
 
-        // CU-12: notify every passenger left Ausente by the close — not everyone on the trip,
-        // since a passenger who already boarded (Abordado) needs no email. Same defensive
-        // posture as every other email-send in this codebase (PaymentApprovedEventHandler):
-        // one passenger's bad/missing email must not block another's, and this must never
-        // throw — CloseBoardingAsync already succeeded by this point.
         private async Task NotifyAbsentPassengersAsync(Guid tripId, Guid eventId, CancellationToken cancellationToken)
         {
             var boardingRecords = await _boardingRecordRepository.GetByTripIdAsync(tripId, cancellationToken);

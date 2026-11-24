@@ -25,8 +25,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
 
         public async Task Handle(ValidateDriverRequirementCommand request, CancellationToken cancellationToken)
         {
-            // Validate is Administrador-only, not self-service at all — not even the
-            // Chofer who owns the row may approve/reject their own document.
+
             if (_currentUser.Role != nameof(Role.Administrador))
             {
                 throw new DriverRequirementAccessDeniedException();
@@ -38,7 +37,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
             var target = await _userRepository.FindByIdAsync(request.TargetUserId, cancellationToken);
             if (target is null || target.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new DriverRequirementNotFoundException();
             }
 
@@ -48,8 +47,6 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
                     $"DriverRequirement row for user {request.TargetUserId} and type {request.Type} is missing. " +
                     "This row must have been auto-created at Chofer registration time.");
 
-            // No requirement that DocumentPresent be true first — an admin can mark
-            // NoApto on an empty row too (e.g. "nothing was ever submitted").
             requirement.Status = request.Approved ? DriverRequirementStatus.Apto : DriverRequirementStatus.NoApto;
             requirement.UpdatedAt = DateTime.UtcNow;
 

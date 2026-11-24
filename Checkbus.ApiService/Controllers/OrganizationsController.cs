@@ -6,10 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Internal CheckbusSoporte tool (odd/tasks/alta-organizacion-soporte.md) — creates a brand
-    // new Organization together with its first Administrador User in one step. Deliberately not
-    // public self-service: every action requires the CheckbusSoporte role, same mechanism
-    // SupportTicketsAdminController already uses for its own internal-staff-only surface.
+
     [Route("api/[controller]")]
     [ApiController]
     public class OrganizationsController : ControllerBase
@@ -29,8 +26,6 @@ namespace Checkbus.ApiService.Controllers
             return StatusCode(StatusCodes.Status201Created, result);
         }
 
-        // CU-16 (odd/tasks/auditoria-sistema.md T4) — [Organización] dropdown for the audit
-        // screen, CheckbusSoporte only (defense in depth re-validated in the handler).
         [Authorize(Roles = "CheckbusSoporte")]
         [HttpGet]
         public async Task<IActionResult> GetAll(CancellationToken cancellationToken)

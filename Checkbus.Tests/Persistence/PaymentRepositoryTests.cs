@@ -84,7 +84,7 @@ public class PaymentRepositoryTests
         var payment = CreatePayment();
         payment.ExternalOrderId = "mp-order-abc";
         await repository.AddAsync(payment, cancellationToken);
-        await repository.AddAsync(CreatePayment(), cancellationToken); // a decoy with no match
+        await repository.AddAsync(CreatePayment(), cancellationToken);
 
         var result = await repository.GetByExternalOrderIdAsync("mp-order-abc", cancellationToken);
 

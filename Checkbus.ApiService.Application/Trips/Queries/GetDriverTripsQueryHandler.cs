@@ -38,11 +38,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
             var trips = await _tripRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
 
-            // Scoped exclusively to the caller's own DriverId. Publicado (upcoming, boardable)
-            // and EnProceso (the chofer already started it, CU-08) both stay visible here — once
-            // the chofer starts their own trip it must not vanish from "Mis Viajes" before they
-            // can reach Finalizar viaje. Programado/Cancelado/Completado are excluded: nothing
-            // left for the driver to do on this screen for those.
             var driverTrips = trips
                 .Where(t => t.DriverId == driverId && t.Status is TripStatus.Publicado or TripStatus.EnProceso)
                 .OrderBy(t => t.DepartureDate)

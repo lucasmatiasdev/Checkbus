@@ -10,14 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // CU-08: flips a Publicado trip to EnProceso. Admin-initiated (Planificador/Administrador) OR
-    // the trip's own Chofer, same tenant-check/role-gate posture as
-    // PublishTripCommandHandler/CancelTripCommandHandler, plus a Chofer-only ownership check
-    // below (the role claim alone never proves it's THIS driver's trip).
+
     public class StartTripCommandHandler : IRequestHandler<StartTripCommand>
     {
-        // ±30 minutes around the scheduled DepartureDate — neither too early (passengers may
-        // still be arriving) nor so late the status would be stale/misleading.
+
         public static readonly TimeSpan StartWindow = TimeSpan.FromMinutes(30);
 
         private readonly ITripRepository _tripRepository;
@@ -57,14 +53,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var trip = await _tripRepository.GetByIdAsync(request.Id, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
             if (_currentUser.Role == nameof(Role.Chofer) && trip.DriverId != _currentUser.UserId)
             {
-                // IDOR-safe: a chofer may only start their OWN trip — existence of someone
-                // else's trip is never leaked, same as the cross-tenant case above.
+
                 throw new TripNotFoundException();
             }
 
@@ -86,8 +81,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             trip.UpdatedAt = DateTime.UtcNow;
             await _tripRepository.UpdateAsync(trip, cancellationToken);
 
-            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y el
-            // inicio del viaje ya persistido sigue su curso normal.
             try
             {
                 await _auditLogRepository.AddAsync(new AuditLogEntry

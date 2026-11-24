@@ -2,9 +2,7 @@ using Checkbus.ApiService.Domain.Enums;
 
 namespace Checkbus.ApiService.Application.Trips.Queries
 {
-    // Same display fields as TripDto, plus the nested Route/Stops detail — kept as a separate
-    // type (rather than reusing TripDto) because GetTripsQueryHandler (list) deliberately never
-    // resolves Route/Stops/Location per item to avoid an N+1 fan-out across the whole list.
+
     public class TripDetailDto
     {
         public required Guid Id { get; set; }
@@ -39,9 +37,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
         public class StopDto
         {
-            // Needed by UpdateStopTimesCommand so the Planificador's edit dialog can submit a
-            // real StopId per row — the public StopDto deliberately has no edit affordance and
-            // so doesn't need this.
+
             public Guid Id { get; set; }
 
             public int Order { get; set; }
@@ -51,8 +47,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             public double Latitude { get; set; }
             public double Longitude { get; set; }
 
-            // Nullable for backward compatibility with pre-existing Stop rows — see
-            // Stop.DepartureTime's doc comment.
             public DateTime? DepartureTime { get; set; }
         }
     }

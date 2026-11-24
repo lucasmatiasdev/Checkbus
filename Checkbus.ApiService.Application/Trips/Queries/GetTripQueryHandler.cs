@@ -38,8 +38,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             var trip = await _tripRepository.GetByIdAsync(request.Id, cancellationToken);
             if (trip is null || trip.OrganizationId != organizationId)
             {
-                // IDOR-safe: a trip belonging to another organization looks identical to a
-                // missing one — cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 

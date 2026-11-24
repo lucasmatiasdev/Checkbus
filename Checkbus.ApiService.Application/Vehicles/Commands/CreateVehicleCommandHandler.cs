@@ -10,9 +10,7 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
 {
     public class CreateVehicleCommandHandler : IRequestHandler<CreateVehicleCommand, CreateVehicleCommandResult>
     {
-        // Universal VehicleDocumentType values, auto-created Pendiente (no dates) the moment
-        // a vehicle is registered. The other 4 enum values are conditional — created later,
-        // only on first upload (odd/tasks/vehiculos.md V3) — never pre-created here.
+
         private static readonly VehicleDocumentType[] UniversalDocumentTypes =
         [
             VehicleDocumentType.Seguro,
@@ -38,8 +36,7 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
 
         public async Task<CreateVehicleCommandResult> Handle(CreateVehicleCommand request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — the command has no
-            // OrganizationId field, so no request body value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -47,9 +44,6 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
             {
                 var owner = await _userRepository.FindByIdAsync(request.OwnerUserId!.Value, cancellationToken);
 
-                // Deliberately generic failure (VehicleOwnerNotFoundException) whether the
-                // user doesn't exist, isn't a Chofer, or belongs to a different organization
-                // — IDOR-safe, mirrors DriverRequirementNotFoundException's precedent.
                 if (owner is null || owner.Role != Role.Chofer || owner.OrganizationId != organizationId)
                 {
                     throw new VehicleOwnerNotFoundException();
@@ -83,9 +77,6 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
 
             await _vehicleRepository.AddAsync(vehicle, cancellationToken);
 
-            // Auto-create the 2 universal VehicleDocument rows (Pendiente, no dates), in the
-            // same unit of work as the vehicle insert — same pattern as
-            // RegisterUserCommandHandler's DriverRequirement auto-creation for Chofer.
             var documentsNow = DateTime.UtcNow;
             var documents = UniversalDocumentTypes.Select(type => new VehicleDocument
             {

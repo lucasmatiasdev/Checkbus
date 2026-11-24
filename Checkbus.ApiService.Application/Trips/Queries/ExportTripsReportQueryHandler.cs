@@ -16,8 +16,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
         public async Task<ExportedReportDto> Handle(ExportTripsReportQuery request, CancellationToken cancellationToken)
         {
-            // Reuses GetTripsReportQueryHandler's filtering/joins/statistics via mediator
-            // instead of duplicating that logic here.
+
             var report = await _sender.Send(
                 new GetTripsReportQuery
                 {

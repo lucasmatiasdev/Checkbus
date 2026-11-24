@@ -19,9 +19,6 @@ public sealed class RegisterOrganizationFormModel
     [StringLength(200, ErrorMessage = "El nombre de la organización no puede superar los 200 caracteres.")]
     public string OrganizationName { get; set; } = string.Empty;
 
-    // Format only: two digits, hyphen, eight digits, hyphen, one digit (e.g. 20-12345678-9) —
-    // same format RegisterOrganizationCommandValidator enforces server-side. Deliberately not a
-    // real Argentine check-digit validation; out of scope.
     [Required(ErrorMessage = "El CUIT es obligatorio.")]
     [RegularExpression(@"^\d{2}-\d{8}-\d$", ErrorMessage = "El CUIT debe tener el formato NN-NNNNNNNN-N.")]
     public string CUIT { get; set; } = string.Empty;

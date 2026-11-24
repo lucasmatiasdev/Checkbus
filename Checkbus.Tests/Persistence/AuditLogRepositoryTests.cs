@@ -72,8 +72,7 @@ public class AuditLogRepositoryTests
         db.Database.EnsureCreated();
 
         var repository = new AuditLogRepository(db);
-        // No Organization/User row created on purpose: a failed login with an unknown email has
-        // no OrganizationId/ActorUserId to attribute, only the attempted ActorEmail.
+
         var entry = CreateEntry(null, null, "unknown@checkbus-demo.com", AuditAction.LoginFallido, DateTime.UtcNow);
 
         await repository.AddAsync(entry, cancellationToken);

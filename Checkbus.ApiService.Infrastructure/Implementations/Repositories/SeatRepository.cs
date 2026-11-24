@@ -23,7 +23,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             if (existingNumbers.Count >= capacity)
             {
-                // Idempotent no-op read — seats already exist for this vehicle.
+
                 return;
             }
 

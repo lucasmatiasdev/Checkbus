@@ -34,12 +34,10 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
-            // Unlike GetByTripIdAsync, includes Cancelada rows — after a trip cancellation every
-            // Reservation on it IS Cancelada, and that is exactly what this report looks at.
             var reservations = await _reservationRepository.GetAllByTripIdAsync(trip.Id, cancellationToken);
 
             var cancelledPaymentIds = reservations
@@ -53,10 +51,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             {
                 var payment = await _paymentRepository.GetByIdAsync(paymentId, cancellationToken);
 
-                // Aprobado/ParcialmenteReembolsado means the gateway actually charged this
-                // Payment at some point and the refund never reached Reembolsado — exactly the
-                // "needs manual follow-up at the gateway" case this report exists for. Pendiente
-                // (never charged) and Reembolsado (already fully refunded) are both non-issues.
                 if (payment is not null && payment.Status is PaymentStatus.Aprobado or PaymentStatus.ParcialmenteReembolsado)
                 {
                     pendingRefunds.Add(new PendingRefundDto

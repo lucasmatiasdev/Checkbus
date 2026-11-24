@@ -32,14 +32,12 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new VehicleNotFoundException();
             }
 
             var documents = await _vehicleDocumentRepository.GetByVehicleIdAsync(request.VehicleId, cancellationToken);
 
-            // At most a handful of document types per vehicle, so resolving each distinct
-            // validator individually is simpler than adding a batch lookup to IUserRepository.
             var validatorNames = new Dictionary<Guid, string>();
             foreach (var validatorId in documents.Where(d => d.ValidatedBy.HasValue).Select(d => d.ValidatedBy!.Value).Distinct())
             {

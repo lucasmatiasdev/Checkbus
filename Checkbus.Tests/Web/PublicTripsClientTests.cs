@@ -292,16 +292,14 @@ public class PublicTripsClientTests
         var success = Assert.IsType<CreateReservationOutcome.Success>(outcome);
         Assert.Single(success.Result.Reservations);
         Assert.Equal(1, success.Result.Reservations[0].SeatNumber);
-        // Fase C (odd/tasks/pagos-mercadopago.md): the created batch is now a payment-pending
-        // hold, so the response carries where to redirect the buyer to actually pay.
+
         Assert.Equal("https://mercadopago.test/checkout/123", success.Result.CheckoutUrl);
     }
 
     [Fact]
     public async Task CreateReservationAsync_WhenCreatedWithNullCheckoutUrl_ReturnsSuccessWithNullCheckoutUrl()
     {
-        // Documented-rare case (CreateReservationResponse.CheckoutUrl's own doc comment) — the
-        // client must not choke deserializing a missing/null CheckoutUrl.
+
         var expected = new CreateReservationResponse { Reservations = [], CheckoutUrl = null };
         var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.Created)
         {

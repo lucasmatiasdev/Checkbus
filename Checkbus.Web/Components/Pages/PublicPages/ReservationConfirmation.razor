@@ -4,10 +4,7 @@
 @using Checkbus.Web.Components.Maps
 @using Checkbus.Web.Features.PublicReservations.Contracts
 @using Checkbus.Web.Features.PublicReservations.Services
-@* This .razor file's own generated page class is also named "ReservationConfirmation" (same
-   convention Blazor always uses: file name -> class name), which shadows the contract record
-   of the same name from the Contracts namespace above — the alias below disambiguates every
-   explicit reference to the DTO in this file's @code block. *@
+
 @using ReservationConfirmationDto = Checkbus.Web.Features.PublicReservations.Contracts.ReservationConfirmation
 
 <PageTitle>Checkbus - Confirmación de reserva</PageTitle>
@@ -19,9 +16,7 @@
     }
     else if (notFound)
     {
-        <!-- Covers both "no valid guid in the route at all" and the API's own 404 (none of
-             the submitted ids resolved to a real Reservation) — same read-only, no-crash
-             requirement either way. -->
+
         <MudAlert Severity="Severity.Error">No encontramos esa reserva.</MudAlert>
     }
     else if (errorMessage is not null)
@@ -39,7 +34,7 @@
             <MudPaper Elevation="2" Class="pa-6 mb-4">
                 <MudText Typo="Typo.h6" Class="mb-2">@reservation.EventName</MudText>
                 <MudText Typo="Typo.body2" Class="mb-4">
-                    Salida: @reservation.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                    Salida: @reservation.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                 </MudText>
 
                 <MudGrid>
@@ -111,9 +106,6 @@
                         }
                     </MudGrid>
 
-                    @* DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md S4) — only while the
-                       trip is actually in progress; LiveLocationMap itself still renders nothing
-                       if the driver hasn't turned tracking on. *@
                     @if (reservation.TripStatus == EnCursoTripStatus)
                     {
                         <LiveLocationMap TripId="@reservation.TripId" />
@@ -176,24 +168,14 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
-    // Reservation.Status is exposed as a plain string by the API (see
-    // ReservationsConfirmationResponse's doc comment) — this page only ever compares against
-    // these literals, matching the server's HasConversion<string>() representation.
     private const string CanceladaStatus = "Cancelada";
     private const string ConfirmadaStatus = "Confirmada";
     private const string PendientePagoStatus = "PendientePago";
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md S4) — reservation.TripStatus's plain
-    // string value for Trip.Status == EnProceso (see GetPublicReservationsConfirmationQueryHandler),
-    // gating the live-tracking map below.
     private const string EnCursoTripStatus = "En curso";
 
     private ReservationsConfirmationResponse? confirmation;
 
-    // Mutable local copy of confirmation.Reservations (itself an IReadOnlyList<record> with
-    // init-only properties) so a successful cancel can flip just that one row's displayed
-    // Status in place — same "flip the one field that changed" precedent R2's TripDetail.razor
-    // used — without a full page reload/refetch.
     private List<ReservationConfirmationDto> displayedReservations = [];
 
     private readonly HashSet<Guid> cancellingReservationIds = [];
@@ -208,8 +190,7 @@
         var ids = ParseReservationIds(ReservationIds);
         if (ids.Count == 0)
         {
-            // No valid GUID in the route segment at all — same user-facing message as the
-            // API's own "none resolved" 404, no separate error state needed.
+
             notFound = true;
             isLoading = false;
             return;
@@ -273,8 +254,7 @@
                     break;
 
                 case CancelReservationOutcome.NotCancellable notCancellable:
-                    // Row-specific, not a page-level alert: the reason ("ya abordó" / "faltan
-                    // menos de 24hs") is only meaningful next to the reservation it blocks.
+
                     rowErrorsByReservationId[reservation.ReservationId] = notCancellable.Message;
                     break;
 
@@ -293,18 +273,8 @@
         }
     }
 
-    // Added in odd/tasks/pagos-mercadopago.md Fase C2: a PendientePago row is a payment-pending
-    // hold, not an actual booking yet — offering to "cancel" it here would be a different,
-    // unscoped operation (CancelReservationCommandHandler only knows how to cancel a
-    // Confirmada reservation). Public and static (not private) specifically so this pure logic
-    // is unit-testable without bUnit, which this repo does not have (see
-    // RegisterUserPageAuthorizationTests's own doc comment for that same constraint).
     public static bool CanCancel(string status) => status == ConfirmadaStatus;
 
-    // Plain-string status values coming straight off the server (see the field's own doc
-    // comment above) rendered as short, buyer-facing Spanish labels instead of the raw enum
-    // name — "PendientePago" read literally would be confusing to a non-technical visitor.
-    // Falls back to the raw value for anything unrecognized rather than hiding it.
     public static string GetStatusLabel(string status) => status switch
     {
         ConfirmadaStatus => "Confirmada",
@@ -313,10 +283,6 @@
         _ => status
     };
 
-    // The route segment is a comma-separated list of Reservation ids (the small batch
-    // returned together by one R4 submission) — any entry that isn't a valid GUID is
-    // dropped rather than failing the whole page, same "omit, don't error" posture as the
-    // API handler.
     private static List<Guid> ParseReservationIds(string raw)
     {
         var ids = new List<Guid>();

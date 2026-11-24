@@ -201,8 +201,6 @@ public class BoardingRecordRepositoryTests
         var repository = new BoardingRecordRepository(db);
         await repository.EnsureForTripAsync(trip.Id, cancellationToken);
 
-        // Second call must be a pure no-op read — no duplicate inserts, no unique-index
-        // violation, still exactly one row per Reservation.
         await repository.EnsureForTripAsync(trip.Id, cancellationToken);
 
         var records = await db.BoardingRecords

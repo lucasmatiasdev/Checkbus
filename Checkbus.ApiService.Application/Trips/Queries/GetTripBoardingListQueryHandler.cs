@@ -35,9 +35,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
         {
             var trip = await AuthorizeDriverOwnsTripAsync(request.TripId, _tripRepository, _currentUser, cancellationToken);
 
-            // Lazily, idempotently backfill any BoardingRecord rows this Trip's Reservations
-            // never got — safe to call on every boarding-screen open (see
-            // IBoardingRecordRepository.EnsureForTripAsync's doc comment).
             await _boardingRecordRepository.EnsureForTripAsync(trip.Id, cancellationToken);
 
             var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);
@@ -58,9 +55,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                 var passenger = await _passengerRepository.GetByIdAsync(reservation.PassengerId, cancellationToken);
                 if (passenger is null || !seatsById.TryGetValue(reservation.SeatId, out var seat))
                 {
-                    // Should not happen given FK integrity, but a Reservation whose
-                    // Passenger/Seat row is missing cannot be rendered meaningfully — omit it
-                    // rather than crashing the whole boarding list for the rest.
+
                     continue;
                 }
 
@@ -74,8 +69,7 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                     PassengerSurname = passenger.Surname,
                     PassengerDocumentType = passenger.DocumentType,
                     PassengerDocumentNumber = passenger.DocumentNumber,
-                    // Deliberately NOT passenger.Email / passenger.Phone — see
-                    // TripBoardingListDto's doc comment.
+
                     Status = boardingRecord?.Status ?? Domain.Enums.BoardingStatus.Pendiente
                 });
             }
@@ -83,12 +77,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             return new TripBoardingListDto { Passengers = passengers };
         }
 
-        // Shared by ValidateBoardingCommandHandler and CloseBoardingCommandHandler — every
-        // action on this boarding surface needs the exact same "the Trip exists, belongs to
-        // the caller's organization, and its DriverId is the caller's own id" rule. IDOR-safe:
-        // a non-existent Trip, a cross-tenant Trip, and someone else's Trip are all
-        // indistinguishable to the caller (same TripNotFoundException CreatePublicReservationCommandHandler
-        // throws for "exists but not published" — "exists but not mine" gets the same treatment).
         internal static async Task<Trip> AuthorizeDriverOwnsTripAsync(
             Guid tripId,
             ITripRepository tripRepository,

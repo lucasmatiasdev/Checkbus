@@ -37,8 +37,7 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
         public async Task<SupportTicketDto> Handle(CreateSupportTicketCommand request, CancellationToken cancellationToken)
         {
-            // Tenant and author come exclusively from the validated claims - the command has
-            // no OrganizationId/UserId field, so no request value can ever influence them.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -72,10 +71,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
 
             await _ticketRepository.AddAsync(ticket, cancellationToken);
 
-            // Sending happens after the ticket is durably persisted: it is already real at this
-            // point, so a flaky SMTP relay must never turn into a failed response for the
-            // caller - same posture CancelReservationCommandHandler uses for its cancellation
-            // email.
             if (!string.IsNullOrWhiteSpace(_supportOptions.NotificationEmail))
             {
                 try
@@ -145,9 +140,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Commands
             return new EmailMessage(notificationEmail, subject, body);
         }
 
-        // Display-only label, never stored or used as a lookup key - truncating to 8 hex chars
-        // (32 bits) trades a small, accepted collision risk (~50% past ~65k tickets) for a
-        // human-readable reference. The real Guid in ticket.Id remains the sole source of truth.
         private static string FormatDisplayId(Guid id) => $"#TK-{id.ToString("N")[..8].ToUpperInvariant()}";
 
         private static SupportTicketDto MapToDto(SupportTicket ticket)

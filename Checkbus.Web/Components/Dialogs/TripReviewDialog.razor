@@ -39,10 +39,7 @@
 </MudDialog>
 
 @code {
-    // Shown by TripNew.razor's HandleValidSubmit BEFORE the actual CreateAsync call — nothing
-    // is persisted until the user confirms here. The timeline exists specifically so a
-    // Departure/Arrival date mix-up (entered in the wrong field) is visually obvious before
-    // submission, rather than only discoverable afterward.
+
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 

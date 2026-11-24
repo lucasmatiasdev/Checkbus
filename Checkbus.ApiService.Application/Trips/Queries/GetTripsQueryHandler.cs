@@ -31,22 +31,18 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
         public async Task<IReadOnlyList<TripDto>> Handle(GetTripsQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — mirrors GetVehiclesQueryHandler.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var trips = await _tripRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
 
-            // Vehicles/drivers referenced by this org's trips are always themselves in this org
-            // (enforced at creation time), so a single org-scoped fetch each covers every join.
             var vehicles = await _vehicleRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
             var vehiclesById = vehicles.ToDictionary(v => v.Id);
 
             var users = await _userRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
             var usersById = users.ToDictionary(u => u.Id);
 
-            // Event is a shared catalog with no batch-by-ids lookup, so resolve each distinct
-            // Event at most once — mirrors GetEventsQueryHandler's Location resolution.
             var eventsById = new Dictionary<Guid, Event>();
             foreach (var eventId in trips.Select(t => t.EventId).Distinct())
             {

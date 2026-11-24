@@ -54,7 +54,7 @@
                     <MudPaper Elevation="2" Class="pa-4">
                         <MudText Typo="Typo.h6" Class="mb-2">@trip.EventName</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">Salida</MudText>
-                        <MudText Typo="Typo.body1" Class="mb-2">@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-2">@trip.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">Precio</MudText>
                         <MudText Typo="Typo.body1" Class="mb-4">@trip.Price.ToString("C")</MudText>
                         <MudButton Variant="Variant.Filled"
@@ -106,9 +106,7 @@
                     break;
 
                 case GetPublicOrganizationTripsOutcome.NotFound:
-                    // Not currently returned by the API (an unknown orgSlug resolves to an
-                    // empty Success list instead — see the outcome's own doc comment), kept
-                    // here only for completeness alongside every switch over this outcome type.
+
                     trips = [];
                     break;
 

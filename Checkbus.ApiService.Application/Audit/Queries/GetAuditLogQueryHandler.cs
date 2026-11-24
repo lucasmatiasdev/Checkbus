@@ -33,11 +33,7 @@ namespace Checkbus.ApiService.Application.Audit.Queries
 
             if (_currentUser.Role == nameof(Role.CheckbusSoporte))
             {
-                // Role gate (Administrador,CheckbusSoporte) is enforced at the controller; this
-                // handler additionally verifies the caller's own OrganizationId resolves to the
-                // sentinel Checkbus Organization - defense in depth, never trust the Role claim
-                // alone for this cross-tenant visibility (same pattern as
-                // GetAllSupportTicketsQueryHandler).
+
                 var slug = await _organizationRepository.GetSlugByIdAsync(organizationId, cancellationToken);
                 if (slug != CheckbusInternalOrganization.Slug)
                 {
@@ -51,15 +47,13 @@ namespace Checkbus.ApiService.Application.Audit.Queries
             }
             else if (_currentUser.Role == nameof(Role.Administrador))
             {
-                // Scope is always the caller's own organization - any OrganizationId filter in
-                // the request is ignored for this role (CU-16 main flow).
+
                 entries = await _auditLogRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
                 crossTenant = false;
             }
             else
             {
-                // Should never be reached past the controller's [Authorize(Roles = ...)] -
-                // defense in depth, same criterion as the rest of the codebase.
+
                 throw new AuditLogAccessDeniedException();
             }
 
@@ -71,10 +65,6 @@ namespace Checkbus.ApiService.Application.Audit.Queries
                 .OrderByDescending(e => e.CreatedAt)
                 .ToList();
 
-            // Resolve each distinct OrganizationId's display Name once, instead of calling the
-            // repository once per row - mirrors GetAllSupportTicketsQueryHandler.MapToDto. Only
-            // needed when the scope is cross-tenant (CheckbusSoporte); an Administrador's rows
-            // are all their own single organization, so OrganizationName stays null.
             var organizationNames = new Dictionary<Guid, string>();
             if (crossTenant)
             {

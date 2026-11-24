@@ -95,9 +95,7 @@ public class PublicReservationsClientTests
     [Fact]
     public async Task GetConfirmationAsync_GetsExpectedRouteWithRepeatedIdsKeys()
     {
-        // ASP.NET Core model-binds IReadOnlyList<Guid> from repeated "ids=" query keys, not a
-        // single comma-joined value — a comma-joined "ids=a,b" fails binding with a 400 (found
-        // during R7 manual smoke testing).
+
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
@@ -112,10 +110,6 @@ public class PublicReservationsClientTests
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"public/reservations?ids={id1}&ids={id2}", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // Proves PublicReservationsClient.CancelReservationAsync (odd/tasks/reservas-publicas.md
-    // Fase 4 / C5) maps every realistic api/public/reservations/{id}/cancel response into the
-    // matching CancelReservationOutcome case. Mirrors the GetConfirmationAsync tests above.
 
     [Fact]
     public async Task CancelReservationAsync_WhenNoContent_ReturnsSuccess()

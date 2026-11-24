@@ -62,10 +62,7 @@ public sealed class SupportTicketsAdminClient([FromKeyedServices("apiservice")] 
         HttpResponseMessage response;
         try
         {
-            // The keyed "apiservice" HttpClient's BaseAddress already ends in "/api/" (see
-            // Program.cs), so this relative path resolves to "api/support-tickets-admin" — the
-            // controller's literal route, not the "api/[controller]" token SupportTicketsClient's
-            // target uses.
+
             response = await _httpClient.GetAsync("support-tickets-admin", cancellationToken);
         }
         catch (Exception)
@@ -96,8 +93,7 @@ public sealed class SupportTicketsAdminClient([FromKeyedServices("apiservice")] 
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new SupportTicketsAdminListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

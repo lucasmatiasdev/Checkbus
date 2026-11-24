@@ -119,9 +119,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task Passenger_AllowsDuplicateDocumentNumber_NoDedup()
     {
-        // Explicit design decision in odd/tasks/reservas-publicas.md: Passenger is NOT a
-        // reusable catalog — a fresh row is created on every reservation even when the
-        // DocumentNumber repeats. No unique index exists on DocumentNumber.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -245,10 +243,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task Reservation_UniqueIndex_DuplicateTripIdAndSeatId_IsRejected()
     {
-        // The real double-booking guard added in R4 (odd/tasks/reservas-publicas.md): a
-        // unique index on Reservation(TripId, SeatId). Two different Passengers trying to
-        // book the same Seat on the same Trip must be rejected at the DB level even if an
-        // application-level pre-check were somehow bypassed.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -344,10 +339,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task Reservation_FilteredUniqueIndex_CanceladaRow_DoesNotBlockNewConfirmadaOnSameSeat()
     {
-        // The actual regression this phase (odd/tasks/reservas-publicas.md Fase 4 / C1) is
-        // built to prevent: once a Reservation is Cancelada, its Seat must be re-bookable on
-        // the same Trip without tripping the unique index on (TripId, SeatId) — that index is
-        // now filtered (WHERE "Status" <> 'Cancelada') specifically so this insert succeeds.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -431,8 +423,6 @@ public class ReservationPersistenceTests
         db.Reservations.Add(cancelledReservation);
         await db.SaveChangesAsync(cancellationToken);
 
-        // A brand-new, still-Confirmada Reservation for the SAME (TripId, SeatId) must not
-        // throw, because the cancelled row above no longer counts against the unique index.
         db.Reservations.Add(new Reservation
         {
             Id = Guid.NewGuid(),
@@ -452,11 +442,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task Reservation_FilteredUniqueIndex_PendientePagoRow_BlocksNewReservationOnSameSeat()
     {
-        // Sibling of Reservation_FilteredUniqueIndex_CanceladaRow_DoesNotBlockNewConfirmadaOnSameSeat
-        // (odd/tasks/pagos-mercadopago.md Fase A / A2): the filtered unique index on
-        // (TripId, SeatId) excludes only Cancelada rows, so a PendientePago row — the new
-        // payment-hold state — must still count as "active" and block a second Reservation on
-        // the same seat, with no index change required.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -539,9 +525,6 @@ public class ReservationPersistenceTests
         });
         await db.SaveChangesAsync(cancellationToken);
 
-        // A second Reservation for the SAME (TripId, SeatId) must still be rejected while the
-        // first one sits in PendientePago — it is not Cancelada, so it keeps counting against
-        // the filtered unique index.
         db.Reservations.Add(new Reservation
         {
             Id = Guid.NewGuid(),
@@ -556,10 +539,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task ReservationRepository_CancelAsync_SetsStatusToCancelada_AndFreesTheSeatForANewReservation()
     {
-        // Repository-level equivalent of the EF test above (odd/tasks/reservas-publicas.md
-        // Fase 4 / C6): going through ReservationRepository.CancelAsync (not raw EF) must
-        // produce the exact same persisted effect — Status flips to Cancelada and the
-        // filtered unique index no longer blocks a new Reservation on the same seat.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -648,8 +628,6 @@ public class ReservationPersistenceTests
         var reloaded = await db.Reservations.FirstAsync(r => r.Id == reservation.Id, cancellationToken);
         Assert.Equal(ReservationStatus.Cancelada, reloaded.Status);
 
-        // The freed seat must accept a brand-new Confirmada Reservation on the same
-        // (TripId, SeatId) without tripping the filtered unique index.
         db.Reservations.Add(new Reservation
         {
             Id = Guid.NewGuid(),
@@ -664,11 +642,7 @@ public class ReservationPersistenceTests
     [Fact]
     public async Task ReservationRepository_GetByTripIdAsync_ExcludesCanceladaReservations()
     {
-        // Follow-up to Fase 4 / C1 (odd/tasks/reservas-publicas.md): a Cancelada Reservation
-        // must not count as occupying its Seat. GetByTripIdAsync now filters it out at the
-        // repository level so every caller (GetPublicTripSeatMapQueryHandler,
-        // GetPublicTripDetailQueryHandler, CreatePublicReservationCommandHandler's pre-check)
-        // stays correct without each one re-deriving "active" itself.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

@@ -39,7 +39,7 @@ public class LoginCommandValidatorTests
     public void Email_TooLong_IsRejected()
     {
         var command = ValidCommand();
-        command.Email = new string('a', 250) + "@x.co"; // 255 chars
+        command.Email = new string('a', 250) + "@x.co";
 
         var result = _validator.TestValidate(command);
 
@@ -70,11 +70,9 @@ public class LoginCommandValidatorTests
     [Fact]
     public void Password_SevenChars_IsAccepted()
     {
-        // The login password-length floor was removed: a newly-registered user's
-        // initial password is their DocumentNumber, which may legitimately be as
-        // short as 7 characters (Argentine DNIs). Only NotEmpty/MaximumLength remain.
+
         var command = ValidCommand();
-        command.Password = "abcdefg"; // 7 chars
+        command.Password = "abcdefg";
 
         var result = _validator.TestValidate(command);
 

@@ -97,8 +97,7 @@ public class GoogleDirectionsServiceTests
     [Fact]
     public async Task GetDirectionsAsync_WhenMultiLegOk_PopulatesLegDurationsOrderedPerLeg()
     {
-        // The whole point of D1: the per-leg breakdown must survive, ordered, instead of being
-        // collapsed straight into the sum — legDurations[i] corresponds to points[i]->points[i+1].
+
         var (service, _) = CreateService(MakeJsonResponse(MultiLegSuccessJson));
 
         var result = await service.GetDirectionsAsync(ThreePoints, CancellationToken.None);

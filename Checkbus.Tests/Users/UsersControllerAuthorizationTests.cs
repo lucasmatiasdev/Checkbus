@@ -116,10 +116,7 @@ public class UsersControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
     [Fact]
     public async Task Register_MissingNameWithExtraOrganizationIdProperty_Returns400()
     {
-        // RegisterUserCommand has no OrganizationId field, so model binding silently
-        // ignores the extra body property below rather than erroring on it; this request
-        // still 400s on the invalid Name, proving the body binds against the real contract
-        // and an attacker-supplied organizationId has no path into the command at all.
+
         var client = CreateAuthorizedClient(Role.Administrador);
         var body = new
         {

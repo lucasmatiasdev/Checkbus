@@ -134,8 +134,7 @@ public partial class LocationPicker : ComponentBase, IAsyncDisposable
             }
             catch (JSDisconnectedException)
             {
-                // Circuit already torn down (e.g. the user navigated away) — nothing left to
-                // clean up client-side.
+
             }
 
             await _module.DisposeAsync();

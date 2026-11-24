@@ -9,8 +9,6 @@ namespace Checkbus.ApiService.Application.MaintenanceRecords.Commands
         {
             RuleFor(x => x.Status).IsInEnum();
 
-            // EnProceso implies the service visit has actually started — conditional
-            // validation style mirrors CreateVehicleCommandValidator's OwnerType branches.
             When(x => x.Status == MaintenanceStatus.EnProceso, () =>
             {
                 RuleFor(x => x.StartDate)

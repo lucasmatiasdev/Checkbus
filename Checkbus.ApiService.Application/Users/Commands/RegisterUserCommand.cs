@@ -12,8 +12,5 @@ namespace Checkbus.ApiService.Application.Users.Commands
         public required string DocumentNumber { get; set; }
         public required Role Role { get; set; }
 
-        // Deliberately ABSENT: Email (generated), Password (derived from DocumentNumber),
-        // OrganizationId (from the validated token — a body-supplied value would be a
-        // cross-tenant IDOR).
     }
 }

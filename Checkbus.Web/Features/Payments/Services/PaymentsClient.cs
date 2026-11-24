@@ -58,8 +58,7 @@ public sealed class PaymentsClient([FromKeyedServices("apiservice")] HttpClient 
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body must not bubble up as an unhandled
-                // exception — the caller only ever expects a typed outcome.
+
                 return new MercadoPagoConnectionStatusOutcome.TransportError(
                     "Ocurrió un error inesperado. Probá de nuevo.");
             }

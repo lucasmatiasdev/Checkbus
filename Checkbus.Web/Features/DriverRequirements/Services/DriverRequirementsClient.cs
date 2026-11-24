@@ -66,8 +66,7 @@ public sealed class DriverRequirementsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new DriverRequirementsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -137,8 +136,7 @@ public sealed class DriverRequirementsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new DriverRequirementActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -194,8 +192,7 @@ public sealed class DriverRequirementsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new DriverRequirementActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -237,8 +234,7 @@ public sealed class DriverRequirementsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new DriverRequirementCountOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

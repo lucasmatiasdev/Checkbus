@@ -128,9 +128,7 @@ public class RegisterUserCommandValidatorTests
     [Fact]
     public void DocumentNumber_SevenChars_PasaporteType_IsAccepted()
     {
-        // No generic MinimumLength on this field: the Q1 decision moved the short-password
-        // floor to login, not to the document number used here as the initial password.
-        // The exact-8-digit rule below only applies to DocumentType.DNI (CU-06).
+
         var command = ValidCommand();
         command.DocumentType = DocumentType.Pasaporte;
         command.DocumentNumber = "4012345";
@@ -201,9 +199,7 @@ public class RegisterUserCommandValidatorTests
     [Fact]
     public void Role_CheckbusSoporte_IsRejected()
     {
-        // CheckbusSoporte must never be self-registered: it is only ever meaningful for a
-        // user of the sentinel Checkbus-internal organization and is created exclusively by
-        // seeding (see CheckbusDbSeeder), never through this self-service registration path.
+
         var command = ValidCommand();
         command.Role = Role.CheckbusSoporte;
 

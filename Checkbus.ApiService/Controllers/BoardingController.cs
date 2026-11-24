@@ -8,11 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Chofer-facing boarding/abordaje surface (odd/tasks/reservas-publicas.md Fase 3). Every
-    // action is role-gated to Chofer, NOT anonymous — the opposite posture from
-    // Public/PublicTripsController: this is an authenticated staff surface, and every handler
-    // additionally verifies Trip.DriverId == the caller's own id (IDOR-safe ownership check),
-    // not just the role claim.
+
     [Route("api/[controller]")]
     [ApiController]
     public class BoardingController : ControllerBase
@@ -57,8 +53,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — the driver's own device toggles
-        // and posts its Geolocation position while the trip is in progress.
         [Authorize(Roles = nameof(Role.Chofer))]
         [HttpPost("{tripId:guid}/location/toggle")]
         public async Task<IActionResult> ToggleLiveTracking(

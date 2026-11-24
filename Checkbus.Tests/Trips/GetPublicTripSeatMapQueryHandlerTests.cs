@@ -100,9 +100,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
         public bool ReleaseExpiredHoldsCalled { get; private set; }
 
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
-            // Excludes Cancelada, matching ReservationRepository's real contract — needed so a
-            // hold just released by ReleaseExpiredHoldsAsync below correctly stops counting as
-            // occupied in the same Handle() call.
+
             => Task.FromResult<IReadOnlyList<Reservation>>(
                 reservations.Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada).ToList());
 
@@ -119,9 +117,6 @@ public class GetPublicTripSeatMapQueryHandlerTests
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by GetPublicTripSeatMapQueryHandler.");
 
-        // Fase E: mirrors ReservationRepository.ReleaseExpiredHoldsAsync's real behavior
-        // in-memory, so this handler's own tests can prove the call site actually releases an
-        // expired hold before occupancy is computed, not just that it was invoked.
         public Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
         {
             ReleaseExpiredHoldsCalled = true;
@@ -182,7 +177,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
         {
             Id = Guid.NewGuid(),
             TripId = trip.Id,
-            SeatId = seats[1].Id, // Number = 2
+            SeatId = seats[1].Id,
             PassengerId = Guid.NewGuid(),
             Price = trip.Price
         };
@@ -217,10 +212,6 @@ public class GetPublicTripSeatMapQueryHandlerTests
             handler.Handle(new GetPublicTripSeatMapQuery { TripId = Guid.NewGuid() }, TestContext.Current.CancellationToken));
     }
 
-    // Fase E (odd/tasks/pagos-mercadopago.md): a PendientePago hold older than
-    // HoldExpirationMinutes must be released (and its seat freed) on the very next seat-map
-    // read — proves the call site wires ReleaseExpiredHoldsAsync in before occupancy is
-    // computed, not just that the repository method itself works.
     [Fact]
     public async Task Handle_PendientePagoReservationOlderThanHoldExpiration_IsReleasedAndSeatBecomesAvailable()
     {
@@ -257,8 +248,6 @@ public class GetPublicTripSeatMapQueryHandlerTests
         Assert.Empty(result.OccupiedSeatNumbers);
     }
 
-    // The mirror case: a PendientePago hold still inside the window must survive untouched —
-    // the seat stays occupied.
     [Fact]
     public async Task Handle_PendientePagoReservationYoungerThanHoldExpiration_IsLeftUntouched()
     {
@@ -300,8 +289,7 @@ public class GetPublicTripSeatMapQueryHandlerTests
     [InlineData(TripStatus.Cancelado)]
     public async Task Handle_TripExistsButNotPublicado_ThrowsSameTripNotFound(TripStatus status)
     {
-        // Indistinguishable from "truly doesn't exist" at the exception-type level — the
-        // whole point of this public surface's IDOR-safe gate.
+
         var trip = CreateTrip(status);
         var handler = new GetPublicTripSeatMapQueryHandler(
             new FakeTripRepository(trip),

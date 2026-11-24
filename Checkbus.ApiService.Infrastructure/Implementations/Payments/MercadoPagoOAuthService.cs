@@ -60,10 +60,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // No dedicated Domain exception exists for an OAuth failure (same posture
-                // MercadoPagoPaymentService already uses for GetOrderAsync/RefundAsync — Fase A
-                // only ever added OrderCreationFailedException for the order-create path
-                // specifically).
+
                 throw new InvalidOperationException("Mercado Pago OAuth code exchange failed.", ex);
             }
         }
@@ -72,8 +69,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
         {
             try
             {
-                // See this class's own doc comment: the SDK repurposes RequestOptions.AccessToken
-                // to carry the platform app's ClientSecret for this specific call.
+
                 var requestOptions = new RequestOptions { AccessToken = options.ClientSecret };
                 var credential = await _oauthClient.RefreshOAuthCredentialAsync(refreshToken, requestOptions, cancellationToken);
 

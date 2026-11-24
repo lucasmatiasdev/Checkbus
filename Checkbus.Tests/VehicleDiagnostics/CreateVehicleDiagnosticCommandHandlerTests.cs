@@ -135,7 +135,7 @@ public class CreateVehicleDiagnosticCommandHandlerTests
     [Fact]
     public async Task Handle_CrossOrganizationVehicle_ThrowsMaintenanceRecordNotFoundException()
     {
-        var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
+        var vehicle = CreateVehicle(Guid.NewGuid());
         var record = CreateRecord(vehicle.Id);
         var diagnosticRepository = new FakeVehicleDiagnosticRepository();
         var handler = new CreateVehicleDiagnosticCommandHandler(

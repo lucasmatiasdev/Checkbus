@@ -26,16 +26,14 @@ namespace Checkbus.ApiService.Application.MaintenanceRecords.Commands
 
         public async Task<MaintenanceRecordDto> Handle(CreateMaintenanceRecordCommand request, CancellationToken cancellationToken)
         {
-            // Role gate (Mecanico/Administrador) is enforced at the controller; this handler
-            // only needs to verify tenant ownership of the target vehicle (IDOR-safe, mirrors
-            // UploadVehicleDocumentCommandHandler / CreateVehicleCommandHandler).
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new VehicleNotFoundException();
             }
 

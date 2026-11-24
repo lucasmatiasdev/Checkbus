@@ -11,9 +11,7 @@ namespace Checkbus.Tests.SupportTickets;
 
 public class GetAllSupportTicketsQueryHandlerTests
 {
-    // Local fake, not the shared one in GetMySupportTicketsQueryHandlerTests/
-    // CreateSupportTicketCommandHandlerTests/GetSupportTicketAttachmentQueryHandlerTests —
-    // this handler needs GetAllAsync wired to real data while the other three stub it out.
+
     private sealed class FakeSupportTicketRepository(IReadOnlyList<SupportTicket> tickets) : ISupportTicketRepository
     {
         public Task AddAsync(SupportTicket ticket, CancellationToken cancellationToken)
@@ -104,8 +102,7 @@ public class GetAllSupportTicketsQueryHandlerTests
     [Fact]
     public async Task Handle_CallerOrganizationIsNotSentinel_ThrowsSupportTicketAccessDeniedException()
     {
-        // The security-critical case: having the CheckbusSoporte Role claim is not enough — the
-        // caller's own OrganizationId must resolve to CheckbusInternalOrganization.Slug.
+
         var callerOrganizationId = Guid.NewGuid();
         var handler = new GetAllSupportTicketsQueryHandler(
             new FakeSupportTicketRepository([CreateTicket(Guid.NewGuid(), "Ticket ajeno")]),

@@ -15,8 +15,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             _context = context;
         }
 
-        // Trip, Route and all Stops are added to the same ChangeTracker and saved in one
-        // SaveChangesAsync call, so they are persisted atomically as a single aggregate.
         public async Task AddAsync(Trip trip, Route route, IEnumerable<Stop> stops, CancellationToken cancellationToken)
         {
             _context.Trips.Add(trip);
@@ -43,12 +41,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        // Standard interval-overlap condition: existing.DepartureDate <= arrivalDate &&
-        // existing.ArrivalDate >= departureDate. A trip ending exactly when another starts
-        // (or vice versa) counts as overlapping (boundary is inclusive on both sides).
-        // Cancelado is excluded: a cancelled trip must free its vehicle/driver for a new trip in
-        // the same window (CU-05) — there is no separate "unassign" step since VehicleId/DriverId
-        // are required, non-nullable FKs, so this exclusion IS the release mechanism.
         public async Task<IReadOnlyList<Trip>> GetOverlappingByVehicleIdAsync(
             Guid vehicleId, DateTime departureDate, DateTime arrivalDate, CancellationToken cancellationToken)
         {
@@ -84,9 +76,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        // Loads exactly the given Stop rows and sets their DepartureTime, one SaveChangesAsync
-        // for the whole batch — same atomicity convention as every other batch write in this
-        // codebase.
         public async Task UpdateStopDepartureTimesAsync(
             IReadOnlyDictionary<Guid, DateTime> departureTimesByStopId, CancellationToken cancellationToken)
         {
@@ -149,12 +138,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             if (!string.IsNullOrWhiteSpace(eventName))
             {
-                // Trip has no navigation property to Event — resolve matching EventIds with a
-                // subquery against the Events DbSet instead of a LINQ join on a nonexistent nav
-                // property. ToLower() on both sides keeps the comparison case-insensitive
-                // identically on SQLite (tests) and Npgsql (production), unlike a bare
-                // .Contains(), whose case sensitivity differs between those two providers'
-                // default LIKE translation.
+
                 var normalizedEventName = eventName.ToLower();
                 var matchingEventIds = _context.Events
                     .Where(e => e.Name.ToLower().Contains(normalizedEventName))
@@ -168,8 +152,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        // Every Trip tied to one Event, any status — see ITripRepository's own doc comment for
-        // why status filtering is deliberately NOT done here.
         public async Task<IReadOnlyList<Trip>> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken)
         {
             return await _context.Trips

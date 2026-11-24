@@ -5,12 +5,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // Planificador/Administrador-only is enforced at the controller; this handler verifies
-    // tenant ownership of the target Trip (same org-ownership check GetTripQueryHandler already
-    // does) and that every submitted StopId truly belongs to that Trip's own Route — the
-    // client's StopId list is never trusted blindly. Both "Trip doesn't exist"/"wrong org" and
-    // "StopId doesn't belong to this Trip's Route" throw the same TripNotFoundException,
-    // IDOR-safe like every other handler in this module.
+
     public class UpdateStopTimesCommandHandler : IRequestHandler<UpdateStopTimesCommand>
     {
         private readonly ITripRepository _tripRepository;
@@ -30,7 +25,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
@@ -45,14 +40,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             if (request.Stops.Any(s => !validStopIds.Contains(s.StopId)))
             {
-                // Not trusting the client's StopId list blindly — a StopId that doesn't belong
-                // to this Trip's Route is treated the same as a not-found Trip.
+
                 throw new TripNotFoundException();
             }
 
-            // Checkbus.Web's pickers produce Kind=Unspecified DateTimes; Npgsql's "timestamp
-            // with time zone" columns only accept Utc, same normalization CreateTripCommandHandler
-            // already does for DepartureDate/ArrivalDate.
             var departureTimesByStopId = request.Stops.ToDictionary(
                 s => s.StopId,
                 s => DateTime.SpecifyKind(s.DepartureTime, DateTimeKind.Utc));

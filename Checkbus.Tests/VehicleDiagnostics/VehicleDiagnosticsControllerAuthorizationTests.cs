@@ -39,8 +39,6 @@ public class VehicleDiagnosticsControllerAuthorizationTests : IClassFixture<Chec
         return client;
     }
 
-    // ---- Create (POST) ----
-
     [Fact]
     public async Task Create_MissingToken_Returns401()
     {
@@ -76,7 +74,7 @@ public class VehicleDiagnosticsControllerAuthorizationTests : IClassFixture<Chec
             Notes = (string?)null,
             Components = new[]
             {
-                new { Component = 999, Condition = 0, Notes = (string?)null } // invalid VehicleComponent -> FluentValidation 400, never touches the DB
+                new { Component = 999, Condition = 0, Notes = (string?)null }
             }
         };
 
@@ -86,8 +84,6 @@ public class VehicleDiagnosticsControllerAuthorizationTests : IClassFixture<Chec
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- GetVehicleDiagnostics (GET, list by maintenanceRecordId) ----
 
     [Fact]
     public async Task GetList_MissingToken_Returns401()
@@ -118,8 +114,6 @@ public class VehicleDiagnosticsControllerAuthorizationTests : IClassFixture<Chec
     {
         var client = CreateAuthorizedClient(role);
 
-        // Malformed maintenanceRecordId fails Guid model binding -> 400 via [ApiController],
-        // before the action method (and the DB) is ever reached.
         var response = await client.GetAsync($"{BasePath}?maintenanceRecordId=not-a-guid", TestContext.Current.CancellationToken);
 
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);

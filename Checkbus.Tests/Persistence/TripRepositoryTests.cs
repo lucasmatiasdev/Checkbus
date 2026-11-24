@@ -219,15 +219,15 @@ public class TripRepositoryTests
     }
 
     [Theory]
-    // Fully contained inside the existing trip's range.
+
     [InlineData("2026-11-01T11:00:00Z", "2026-11-01T13:00:00Z", true)]
-    // Starts exactly when the existing trip ends — boundary is inclusive, counts as overlap.
+
     [InlineData("2026-11-01T14:00:00Z", "2026-11-01T16:00:00Z", true)]
-    // Ends exactly when the existing trip starts — boundary is inclusive, counts as overlap.
+
     [InlineData("2026-11-01T08:00:00Z", "2026-11-01T10:00:00Z", true)]
-    // Entirely before the existing trip, no contact at all.
+
     [InlineData("2026-11-01T06:00:00Z", "2026-11-01T09:00:00Z", false)]
-    // Entirely after the existing trip, no contact at all.
+
     [InlineData("2026-11-01T15:00:00Z", "2026-11-01T17:00:00Z", false)]
     public async Task GetOverlappingByVehicleIdAsync_DetectsOverlapIncludingBoundaries(
         string candidateStart, string candidateEnd, bool expectOverlap)
@@ -314,9 +314,7 @@ public class TripRepositoryTests
     [Fact]
     public async Task GetOverlappingByVehicleIdAsync_CanceladoTrip_IsExcluded()
     {
-        // CU-05: a Cancelado trip must free its vehicle for a new trip in the same window —
-        // DriverId/VehicleId are required, non-nullable FKs, so this exclusion IS the release
-        // mechanism (there is no separate "unassign" step).
+
         var cancellationToken = TestContext.Current.CancellationToken;
         var (db, connection, organization, vehicle, driver, @event) = await SeedAsync(cancellationToken);
         using var _ = connection;
@@ -364,10 +362,6 @@ public class TripRepositoryTests
         Assert.Empty(result);
     }
 
-    // GetPublicUpcomingByOrganizationIdAsync (odd/tasks/viajes-disponibles-publico.md T1) — the
-    // public "viajes disponibles" listing's repository query. Every trip below is built with
-    // offsets from DateTime.UtcNow (not hardcoded calendar dates) so "past" vs "future" stays
-    // correct no matter when this suite actually runs.
     [Fact]
     public async Task GetPublicUpcomingByOrganizationIdAsync_ExcludesNonPublicadoTrips()
     {
@@ -461,15 +455,10 @@ public class TripRepositoryTests
         using var _ = connection;
         using var __ = db;
 
-        // `@event` ("River vs Boca", seeded by SeedAsync) is the match target; a second,
-        // differently-named Event proves the filter actually excludes non-matching trips rather
-        // than just happening to return everything.
         var otherEventWithDifferentName = new Event
         {
             Id = Guid.NewGuid(),
-            // Deliberately shares no substring with "River vs Boca" (an earlier draft used
-            // "Coldplay en River", which still contains "river" and made this test a false
-            // positive — both events matched).
+
             Name = "Lali en Velez",
             Type = EventType.Partido,
             Date = new DateTime(2026, 11, 2, 20, 0, 0, DateTimeKind.Utc),
@@ -491,8 +480,6 @@ public class TripRepositoryTests
         await repository.AddAsync(matchingTrip, CreateRoute(matchingTrip.Id), [], cancellationToken);
         await repository.AddAsync(nonMatchingTrip, CreateRoute(nonMatchingTrip.Id), [], cancellationToken);
 
-        // Deliberately mixed-case and only a partial substring of "River vs Boca" to prove both
-        // case-insensitivity and contains-style matching.
         var result = await repository.GetPublicUpcomingByOrganizationIdAsync(
             organization.Id, dateFrom: null, dateTo: null, eventName: "rIVER", cancellationToken);
 
@@ -500,9 +487,6 @@ public class TripRepositoryTests
         Assert.Equal(matchingTrip.Id, result[0].Id);
     }
 
-    // GetByEventIdAsync (odd/tasks/notificaciones-viaje.md T1) — resolves the Event scope for
-    // CU-04's notification audience. Any Trip status counts (status eligibility is the
-    // handler's job, not this query's), and a Trip under a DIFFERENT Event must never leak in.
     [Fact]
     public async Task GetByEventIdAsync_ReturnsEveryTripForThatEvent_RegardlessOfStatus()
     {

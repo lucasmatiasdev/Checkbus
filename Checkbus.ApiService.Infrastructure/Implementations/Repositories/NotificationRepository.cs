@@ -21,8 +21,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // Union of two independent conditions — see INotificationRepository's own doc comment:
-        // rows that target this Trip directly, OR rows that target its Event.
         public async Task<IReadOnlyList<Notification>> GetRelevantToTripAsync(
             Guid tripId, Guid eventId, CancellationToken cancellationToken)
         {

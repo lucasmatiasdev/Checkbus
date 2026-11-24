@@ -8,16 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers.Public
 {
-    // Fase J2 (odd/tasks/pagos-mercadopago.md) — the self-contained fake Mercado Pago checkout
-    // page for the I10 KYC-blocker workaround. [AllowAnonymous]/no ICurrentUserService, same
-    // posture as PaymentsWebhookController/PublicReservationsController: there is no buyer
-    // identity to check here, and Mercado Pago's own real hosted checkout page has none either.
-    //
-    // Only reachable at all when MercadoPagoOptions.Simulated is true (that flag is what makes
-    // Program.cs register ISimulatedOrderStore/SimulatedPaymentService in the first place — see
-    // J3's wiring); with it false (the default), hitting this controller fails DI resolution of
-    // ISimulatedOrderStore rather than silently doing anything, which is the correct "not enabled
-    // in this environment" behavior for a demo-only surface.
+
     [AllowAnonymous]
     [Route("api/public/payments/simulate")]
     [ApiController]
@@ -40,8 +31,6 @@ namespace Checkbus.ApiService.Controllers.Public
             _logger = logger;
         }
 
-        // Renders the fake checkout page itself — a plain ContentResult, no view engine (this
-        // codebase has no server-rendered-view convention to match, per this Fase's own note).
         [HttpGet("{orderId}")]
         public IActionResult Show(string orderId)
         {
@@ -70,12 +59,6 @@ namespace Checkbus.ApiService.Controllers.Public
 
             _orderStore.SetStatus(orderId, status);
 
-            // This is what makes the simulation exercise the REAL signature validation, dedupe,
-            // and HandlePaymentWebhookCommandHandler logic (Fase D) — not a shortcut around any
-            // of it. A failure here (e.g. the app's own webhook endpoint unreachable) is logged
-            // and swallowed rather than stranding the buyer on a 500 — this is a demo path, not a
-            // real payment, so the worst case is a hold that never gets confirmed, same as Fase
-            // E's existing lazy-expiry story already handles.
             await PostSimulatedWebhookAsync(orderId, cancellationToken);
 
             var redirectUrl = status == MercadoPagoOrderStatus.Approved ? record.SuccessUrl : record.FailureUrl;
@@ -90,15 +73,9 @@ namespace Checkbus.ApiService.Controllers.Public
             var signatureHeader = SimulatedWebhookSigner.BuildSignatureHeader(
                 orderId, requestId, _mercadoPagoOptions.WebhookSecret);
 
-            // Built from the CURRENT request's own scheme+host, never a hardcoded config value —
-            // so this works correctly behind whatever tunnel/host is actually serving this
-            // request (per this Fase's own explicit instruction).
             var webhookUrl =
                 $"{Request.Scheme}://{Request.Host}/api/public/payments/webhook?data.id={Uri.EscapeDataString(orderId)}";
 
-            // Only a top-level "id" is strictly required by PaymentsWebhookController's own
-            // TryExtractTopLevelId (Fase D1) — type/data.id are included too, for realism, but
-            // aren't functionally required by the controller itself.
             var body = JsonSerializer.Serialize(new
             {
                 id = Guid.NewGuid().ToString(),

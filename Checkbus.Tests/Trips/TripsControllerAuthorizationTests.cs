@@ -42,8 +42,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         return client;
     }
 
-    // ---- Create (POST) ----
-
     [Fact]
     public async Task Create_MissingToken_Returns401()
     {
@@ -80,7 +78,7 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
             DepartureDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
             ArrivalDate = new DateTime(2026, 5, 1, 18, 0, 0, DateTimeKind.Utc),
             Price = 15000m,
-            Stops = Array.Empty<object>() // fewer than 2 -> FluentValidation 400, never touches the DB
+            Stops = Array.Empty<object>()
         };
 
         var response = await client.PostAsJsonAsync(BasePath, body, TestContext.Current.CancellationToken);
@@ -89,8 +87,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---- GetAll (GET) ----
 
     [Fact]
     public async Task GetAll_MissingToken_Returns401()
@@ -114,8 +110,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ---- GetById (GET) ----
-
     [Fact]
     public async Task GetById_MissingToken_Returns401()
     {
@@ -137,10 +131,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- Publish (POST {id}/publish) ----
-    // No request body/query parameters to craft a 400 shortcut with (unlike Create) — same
-    // established convention as GetAll/GetById, only 401/403 are proven here.
 
     [Fact]
     public async Task Publish_MissingToken_Returns401()
@@ -164,10 +154,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ---- Start (POST {id}/start) ----
-    // No request body shortcut to craft a 400 with here — same established convention as
-    // Publish, only 401/403 are proven here.
-
     [Fact]
     public async Task Start_MissingToken_Returns401()
     {
@@ -188,8 +174,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- Finish (POST {id}/finish) ----
 
     [Fact]
     public async Task Finish_MissingToken_Returns401()
@@ -213,11 +197,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- UpdateStopTimes (PUT {id}/stops/times) ----
-    // No request body shortcut to craft a 400 with here (an empty Stops list is a valid-shape
-    // but semantically empty request, still resolved by FluentValidation before any DB touch) —
-    // same established convention as GetAll/GetById/Publish, only 401/403 are proven here.
 
     [Fact]
     public async Task UpdateStopTimes_MissingToken_Returns401()
@@ -243,10 +222,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ---- Cancel (POST {id}/cancel) ----
-    // No request body shortcut to craft a 400 with here (Reason=ProblemaChofer alone is a
-    // valid-shape body) — same established convention as Publish, only 401/403 are proven here.
-
     [Fact]
     public async Task Cancel_MissingToken_Returns401()
     {
@@ -270,8 +245,6 @@ public class TripsControllerAuthorizationTests : IClassFixture<CheckbusApiFactor
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- GetSeatMap (GET {id}/seats) ----
 
     [Fact]
     public async Task GetSeatMap_MissingToken_Returns401()

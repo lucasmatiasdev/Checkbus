@@ -32,8 +32,6 @@ public class DriverRequirementsClientTests
             throw new HttpRequestException("Simulated network failure");
     }
 
-    // ----- GetRequirementsAsync -----
-
     [Fact]
     public async Task GetRequirementsAsync_WhenOk_ReturnsSuccessWithDeserializedList()
     {
@@ -130,8 +128,6 @@ public class DriverRequirementsClientTests
         var transportError = Assert.IsType<DriverRequirementsListOutcome.TransportError>(outcome);
         Assert.NotEmpty(transportError.Message);
     }
-
-    // ----- UploadDocumentAsync -----
 
     private static async Task<DriverRequirementActionOutcome> UploadAsync(
         DriverRequirementsClient client,
@@ -268,8 +264,6 @@ public class DriverRequirementsClientTests
         Assert.DoesNotContain(parts, p => p.Headers.ContentDisposition?.Name?.Trim('"') == "IssueDate");
     }
 
-    // ----- ValidateAsync -----
-
     [Fact]
     public async Task ValidateAsync_WhenNoContent_ReturnsSuccess()
     {
@@ -330,8 +324,6 @@ public class DriverRequirementsClientTests
         Assert.NotEmpty(transportError.Message);
         Assert.DoesNotContain("HttpRequestException", transportError.Message);
     }
-
-    // ----- GetExpiringCountAsync -----
 
     [Fact]
     public async Task GetExpiringCountAsync_WhenOk_ReturnsSuccessWithDeserializedCount()

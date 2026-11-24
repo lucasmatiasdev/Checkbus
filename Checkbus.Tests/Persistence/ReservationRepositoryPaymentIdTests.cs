@@ -175,8 +175,7 @@ public class ReservationRepositoryPaymentIdTests
     [Fact]
     public async Task GetByPaymentIdAsync_IncludesCanceladaReservations_UnlikeGetByTripIdAsync()
     {
-        // The orphaned-approval detection in HandlePaymentWebhookCommandHandler depends on
-        // seeing a Cancelada row for this Payment, not having it filtered out.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -198,9 +197,7 @@ public class ReservationRepositoryPaymentIdTests
     [Fact]
     public async Task GetByPaymentIdAsync_ExcludesReservationsWithNoPaymentIdOrADifferentPayment()
     {
-        // Pre-existing Reservation rows from before this feature have PaymentId == null — they
-        // must never show up for any Payment. A Reservation belonging to a different Payment
-        // must not leak in either.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

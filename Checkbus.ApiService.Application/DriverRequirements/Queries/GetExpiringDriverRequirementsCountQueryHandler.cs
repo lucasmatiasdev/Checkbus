@@ -21,8 +21,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Queries
 
         public async Task<int> Handle(GetExpiringDriverRequirementsCountQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — same anti-IDOR rationale
-            // as GetUsersQueryHandler.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

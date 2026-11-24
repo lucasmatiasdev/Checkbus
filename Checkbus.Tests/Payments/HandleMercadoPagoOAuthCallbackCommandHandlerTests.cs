@@ -139,8 +139,7 @@ public class HandleMercadoPagoOAuthCallbackCommandHandlerTests
         Assert.Equal("seller-123", connectionRepository.Upserted.SellerUserId);
 
         Assert.Equal("auth-code", oauthService.ReceivedCode);
-        // ExchangeCodeAsync's own "state" argument is the WHOLE combined value, per
-        // IMercadoPagoOAuthService's own doc comment — never just the protected-blob half.
+
         Assert.Equal($"{organizationId}|protected-blob", oauthService.ReceivedState);
         Assert.Equal(1, stateService.TryUnprotectCallCount);
     }
@@ -171,7 +170,7 @@ public class HandleMercadoPagoOAuthCallbackCommandHandlerTests
     public async Task Handle_TamperedOrExpiredState_RedirectsToFailure_WithoutCallingExchangeOrUpsert()
     {
         var oauthService = new FakeOAuthService();
-        // IsValid: false — simulates TryUnprotect rejecting a tampered or expired value.
+
         var stateService = new FakeStateService(isValid: false, Guid.Empty);
         var connectionRepository = new FakeConnectionRepository();
         var handler = CreateHandler(oauthService, stateService, connectionRepository);

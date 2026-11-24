@@ -1,9 +1,6 @@
 namespace Checkbus.ApiService.Domain.Entities.Trips
 {
-    // Shared catalog of real-world places — deliberately no OrganizationId, the same
-    // physical place can be reused across organizations/routes/events. PlaceId is
-    // Google's place id and is used to dedupe: callers must look up by PlaceId before
-    // inserting a new row (see ILocationRepository.FindByPlaceIdAsync).
+
     public class Location
     {
         public Guid Id { get; set; }

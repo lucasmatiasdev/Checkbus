@@ -10,7 +10,5 @@ namespace Checkbus.ApiService.Application.Users.Queries
         public required string Email { get; set; }
         public required Role Role { get; set; }
 
-        // Deliberately ABSENT: PasswordHash and any other sensitive User field —
-        // this DTO is what crosses the HTTP boundary to the caller.
     }
 }

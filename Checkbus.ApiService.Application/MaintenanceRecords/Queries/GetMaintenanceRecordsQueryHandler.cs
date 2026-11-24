@@ -23,19 +23,13 @@ namespace Checkbus.ApiService.Application.MaintenanceRecords.Queries
 
         public async Task<IReadOnlyList<MaintenanceRecordDto>> Handle(GetMaintenanceRecordsQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — mirrors
-            // GetVehiclesQueryHandler. MaintenanceRecord has no direct OrganizationId
-            // column, so org-scoping always goes through this Vehicle lookup first
-            // (odd/tasks/vehicle-maintenance.md Constraint 1).
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var vehicles = await _vehicleRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
             var vehiclesById = vehicles.ToDictionary(v => v.Id);
 
-            // A VehicleId filter naming a vehicle outside the caller's org never leaks
-            // cross-tenant existence: it simply yields no matching ids below, the same
-            // IDOR-safe effect as VehicleNotFoundException without a special-cased throw.
             List<Guid> vehicleIds;
             if (request.VehicleId.HasValue)
             {

@@ -2,10 +2,7 @@ using Checkbus.ApiService.Domain.Enums;
 
 namespace Checkbus.ApiService.Domain.Entities.Vehicles
 {
-    // One row per service visit. Deliberately no navigation property back to Vehicle — the
-    // relationship stays FK-only, same pattern as VehicleDocument -> Vehicle. No
-    // next-service scheduling fields (NextServiceDate/NextServiceMileage) by explicit
-    // decision: ScheduledDate/StartDate/EndDate/Status only cover this record's own history.
+
     public class MaintenanceRecord
     {
         public Guid Id { get; set; }

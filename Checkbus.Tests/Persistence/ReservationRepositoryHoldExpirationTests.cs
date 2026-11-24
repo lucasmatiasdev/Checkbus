@@ -208,8 +208,7 @@ public class ReservationRepositoryHoldExpirationTests
     [Fact]
     public async Task ReleaseExpiredHoldsAsync_OldConfirmadaReservation_IsNeverTouched()
     {
-        // Only PendientePago rows are a "hold" — an old Confirmada reservation (a paid,
-        // honored seat) must never be released just because it's old.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -280,7 +279,7 @@ public class ReservationRepositoryHoldExpirationTests
         var reloadedA = await repository.GetByIdAsync(reservationA.Id, cancellationToken);
         var reloadedB = await repository.GetByIdAsync(reservationB.Id, cancellationToken);
         Assert.Equal(ReservationStatus.Cancelada, reloadedA!.Status);
-        Assert.Equal(ReservationStatus.PendientePago, reloadedB!.Status); // untouched — different Trip
+        Assert.Equal(ReservationStatus.PendientePago, reloadedB!.Status);
     }
 
     [Fact]
@@ -295,16 +294,13 @@ public class ReservationRepositoryHoldExpirationTests
 
         var repository = new ReservationRepository(db);
 
-        // No Reservation rows at all for this Trip — must complete without throwing.
         await repository.ReleaseExpiredHoldsAsync(trip.Id, holdExpirationMinutes: 15, cancellationToken);
     }
 
     [Fact]
     public async Task ReleaseExpiredHoldsAsync_ReleasingAnExpiredHold_FreesTheSeatForANewReservation()
     {
-        // The whole point of this Fase: once released, the filtered unique index on
-        // Reservation(TripId, SeatId) (which excludes Cancelada) no longer blocks a brand-new
-        // Reservation on that same seat.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
@@ -329,8 +325,6 @@ public class ReservationRepositoryHoldExpirationTests
         var repository = new ReservationRepository(db);
         await repository.ReleaseExpiredHoldsAsync(trip.Id, holdExpirationMinutes: 15, cancellationToken);
 
-        // A brand-new booking attempt on the same seat, by a new Payment/Passenger/Reservation
-        // batch — must succeed now that the old hold has been released.
         var newPassenger = CreatePassenger();
         var newPayment = new Payment
         {

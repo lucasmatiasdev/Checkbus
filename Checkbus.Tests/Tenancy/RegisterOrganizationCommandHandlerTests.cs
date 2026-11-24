@@ -230,9 +230,7 @@ public class RegisterOrganizationCommandHandlerTests
     [Fact]
     public async Task Handle_AdminEmailCollidesWithTakenEmails_AppliesDisambiguationSuffix()
     {
-        // Reuses UserEmailGenerator's own disambiguation mechanics (already verified by
-        // UserEmailGeneratorTests / RegisterUserCommandHandlerTests) — this only proves the
-        // handler calls it correctly with the already-taken-emails lookup.
+
         var userRepository = new FakeUserRepository
         {
             TakenEmails = ["jose.diaz@checkbusdemo.com"]

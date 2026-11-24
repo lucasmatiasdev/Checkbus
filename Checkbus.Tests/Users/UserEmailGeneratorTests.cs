@@ -69,11 +69,7 @@ public class UserEmailGeneratorTests
     [Fact]
     public void Generate_SameNormalizedName_DifferentOrganizationSlugs_ProducesDifferentDomains()
     {
-        // Regression proof for the spec's `user-identity` -> Organization Slug Uniqueness
-        // scenario "Unique slugs prevent cross-tenant email collisions" (Phase 5, task 5.3
-        // gap closure): two organizations with distinct slugs registering identically
-        // normalizing names must never collide, because the domain is derived from the
-        // (uniquely-indexed) slug.
+
         var resultA = UserEmailGenerator.Generate("Jose", "Diaz", "org-a", NoTakenEmails);
         var resultB = UserEmailGenerator.Generate("Jose", "Diaz", "org-b", NoTakenEmails);
 
@@ -126,8 +122,7 @@ public class UserEmailGeneratorTests
     [Fact]
     public void Generate_OverFetchedSimilarAddress_DoesNotConsumeExactMatch()
     {
-        // The caller's prefix projection query may over-fetch "jose.diazxyz@..." alongside
-        // "jose.diaz@...". Generate must check EXACT membership, not prefix membership.
+
         var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "jose.diazxyz@checkbus-demo.com"

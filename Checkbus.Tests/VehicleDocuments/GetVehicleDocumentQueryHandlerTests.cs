@@ -106,7 +106,7 @@ public class GetVehicleDocumentQueryHandlerTests
     [Fact]
     public async Task Handle_CrossOrganizationVehicle_ThrowsVehicleNotFoundException()
     {
-        var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
+        var vehicle = CreateVehicle(Guid.NewGuid());
         var repository = new FakeVehicleDocumentRepository();
         var handler = new GetVehicleDocumentQueryHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(Guid.NewGuid()));
@@ -133,7 +133,7 @@ public class GetVehicleDocumentQueryHandlerTests
     {
         var organizationId = Guid.NewGuid();
         var vehicle = CreateVehicle(organizationId);
-        var repository = new FakeVehicleDocumentRepository(); // no rows at all
+        var repository = new FakeVehicleDocumentRepository();
         var handler = new GetVehicleDocumentQueryHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId));
 

@@ -27,8 +27,6 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
 {
     private const string ModuleImportPath = "./Components/Maps/LiveLocationMap.razor.js";
 
-    // Demo-scale polling cadence (S4: last-known-position only, no trail/history) — frequent
-    // enough to feel "live" for a short classroom demo without hammering the public endpoint.
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(7);
 
     [Parameter, EditorRequired]
@@ -57,8 +55,7 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        // Poll once immediately so a trip that's already tracking shows its pin on first render,
-        // instead of waiting a full PollInterval for the recurring loop below to kick in.
+
         await PollOnceAsync();
     }
 
@@ -94,7 +91,7 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            // Expected on DisposeAsync/navigation — not an error.
+
         }
     }
 
@@ -104,8 +101,7 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
 
         if (outcome is not PublicTripLocationOutcome.Success success)
         {
-            // Transport error on one poll: keep showing the last known state (if any) and try
-            // again on the next tick rather than tearing the map down.
+
             return;
         }
 
@@ -127,8 +123,7 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
 
         if (!_liveTrackingEnabled)
         {
-            // First time we see tracking turn on: flip the flag and re-render so the <div> for
-            // the map exists before OnAfterRenderAsync tries to initialize it.
+
             _liveTrackingEnabled = true;
             await InvokeAsync(StateHasChanged);
             return;
@@ -166,8 +161,7 @@ public partial class LiveLocationMap : ComponentBase, IAsyncDisposable
             }
             catch (JSDisconnectedException)
             {
-                // Circuit already torn down (e.g. the user navigated away) — nothing left to
-                // clean up client-side.
+
             }
 
             await _module.DisposeAsync();

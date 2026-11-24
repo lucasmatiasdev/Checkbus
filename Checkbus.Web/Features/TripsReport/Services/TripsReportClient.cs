@@ -69,8 +69,7 @@ public sealed class TripsReportClient([FromKeyedServices("apiservice")] HttpClie
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new TripsReportOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

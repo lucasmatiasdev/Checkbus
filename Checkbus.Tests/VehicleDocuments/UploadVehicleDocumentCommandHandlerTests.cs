@@ -160,14 +160,10 @@ public class UploadVehicleDocumentCommandHandlerTests
     [Fact]
     public async Task Handle_ConditionalType_NoExistingRow_CreatesNewRow()
     {
-        // This is the key new behavior vs. the driver-documents precedent: conditional
-        // types (TituloPropiedad, LeasingInscripto, ContratoAlquiler, HabilitacionEspecifica)
-        // have no pre-created row, so the first upload must get-or-create it rather than
-        // assuming the row already exists (which would be a data invariant violation for
-        // driver requirements, but is the normal, expected path here).
+
         var organizationId = Guid.NewGuid();
         var vehicle = CreateVehicle(organizationId);
-        var vehicleDocumentRepository = new FakeVehicleDocumentRepository(); // no rows at all
+        var vehicleDocumentRepository = new FakeVehicleDocumentRepository();
         var fileStorage = new FakeFileStorageService();
         var handler = new UploadVehicleDocumentCommandHandler(
             new FakeVehicleRepository(vehicle), vehicleDocumentRepository, fileStorage, new FakeCurrentUserService(organizationId));
@@ -188,7 +184,7 @@ public class UploadVehicleDocumentCommandHandlerTests
     [Fact]
     public async Task Handle_CrossOrganizationVehicle_ThrowsVehicleNotFoundException()
     {
-        var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
+        var vehicle = CreateVehicle(Guid.NewGuid());
         var vehicleDocumentRepository = new FakeVehicleDocumentRepository();
         var fileStorage = new FakeFileStorageService();
         var handler = new UploadVehicleDocumentCommandHandler(

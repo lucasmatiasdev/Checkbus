@@ -97,8 +97,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
         public Task RefundAsync(
             string externalOrderId, Money? amount, CancellationToken cancellationToken, string sellerAccessToken = "")
         {
-            // No real money motion, obviously — just records the order as refunded, same as every
-            // other state transition here.
+
             SetStatus(externalOrderId, MercadoPagoOrderStatus.Refunded);
             return Task.CompletedTask;
         }

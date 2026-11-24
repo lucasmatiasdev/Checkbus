@@ -17,8 +17,7 @@ namespace Checkbus.ApiService.Application.Users.Queries
 
         public async Task<IReadOnlyList<UserListItemDto>> Handle(GetUsersQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — the query has no
-            // OrganizationId field, so no request value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

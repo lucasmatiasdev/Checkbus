@@ -56,7 +56,7 @@ public class ReportExportServiceTests
         var lastRow = sheet.LastRowUsed()!.RowNumber();
 
         Assert.Equal("Fecha salida", sheet.Cell(1, 1).GetString());
-        Assert.Equal(3, lastRow); // header + 2 trips
+        Assert.Equal(3, lastRow);
         Assert.Equal(report.Trips[0].VehiclePatent, sheet.Cell(2, 4).GetString());
     }
 
@@ -102,7 +102,7 @@ public class ReportExportServiceTests
         var text = Encoding.UTF8.GetString(bytes);
         var lines = text.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal(3, lines.Length); // header + 2 trips
+        Assert.Equal(3, lines.Length);
         Assert.StartsWith("Fecha salida,", lines[0]);
         Assert.Contains(report.Trips[0].VehiclePatent!, lines[1]);
     }

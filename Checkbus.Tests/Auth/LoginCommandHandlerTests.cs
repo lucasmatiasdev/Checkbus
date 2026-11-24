@@ -237,9 +237,7 @@ public class LoginCommandHandlerTests
     [Fact]
     public async Task Handle_OrganizationNotLoaded_DoesNotThrowOrganizationInactiveException()
     {
-        // Organization is null here (not Included) - must never be treated as inactive. In
-        // production UserRepository.FindByEmailAsync always Includes it, so this only guards
-        // against a future repository regression dropping that Include.
+
         var user = CreateUser(organization: null);
         var handler = new LoginCommandHandler(
             new FakeUserRepository(user),
@@ -424,8 +422,6 @@ public class LoginCommandHandlerTests
         await Assert.ThrowsAsync<InvalidCredentialsException>(
             () => handler.Handle(command, TestContext.Current.CancellationToken));
 
-        // A wrong password still persists the incremented FailedLoginAttempts counter (see the
-        // lockout tests), but must never touch LastLoginAt - that only happens on success.
         Assert.All(userRepository.UpdatedUsers, u => Assert.Null(u.LastLoginAt));
     }
 

@@ -54,12 +54,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Email
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Catches every MailKit/MimeKit/transport failure mode: bad host/port
-                // (ArgumentException/SocketException), SMTP protocol/command errors
-                // (SmtpCommandException/SmtpProtocolException), auth failures
-                // (AuthenticationException), and malformed addresses (FormatException/
-                // ParseException) — same posture as GoogleDirectionsService: never let a
-                // provider-specific exception type leak out of this adapter.
+
                 throw new InvalidOperationException("Failed to send the email via the SMTP relay.", ex);
             }
         }

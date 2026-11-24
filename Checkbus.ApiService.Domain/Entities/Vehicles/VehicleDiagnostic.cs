@@ -1,9 +1,6 @@
 namespace Checkbus.ApiService.Domain.Entities.Vehicles
 {
-    // One row per diagnostic event, always tied to a MaintenanceRecord. VehicleId is a
-    // denormalized FK kept alongside MaintenanceRecordId (explicit decision — a diagnostic
-    // never exists without its parent maintenance record). Both relationships stay FK-only,
-    // no navigation properties back, same pattern as VehicleDocument -> Vehicle.
+
     public class VehicleDiagnostic
     {
         public Guid Id { get; set; }

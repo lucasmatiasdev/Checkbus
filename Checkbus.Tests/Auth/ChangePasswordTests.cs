@@ -29,7 +29,7 @@ public class ChangePasswordCommandValidatorTests
     [Fact]
     public void NewPassword_TooShort_IsRejected()
     {
-        var command = new ChangePasswordCommand { NewPassword = "abcd" }; // 4 chars
+        var command = new ChangePasswordCommand { NewPassword = "abcd" };
 
         var result = _validator.TestValidate(command);
 
@@ -39,7 +39,7 @@ public class ChangePasswordCommandValidatorTests
     [Fact]
     public void NewPassword_EightOrMoreChars_IsAccepted()
     {
-        var command = new ChangePasswordCommand { NewPassword = "abcdefgh" }; // 8 chars
+        var command = new ChangePasswordCommand { NewPassword = "abcdefgh" };
 
         var result = _validator.TestValidate(command);
 
@@ -175,10 +175,7 @@ public class ChangePasswordCommandHandlerTests
     [Fact]
     public async Task Handle_MultipleUsersStored_OnlyCallerUserIdIsUpdated()
     {
-        // Anti-IDOR: ChangePasswordCommand has no user-identifying field at all, so the
-        // only way to prove the right (and only the right) row is touched is via
-        // ICurrentUserService.UserId — this test makes that explicit with a second,
-        // untouched user present in the repository.
+
         var callerId = Guid.NewGuid();
         var otherId = Guid.NewGuid();
         var caller = CreateUser(callerId);
@@ -230,10 +227,7 @@ public class ChangePasswordHttpTests : IClassFixture<CheckbusApiFactory>
     [Fact]
     public async Task ChangePassword_WeakPassword_Returns400()
     {
-        // FluentValidation runs inside the MediatR pipeline before any repository
-        // access, so this short-circuits before CheckbusApiFactory's unreachable
-        // dummy Postgres connection ever comes into play (same D-13 constraint
-        // UsersControllerAuthorizationTests documents for POST api/users).
+
         var client = CreateAuthorizedClient(Role.Chofer);
 
         var response = await client.PostAsJsonAsync(
@@ -245,12 +239,7 @@ public class ChangePasswordHttpTests : IClassFixture<CheckbusApiFactory>
     [Fact]
     public async Task ChangePassword_NonAdminRole_IsNotRejectedByAuthorizationFilter()
     {
-        // The endpoint is [Authorize] only, not role-gated. CheckbusApiFactory cannot
-        // reach a database (D-13), so a full 204 happy path is not provable here (it is
-        // Phase 5's Aspire E2E scenario); what IS provable in this harness is that a
-        // non-admin role is never rejected by the ASP.NET Core role-authorization
-        // filter — i.e. the response is never 403, proving the endpoint carries no
-        // [Authorize(Roles = ...)] restriction.
+
         var client = CreateAuthorizedClient(Role.Chofer);
 
         var response = await client.PostAsJsonAsync(

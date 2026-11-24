@@ -14,12 +14,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
     /// </summary>
     public class MercadoPagoConnectionStateService : IMercadoPagoConnectionStateService
     {
-        // Mercado Pago documents its own one-time authorization code as a 10-minute TTL
-        // (odd/tasks/pagos-mercadopago.md Fase I's own confirmed OAuth facts) — this state value
-        // only ever needs to survive the round trip from BuildAuthorizationUrl to the callback,
-        // which happens well inside that same window. Matching it here (rather than inventing an
-        // unrelated number) means a state this old is already useless anyway (the code it would
-        // be paired with has expired too), so rejecting it early is a clear, defensible bound.
+
         public const int StateTtlMinutes = 10;
 
         private readonly IDataProtector _protector;
@@ -55,11 +50,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (Exception)
             {
-                // Covers a tampered/garbage ciphertext (CryptographicException from Unprotect)
-                // and a malformed/unexpected JSON payload (JsonException) identically: either way
-                // this state value is untrustworthy and must never throw into the caller — the
-                // anonymous OAuth callback action has no error page to render an unhandled
-                // exception onto, only a redirect.
+
                 return new MercadoPagoConnectionStateResult(false, Guid.Empty);
             }
         }

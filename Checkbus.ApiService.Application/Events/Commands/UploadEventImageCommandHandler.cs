@@ -24,23 +24,20 @@ namespace Checkbus.ApiService.Application.Events.Commands
 
         public async Task Handle(UploadEventImageCommand request, CancellationToken cancellationToken)
         {
-            // Role gate (Planificador/Administrador) is enforced at the controller; this handler
-            // only needs to verify tenant ownership of the target Event, same pattern as
-            // UploadVehicleDocumentCommandHandler.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var @event = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken);
             if (@event is null || @event.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new EventNotFoundException();
             }
 
             if (@event.ImageKey is not null)
             {
-                // Avoid orphaned files on re-upload, same reasoning as
-                // UploadVehicleDocumentCommandHandler.
+
                 await _fileStorageService.DeleteAsync(@event.ImageKey, cancellationToken);
             }
 

@@ -129,7 +129,7 @@ public class GetDriverRequirementsQueryHandlerTests
     [Fact]
     public async Task Handle_AdminCrossOrganization_ThrowsDriverRequirementNotFoundException()
     {
-        var target = CreateUser(Guid.NewGuid()); // different organization than the caller
+        var target = CreateUser(Guid.NewGuid());
         var repository = new FakeDriverRequirementRepository();
         var handler = new GetDriverRequirementsQueryHandler(
             repository,
@@ -172,10 +172,7 @@ public class GetDriverRequirementsQueryHandlerTests
     [Fact]
     public async Task Handle_ValidRequest_DtoExcludesFileKeyAndFileContentType()
     {
-        // Compile-time proof: DriverRequirementDto has no FileKey/FileContentType members
-        // at all, so the file is never reachable except through the dedicated download
-        // endpoint. This test asserts that absence by reflection, in addition to the
-        // compiler already enforcing it.
+
         var dtoProperties = typeof(DriverRequirementDto).GetProperties().Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("FileKey", dtoProperties);

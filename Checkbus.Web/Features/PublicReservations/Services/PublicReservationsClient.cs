@@ -21,8 +21,7 @@ public sealed class PublicReservationsClient([FromKeyedServices("apiservice")] H
         IReadOnlyList<Guid> reservationIds,
         CancellationToken cancellationToken = default)
     {
-        // The API model-binds IReadOnlyList<Guid> from repeated "ids=" query keys, not a
-        // single comma-joined value — a comma-joined "ids=a,b" fails binding with a 400.
+
         var query = string.Join("&", reservationIds.Select(id => $"ids={id}"));
         HttpResponseMessage response;
         try
@@ -56,18 +55,13 @@ public sealed class PublicReservationsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not
-                // bubble up as an unhandled exception — the caller only ever expects a typed
-                // outcome.
+
                 return new ReservationsConfirmationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }
     }
 
-    // POST api/public/reservations/{id}/cancel (odd/tasks/reservas-publicas.md Fase 4 / C5) —
-    // no request body, the Reservation id comes from the route, same shape GetConfirmation's
-    // simplicity suggested rather than inventing a body for a parameterless action.
     public async Task<CancelReservationOutcome> CancelReservationAsync(
         Guid reservationId,
         CancellationToken cancellationToken = default)
@@ -110,8 +104,7 @@ public sealed class PublicReservationsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body must not bubble up as an
-                // unhandled exception — the caller only ever expects a typed outcome.
+
                 return new CancelReservationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

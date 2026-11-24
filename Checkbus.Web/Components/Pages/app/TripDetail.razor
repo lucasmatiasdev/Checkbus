@@ -113,11 +113,11 @@
                 </MudItem>
                 <MudItem xs="6">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Salida</MudText>
-                    <MudText Typo="Typo.body1">@trip.DepartureDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                    <MudText Typo="Typo.body1">@trip.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                 </MudItem>
                 <MudItem xs="6">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Llegada</MudText>
-                    <MudText Typo="Typo.body1">@trip.ArrivalDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                    <MudText Typo="Typo.body1">@trip.ArrivalDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                 </MudItem>
                 <MudItem xs="6">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Estado</MudText>
@@ -508,9 +508,6 @@
     private bool isPublishing;
     private string? publishErrorMessage;
 
-    // CU-08 — start trip. The ±30-minute window must stay in sync with
-    // StartTripCommandHandler.StartWindow; a timer re-checks it periodically so the button
-    // enables itself once the window opens, without requiring a page refresh.
     private static readonly TimeSpan StartWindow = TimeSpan.FromMinutes(30);
     private bool isStarting;
     private string? startErrorMessage;
@@ -520,7 +517,6 @@
         && DateTime.UtcNow >= trip.DepartureDate - StartWindow
         && DateTime.UtcNow <= trip.DepartureDate + StartWindow;
 
-    // CU-08 — finish trip.
     private bool isFinishTripDialogOpen;
     private bool isFinishingTrip;
     private string? finishTripErrorMessage;
@@ -528,13 +524,11 @@
     private TimeSpan? finishArrivalTime;
     private string? finishObservations;
 
-    // Fase E — seat-map panel (odd/tasks/mejoras-detalle-viaje.md).
     private bool isLoadingSeatMap;
     private string? seatMapErrorMessage;
     private TripSeatMapResponse? seatMap;
     private List<int?[]> seatRows = [];
 
-    // CU-05 — cancel trip dialog.
     private static readonly WebTripCancellationReason[] CancellationReasons = Enum.GetValues<WebTripCancellationReason>();
     private bool isCancelTripDialogOpen;
     private bool isCancelTripConfirmationStep;
@@ -544,14 +538,12 @@
     private string? cancelDescription;
     private IReadOnlyList<PendingRefundResponse> pendingRefunds = [];
 
-    // Fase D — stop times edit dialog (odd/tasks/mejoras-detalle-viaje.md).
     private bool isEditStopTimesDialogOpen;
     private bool isSavingStopTimes;
     private string? stopTimesErrorMessage;
     private string? stopTimesSubmitErrorMessage;
     private List<StopTimeEditModel> stopTimeEdits = [];
 
-    // CU-04 — send notification dialog + history.
     private static readonly WebNotificationReason[] NotificationReasons = Enum.GetValues<WebNotificationReason>();
     private bool isSendNotificationDialogOpen;
     private bool isSendingNotification;
@@ -819,7 +811,7 @@
                     isEditStopTimesDialogOpen = false;
                     stopTimesErrorMessage = null;
                     Snackbar.Add("Horarios actualizados correctamente.", Severity.Success);
-                    // Re-fetch so the Paradas list reflects the saved values.
+
                     var refreshed = await TripsClient.GetByIdAsync(Id);
                     if (refreshed is TripOutcome.Success refreshedSuccess)
                     {
@@ -861,8 +853,7 @@
 
     private async Task CopyPublicUrlToClipboard()
     {
-        // navigator.clipboard is a built-in browser API — invoked directly via IJSRuntime
-        // rather than adding a new .js interop module for a single one-line call.
+
         await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", PublicReservationUrl);
         Snackbar.Add("Link copiado.", Severity.Success);
     }
@@ -878,8 +869,7 @@
             switch (outcome)
             {
                 case TripPublishOutcome.Success:
-                    // Flip locally rather than re-fetching — the only field this action changes
-                    // is Status, and we already have the rest of the detail loaded.
+
                     trip = trip! with { Status = WebTripStatus.Publicado };
                     Snackbar.Add("Viaje publicado correctamente.", Severity.Success);
                     break;

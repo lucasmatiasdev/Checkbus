@@ -64,8 +64,7 @@ public sealed class EventsClient([FromKeyedServices("apiservice")] HttpClient ht
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new EventActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -127,8 +126,7 @@ public sealed class EventsClient([FromKeyedServices("apiservice")] HttpClient ht
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new EventImageUploadOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -170,8 +168,7 @@ public sealed class EventsClient([FromKeyedServices("apiservice")] HttpClient ht
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new EventsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

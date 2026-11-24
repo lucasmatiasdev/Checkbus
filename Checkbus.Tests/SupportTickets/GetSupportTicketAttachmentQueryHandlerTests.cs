@@ -65,8 +65,7 @@ public class GetSupportTicketAttachmentQueryHandlerTests
     [Fact]
     public async Task Handle_TicketBelongsToOtherOrganization_ReturnsNull()
     {
-        // IDOR-safe: a ticket owned by another organization collapses into the same null
-        // result as "does not exist" — the caller must not be able to distinguish the two.
+
         var ticket = CreateTicket(Guid.NewGuid(), "support-tickets/ticket/file.png");
         var handler = new GetSupportTicketAttachmentQueryHandler(
             new FakeSupportTicketRepository(ticket), new FakeCurrentUserService(Guid.NewGuid()));

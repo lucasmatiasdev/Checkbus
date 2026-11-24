@@ -8,10 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Contracts
 {
-    // Colocated here rather than its own Contracts file, same convention
-    // UploadVehicleDocumentRequest/ValidateVehicleDocumentRequest already use on
-    // VehicleDocumentsController.cs — this task's allowed edit surface only authorizes touching
-    // EventsController.cs, not a new Contracts file.
+
     public sealed class UploadEventImageRequest
     {
         public required IFormFile File { get; set; }
@@ -20,9 +17,7 @@ namespace Checkbus.ApiService.Contracts
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Event is a shared catalog (no OrganizationId) — every action still requires
-    // Planificador or Administrador, matching every other controller's raw-string
-    // [Authorize(Roles = "...")] convention (odd/tasks/rutas-publicacion.md Constraint 6).
+
     [Route("api/[controller]")]
     [ApiController]
     public class EventsController : ControllerBase

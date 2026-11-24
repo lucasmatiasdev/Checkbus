@@ -44,19 +44,12 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<Refund> Refunds => Set<Refund>();
 
-        // CU-04 (odd/tasks/notificaciones-viaje.md) — standalone, manually-triggered
-        // notification audit trail. Not wired into any existing entity's own navigation.
         public DbSet<Notification> Notifications => Set<Notification>();
 
-        // Fase I (odd/tasks/pagos-mercadopago.md) — Marketplace/Split Payments: one connected
-        // Mercado Pago seller account per Organization.
         public DbSet<MercadoPagoConnection> MercadoPagoConnections => Set<MercadoPagoConnection>();
 
-        // Fase D (odd/tasks/pagos-mercadopago.md) — Infrastructure-only EF-mapped class with no
-        // Domain/business meaning, see its own doc comment for why.
         public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
 
-        // CU-16 (odd/tasks/auditoria-sistema.md) — append-only audit trail, never updated.
         public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -221,15 +214,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Status).HasConversion<string>();
-                // Real double-booking guard (odd/tasks/reservas-publicas.md R4): one Seat can
-                // have at most one ACTIVE Reservation per Trip. Filtered as of Fase 4
-                // (cancellation): a Cancelada row must stop counting against this guard so the
-                // freed Seat can be re-booked by someone else — the raw SQL filter string is
-                // evaluated by the database (Npgsql in production, SQLite in tests), matching
-                // the Status column's own HasConversion<string>() representation
-                // ("Confirmada"/"Cancelada"), not the enum's numeric value. This is the actual
-                // correctness guarantee against the TOCTOU race; the handler's pre-check is
-                // just a nicer error path for the common non-racing case.
+
                 entity.HasIndex(x => new { x.TripId, x.SeatId })
                     .IsUnique()
                     .HasFilter("\"Status\" <> 'Cancelada'");
@@ -242,9 +227,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Passenger>()
                     .WithMany()
                     .HasForeignKey(x => x.PassengerId);
-                // D7 (odd/tasks/pagos-mercadopago.md): plain 1:N, one Reservation belongs to
-                // exactly one Payment — replaces the PaymentReservationLink join table. Nullable
-                // FK, no navigation property, same posture as TripId/SeatId/PassengerId above.
+
                 entity.HasOne<Payment>()
                     .WithMany()
                     .HasForeignKey(x => x.PaymentId);
@@ -255,7 +238,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Status).HasConversion<string>();
                 entity.Property(x => x.Method).HasConversion<string>();
-                // True 1:1 with Reservation (odd/tasks/reservas-publicas.md Fase 3 / A1).
+
                 entity.HasIndex(x => x.ReservationId).IsUnique();
                 entity.HasOne<Reservation>()
                     .WithMany()
@@ -280,9 +263,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Status).HasConversion<string>();
-                // Money is a value object, not its own table — mapped inline as an EF Core
-                // owned type (odd/tasks/pagos-mercadopago.md A4/A6). IsRequired() because
-                // Payment.TotalAmount is a non-nullable `required` property.
+
                 entity.OwnsOne(x => x.TotalAmount, money =>
                 {
                     money.Property(m => m.Amount).HasColumnName("TotalAmount");
@@ -294,9 +275,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             modelBuilder.Entity<Invoice>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                // FK-only, no navigation properties, same pattern as every other entity here —
-                // Trip/Passenger/Payment are related tables but this entity never dereferences
-                // them in code (odd/tasks/pagos-mercadopago.md A3).
+
                 entity.HasOne<Trip>()
                     .WithMany()
                     .HasForeignKey(x => x.TripId);
@@ -320,8 +299,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasOne<Payment>()
                     .WithMany()
                     .HasForeignKey(x => x.PaymentId);
-                // Deliberate: references the specific Reservation this refund covers, not just
-                // the Payment — see Refund's own doc comment for why (partial-refund traceability).
+
                 entity.HasOne<Reservation>()
                     .WithMany()
                     .HasForeignKey(x => x.ReservationId);
@@ -330,17 +308,14 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             modelBuilder.Entity<ProcessedWebhookEvent>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                // The whole point of this table: a given Mercado Pago notification id is
-                // recorded at most once (Fase D3's dedupe guarantee).
+
                 entity.HasIndex(x => x.ExternalEventId).IsUnique();
             });
 
             modelBuilder.Entity<MercadoPagoConnection>(entity =>
             {
                 entity.HasKey(x => x.Id);
-                // At most one connection per Organization (odd/tasks/pagos-mercadopago.md Fase I,
-                // I1) — the DB itself enforces this, not just the repository's own
-                // find-then-insert-or-update UpsertAsync logic.
+
                 entity.HasIndex(x => x.OrganizationId).IsUnique();
                 entity.HasOne<Organization>()
                     .WithMany()
@@ -352,8 +327,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.TargetType).HasConversion<string>();
                 entity.Property(x => x.Reason).HasConversion<string>();
-                // Indexed for GetRelevantToTripAsync's OR-of-two-conditions lookup (both arms
-                // filter by TargetType+TargetId).
+
                 entity.HasIndex(x => new { x.TargetType, x.TargetId });
                 entity.HasOne<Organization>()
                     .WithMany()
@@ -367,8 +341,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
             {
                 entity.HasKey(x => x.Id);
                 entity.Property(x => x.Action).HasConversion<string>();
-                // OrganizationId/ActorUserId are optional FKs (CU-16): a failed login attempt
-                // with an unknown email has no Organization/User row to attribute.
+
                 entity.HasOne<Organization>()
                     .WithMany()
                     .HasForeignKey(x => x.OrganizationId)
@@ -377,7 +350,7 @@ namespace Checkbus.ApiService.Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(x => x.ActorUserId)
                     .IsRequired(false);
-                // Every search in the main flow is scoped by date range first.
+
                 entity.HasIndex(x => x.CreatedAt);
             });
         }

@@ -6,10 +6,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Trips.Queries
 {
-    // Same ISeatRepository/IReservationRepository occupancy computation as
-    // GetPublicTripSeatMapQueryHandler, but org-scoped via ICurrentUserService instead of
-    // gated by Trip.Status == Publicado — the Planificador legitimately wants to see this
-    // before/after publishing too.
+
     public class GetTripSeatMapQueryHandler : IRequestHandler<GetTripSeatMapQuery, TripSeatMapDto>
     {
         private readonly ITripRepository _tripRepository;
@@ -40,21 +37,15 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.OrganizationId != organizationId)
             {
-                // IDOR-safe: a trip belonging to another organization looks identical to a
-                // missing one — cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
             var vehicle = await _vehicleRepository.GetByIdAsync(trip.VehicleId, cancellationToken);
             var capacity = vehicle?.Capacity ?? trip.Capacity;
 
-            // Lazily, idempotently backfills Seat rows, same as GetPublicTripSeatMapQueryHandler
-            // — a no-op read when seats already exist, so it's safe here too.
             await _seatRepository.EnsureSeatsForVehicleAsync(trip.VehicleId, capacity, cancellationToken);
 
-            // Fase E (odd/tasks/pagos-mercadopago.md): lazily release any PendientePago hold
-            // older than HoldExpirationMinutes before computing occupancy below — same
-            // convention as GetPublicTripSeatMapQueryHandler.
             await _reservationRepository.ReleaseExpiredHoldsAsync(
                 trip.Id, CreatePublicReservationCommandHandler.HoldExpirationMinutes, cancellationToken);
 

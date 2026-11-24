@@ -37,8 +37,7 @@ public class PublicReservationsControllerAuthorizationTests : IClassFixture<Chec
     [Fact]
     public async Task Cancel_NoBearerToken_IsNotRejectedAtAuthLayer()
     {
-        // Proves the new Fase 4 cancel action (odd/tasks/reservas-publicas.md C3) is also
-        // [AllowAnonymous], same convention as GetConfirmation above.
+
         var client = _factory.CreateClient();
 
         var response = await client.PostAsync(

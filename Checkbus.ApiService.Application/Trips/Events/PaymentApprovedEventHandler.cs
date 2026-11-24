@@ -8,19 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Events
 {
-    // Fase D5 (odd/tasks/pagos-mercadopago.md): sends the "reserva confirmada" ticket email,
-    // now triggered from the webhook flow instead of inline in
-    // CreatePublicReservationCommandHandler (which Fase C removed it from — sending it before
-    // payment was confirmed would have been factually wrong). Content/style reused from that
-    // handler's original BuildTicketEmail (git show a8cc6b3), adapted to re-resolve its own data
-    // from just the event's ids instead of already having everything in local variables.
-    //
-    // Same defensive posture as every other email-send in this codebase
-    // (CancelReservationCommandHandler.Handle): a flaky SMTP relay must never fail webhook
-    // processing, so every reservation's send is wrapped in its own try/catch — one passenger's
-    // bad email address must not block another passenger's email in the same batch, and this
-    // Handle method must never throw (it runs inside HandlePaymentWebhookCommandHandler's
-    // MediatR.Publish call).
+
     public class PaymentApprovedEventHandler : INotificationHandler<PaymentApprovedEvent>
     {
         private readonly IReservationRepository _reservationRepository;
@@ -99,8 +87,6 @@ namespace Checkbus.ApiService.Application.Trips.Events
             await _emailService.SendAsync(message, cancellationToken);
         }
 
-        // Content-Id the HTML body's <img> references via "cid:" and the MIME inline resource
-        // SmtpEmailService attaches must share — see EmailInlineImage's doc comment.
         private const string TicketQrContentId = "ticket-qr";
 
         private EmailMessage BuildConfirmationEmail(

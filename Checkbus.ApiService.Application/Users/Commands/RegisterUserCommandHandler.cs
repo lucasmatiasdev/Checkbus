@@ -43,8 +43,7 @@ namespace Checkbus.ApiService.Application.Users.Commands
 
         public async Task<RegisterUserCommandResult> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — the command has no
-            // OrganizationId field, so no request body value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -75,9 +74,6 @@ namespace Checkbus.ApiService.Application.Users.Commands
                     throw new EmailGenerationExhaustedException();
                 }
 
-                // EmptyLocalPart / EmptyDomain are unreachable through the HTTP pipeline —
-                // RegisterUserCommandValidator rejects both with 400 before the handler
-                // ever runs. This branch is defense-in-depth only (D-3).
                 throw new ValidationException(
                     [new ValidationFailure(nameof(request.Name), "Name and Surname must together contain at least one letter or digit usable in an email address.")]);
             }
@@ -103,10 +99,6 @@ namespace Checkbus.ApiService.Application.Users.Commands
 
             await _userRepository.AddAsync(user, cancellationToken);
 
-            // Auto-create the 2 default driver-requirement rows (Pendiente, no dates) for
-            // every Chofer registration, in the same unit of work as the user insert.
-            // Exactly 2 DriverRequirementType values exist by deliberate scope decision
-            // (see odd/tasks/driver-documents.md) — this creates one row per value.
             if (user.Role == Role.Chofer)
             {
                 var requirementNow = DateTime.UtcNow;
@@ -125,9 +117,6 @@ namespace Checkbus.ApiService.Application.Users.Commands
                 await _driverRequirementRepository.AddRangeAsync(requirements, cancellationToken);
             }
 
-            // Same defensive posture as every other email-send in this codebase
-            // (PaymentApprovedEventHandler) — a flaky SMTP relay must never fail a
-            // registration that's already persisted.
             try
             {
                 await _emailService.SendAsync(BuildCredentialsEmail(user, request.DocumentNumber), cancellationToken);

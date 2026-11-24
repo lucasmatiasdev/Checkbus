@@ -74,8 +74,6 @@ public class VehiclesClientTests
             throw new HttpRequestException("Simulated network failure");
     }
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccessWithDeserializedResult()
     {
@@ -208,8 +206,6 @@ public class VehiclesClientTests
         Assert.Equal(JsonValueKind.Number, root.GetProperty("ownerType").ValueKind);
         Assert.Equal((int)WebVehicleOwnerType.Organizacion, root.GetProperty("ownerType").GetInt32());
     }
-
-    // ----- GetVehiclesAsync -----
 
     [Fact]
     public async Task GetVehiclesAsync_WhenOk_ReturnsSuccessWithDeserializedList()

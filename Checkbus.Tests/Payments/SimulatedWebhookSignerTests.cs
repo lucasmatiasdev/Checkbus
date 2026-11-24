@@ -56,10 +56,7 @@ public class SimulatedWebhookSignerTests
     [Fact]
     public void BuildSignatureHeader_OutputIsAccepted_ByTheRealSignatureValidator()
     {
-        // The whole point of this helper (J2) is to produce a header the REAL
-        // MercadoPagoWebhookSignatureValidator (Fase D2) accepts, not a parallel/incompatible
-        // format — proves that end-to-end here, from the opposite direction of
-        // MercadoPagoWebhookSignatureValidatorTests.
+
         var requestId = Guid.NewGuid().ToString();
         var header = SimulatedWebhookSigner.BuildSignatureHeader(DataId, requestId, Secret);
 

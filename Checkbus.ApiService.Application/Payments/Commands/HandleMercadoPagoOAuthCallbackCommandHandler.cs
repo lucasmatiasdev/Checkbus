@@ -9,11 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Payments.Commands
 {
-    // odd/tasks/pagos-mercadopago.md Fase I, I7 — the business logic behind the anonymous OAuth
-    // callback. Validates/decodes State FIRST (cheap, local, no network call) before ever
-    // touching ExchangeCodeAsync — an invalid/expired/tampered State is rejected without
-    // spending Mercado Pago's one-time, 10-minute-TTL code on a call whose result would just be
-    // discarded anyway.
+
     public class HandleMercadoPagoOAuthCallbackCommandHandler
         : IRequestHandler<HandleMercadoPagoOAuthCallbackCommand, MercadoPagoOAuthCallbackResultDto>
     {
@@ -43,13 +39,7 @@ namespace Checkbus.ApiService.Application.Payments.Commands
         public async Task<MercadoPagoOAuthCallbackResultDto> Handle(
             HandleMercadoPagoOAuthCallbackCommand request, CancellationToken cancellationToken)
         {
-            // Mercado Pago echoes back exactly what BuildAuthorizationUrl sent it as "state":
-            // "{organizationId}|{ourProtectedState}" (I3/I4's own confirmed, unchangeable
-            // combined shape — see IMercadoPagoConnectionStateService's own doc comment for why
-            // the cleartext organizationId prefix here is NEVER trusted on its own). Split on
-            // the FIRST '|' only (limit 2) so a protected value that happened to contain one
-            // (it won't — Data Protection's own output alphabet has no '|' — but defense in
-            // depth costs nothing here) stays intact.
+
             var parts = request.State.Split('|', 2);
             if (parts.Length != 2)
             {
@@ -90,15 +80,6 @@ namespace Checkbus.ApiService.Application.Payments.Commands
             };
             await _connectionRepository.UpsertAsync(connection, cancellationToken);
 
-            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
-            // conexión ya persistida sigue su curso normal. Este callback anónimo de OAuth nunca
-            // conoce qué usuario autenticado inició el flujo (solo la Organización, vía State),
-            // así que no hay ActorUserId/ActorEmail reales para atribuir.
-            // Nota: esta clase no tiene una rama de "desconexión" — hoy no existe en el código
-            // ninguna operación de desconectar Mercado Pago (ni comando ni endpoint), solo
-            // conectar/reconectar vía este mismo callback (ver UpsertAsync de
-            // IOrganizationMercadoPagoConnectionRepository). Por eso solo se audita
-            // MercadoPagoConectado aquí.
             try
             {
                 await _auditLogRepository.AddAsync(new AuditLogEntry
@@ -133,10 +114,6 @@ namespace Checkbus.ApiService.Application.Payments.Commands
             RedirectUrl = BuildRedirectUrl(connected: false, reason: reason)
         };
 
-        // Same blank-BaseUrl-until-provisioned permissive posture as Fase C5's own back-URLs:
-        // a blank BaseUrl produces a relative path rather than failing, which only actually
-        // misbehaves (redirects within the API host instead of the Web app) if this callback is
-        // genuinely invoked before PublicWebOptions is configured for the environment.
         private string BuildRedirectUrl(bool connected, string? reason)
         {
             var query = connected

@@ -22,12 +22,7 @@ namespace Checkbus.ApiService.Application.Payments
     /// </summary>
     public class MercadoPagoSellerTokenResolver : IMercadoPagoSellerTokenResolver
     {
-        // How far before the real expiry a token is treated as "needs refreshing now" — avoids a
-        // token that is technically still valid at the moment of this check expiring mid-flight
-        // during the Mercado Pago call that is about to use it. 5 minutes is comfortably larger
-        // than any single HTTP round trip this codebase makes, chosen the same way Fase E chose
-        // 15 minutes for hold expiration: a reasonable default, not a value Mercado Pago's own
-        // docs mandate.
+
         public const int ExpirationBufferMinutes = 5;
 
         private readonly IOrganizationMercadoPagoConnectionRepository _connectionRepository;
@@ -53,12 +48,6 @@ namespace Checkbus.ApiService.Application.Payments
 
             var refreshed = await _oauthService.RefreshAsync(connection.RefreshToken, cancellationToken);
 
-            // Mercado Pago rotates the refresh token on every refresh call (confirmed, docs
-            // verbatim in odd/tasks/pagos-mercadopago.md Fase I) — the OLD RefreshToken must be
-            // replaced in storage, not kept alongside the new AccessToken, or the next refresh
-            // attempt will use an already-dead value and fail. UpsertAsync overwrites the whole
-            // row for this OrganizationId (same connection.Id, same ConnectedAt — this is a
-            // refresh, not a brand-new grant).
             var updatedConnection = new MercadoPagoConnection
             {
                 Id = connection.Id,

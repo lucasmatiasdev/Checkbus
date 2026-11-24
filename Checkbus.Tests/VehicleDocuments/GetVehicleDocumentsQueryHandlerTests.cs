@@ -119,8 +119,7 @@ public class GetVehicleDocumentsQueryHandlerTests
     [Fact]
     public async Task Handle_SameOrganization_ReturnsExistingRowsOnly()
     {
-        // Conditional types that were never uploaded must NOT be synthesized into the
-        // response — only rows that actually exist in the repository are returned.
+
         var organizationId = Guid.NewGuid();
         var vehicle = CreateVehicle(organizationId);
         var repository = new FakeVehicleDocumentRepository { Documents = [CreateDocument(vehicle.Id)] };
@@ -173,7 +172,7 @@ public class GetVehicleDocumentsQueryHandlerTests
     {
         var organizationId = Guid.NewGuid();
         var vehicle = CreateVehicle(organizationId);
-        var document = CreateDocument(vehicle.Id); // ValidatedBy left null
+        var document = CreateDocument(vehicle.Id);
         var repository = new FakeVehicleDocumentRepository { Documents = [document] };
         var handler = new GetVehicleDocumentsQueryHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeUserRepository(), new FakeCurrentUserService(organizationId));
@@ -188,7 +187,7 @@ public class GetVehicleDocumentsQueryHandlerTests
     [Fact]
     public async Task Handle_CrossOrganizationVehicle_ThrowsVehicleNotFoundException()
     {
-        var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
+        var vehicle = CreateVehicle(Guid.NewGuid());
         var repository = new FakeVehicleDocumentRepository();
         var handler = new GetVehicleDocumentsQueryHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeUserRepository(), new FakeCurrentUserService(Guid.NewGuid()));
@@ -211,9 +210,7 @@ public class GetVehicleDocumentsQueryHandlerTests
     [Fact]
     public async Task Handle_ValidRequest_DtoExcludesFileKeyAndFileContentType()
     {
-        // Compile-time proof: VehicleDocumentDto has no FileKey/FileContentType members at
-        // all, so the file is never reachable except through the dedicated download
-        // endpoint. Mirrors the equivalent DriverRequirementDto test.
+
         var dtoProperties = typeof(VehicleDocumentDto).GetProperties().Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("FileKey", dtoProperties);

@@ -54,9 +54,6 @@ public class CreateSupportTicketCommandHandlerTests
             => throw new NotSupportedException("Not needed by CreateSupportTicketCommandHandler.");
     }
 
-    // Same shape as CancelReservationCommandHandlerTests' FakeEmailService: an optional
-    // throwOnSend switch proves the handler swallows a flaky SMTP relay without failing the
-    // (already persisted) ticket creation.
     private sealed class FakeEmailService(bool throwOnSend = false) : IEmailService
     {
         public List<EmailMessage> SentMessages { get; } = [];
@@ -236,8 +233,6 @@ public class CreateSupportTicketCommandHandlerTests
             ticketRepository, new FakeFileStorageService(), emailService,
             new SupportOptions { NotificationEmail = "soporte@checkbus.com" }, Guid.NewGuid(), Guid.NewGuid());
 
-        // Must not throw — the email failure is logged and swallowed; the ticket is already
-        // persisted before the send attempt and the DTO is returned regardless.
         var result = await handler.Handle(CreateCommand(), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);

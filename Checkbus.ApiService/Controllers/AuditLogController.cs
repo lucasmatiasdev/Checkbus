@@ -6,10 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // CU-16 (odd/tasks/auditoria-sistema.md) — visible to Administrador (own organization
-    // only) and CheckbusSoporte (every organization, optionally scoped to one via the
-    // organizationId filter); the handler re-validates the CheckbusSoporte claim against the
-    // sentinel Checkbus Organization, same defense-in-depth idea as SupportTicketsAdminController.
+
     [Route("api/audit-log")]
     [ApiController]
     public class AuditLogController : ControllerBase

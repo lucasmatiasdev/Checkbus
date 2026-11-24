@@ -72,8 +72,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Reports
                 sb.AppendLine(string.Join(',', fields.Select(EscapeCsvField)));
             }
 
-            // Leading BOM so Excel on Windows/es-AR opens the file as UTF-8 instead of
-            // mis-detecting it as the system codepage (breaks accented characters otherwise).
             var bom = Encoding.UTF8.GetPreamble();
             var textBytes = Encoding.UTF8.GetBytes(sb.ToString());
             var result = new byte[bom.Length + textBytes.Length];
@@ -103,8 +101,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Reports
             sheet.Cell(row, 9).Value = trip.Price;
         }
 
-        // Minimal RFC 4180 quoting — only the delimiter, quote char and newlines force quoting,
-        // same as every other hand-written CSV writer; no CsvHelper dependency for this.
         private static string EscapeCsvField(string field)
         {
             if (field.Contains(',') || field.Contains('"') || field.Contains('\n'))

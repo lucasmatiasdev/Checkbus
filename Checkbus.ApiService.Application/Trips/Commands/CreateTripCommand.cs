@@ -12,19 +12,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         public required DateTime ArrivalDate { get; set; }
         public required decimal Price { get; set; }
 
-        // Ordered: first = origin, last = destination, everything else = intermediate. Order/Type
-        // are deliberately absent from CreateTripStopCommand below — both are computed
-        // server-side from this list's position, never accepted from the client.
         public required IReadOnlyList<CreateTripStopCommand> Stops { get; set; }
 
-        // Deliberately ABSENT: OrganizationId (from the validated token, like CreateVehicleCommand)
-        // and EstimatedDuration/DistanceKm (always computed server-side via IDirectionsService,
-        // never trusted from the client).
     }
 
-    // Raw picked-location fields for one ordered stop, crossing the wire from Checkbus.Web's
-    // PickedLocation (see R3) — the API-side equivalent of CreateEventCommand's flattened
-    // Location* fields. The handler resolves/dedupes the real Location row from these.
     public class CreateTripStopCommand
     {
         public required string Name { get; set; }
@@ -33,8 +24,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
         public required double Latitude { get; set; }
         public required double Longitude { get; set; }
 
-        // CU-13: caller-provided per-stop attributes — unlike Order/Type above, these are NOT
-        // computed server-side.
         public int StopDurationMinutes { get; set; }
         public bool IsBoardingPoint { get; set; }
     }

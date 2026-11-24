@@ -9,27 +9,20 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Contracts
 {
-    // Colocated here rather than its own Contracts file, same convention
-    // UploadEventImageRequest uses on EventsController.cs — this task's allowed edit surface
-    // only authorizes touching SupportTicketsController.cs, not a new Contracts file.
+
     public sealed class CreateSupportTicketRequest
     {
         public required SupportTicketCategory Category { get; set; }
         public required string Subject { get; set; }
         public required string Description { get; set; }
 
-        // Unlike UploadEventImageRequest.File, the attachment here is optional — a ticket may
-        // have none at all.
         public IFormFile? Attachment { get; set; }
     }
 }
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Organization-side only (odd/tasks/soporte-tickets.md) — every action requires
-    // Administrador or Planificador, same raw-string [Authorize(Roles = "...")] convention as
-    // EventsController. The future internal Checkbus staff panel (cross-tenant ticket
-    // management) is explicitly out of scope and does not exist on this controller.
+
     [Route("api/[controller]")]
     [ApiController]
     public class SupportTicketsController : ControllerBase

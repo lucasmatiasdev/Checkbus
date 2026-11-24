@@ -23,9 +23,6 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
             RuleFor(x => x.Status).IsInEnum();
             RuleFor(x => x.OwnerType).IsInEnum();
 
-            // OwnerType=Organizacion: no owner fields accepted — ownership stays unset,
-            // never implied from the operational OrganizationId link (see
-            // notes/Politica_documentacion_vehiculos.docx, constraint 1).
             When(x => x.OwnerType == VehicleOwnerType.Organizacion, () =>
             {
                 RuleFor(x => x.OwnerUserId)
@@ -39,9 +36,6 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
                     .WithMessage("OwnerDocumentNumber must not be set when OwnerType is Organizacion.");
             });
 
-            // OwnerType=Chofer: OwnerUserId required (resolved against an existing
-            // Role.Chofer user in the caller's organization by the handler);
-            // OwnerName/OwnerDocumentNumber must stay unset.
             When(x => x.OwnerType == VehicleOwnerType.Chofer, () =>
             {
                 RuleFor(x => x.OwnerUserId)
@@ -55,8 +49,6 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
                     .WithMessage("OwnerDocumentNumber must not be set when OwnerType is Chofer.");
             });
 
-            // OwnerType=Otro: OwnerName + OwnerDocumentNumber both required;
-            // OwnerUserId must stay unset.
             When(x => x.OwnerType == VehicleOwnerType.Otro, () =>
             {
                 RuleFor(x => x.OwnerName)

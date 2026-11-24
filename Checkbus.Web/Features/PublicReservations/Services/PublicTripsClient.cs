@@ -21,9 +21,6 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    // Slug->Guid resolution for the friendly share link (CU-03,
-    // odd/tasks/gaps-reescritura-cu.md T2) — called once at page init, before every other
-    // method here, all of which still take the resolved Guid.
     public async Task<ResolveTripSlugOutcome> ResolveSlugAsync(
         string slug,
         CancellationToken cancellationToken = default)
@@ -102,8 +99,7 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new PublicTripSeatMapOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -146,17 +142,13 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new PublicTripDetailOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }
     }
 
-    // Added in T4 — the Step 1 detail page's event image. Binary response, not JSON: unlike
-    // every other method here, this reads raw bytes + the response Content-Type header rather
-    // than deserializing a DTO.
     public async Task<PublicTripEventImageOutcome> GetEventImageAsync(
         Guid tripId,
         CancellationToken cancellationToken = default)
@@ -199,10 +191,6 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
         }
     }
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md T4) — polled repeatedly by
-    // LiveLocationMap while a trip is in progress. The API action always answers 200 (never
-    // 404 — see GetTripLocationQueryHandler's own doc comment), so this method's outcome only
-    // ever splits on transport success vs. failure, unlike every other method above.
     public async Task<PublicTripLocationOutcome> GetLocationAsync(
         Guid tripId,
         CancellationToken cancellationToken = default)
@@ -234,8 +222,7 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new PublicTripLocationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -295,8 +282,7 @@ public sealed class PublicTripsClient([FromKeyedServices("apiservice")] HttpClie
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new CreateReservationOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

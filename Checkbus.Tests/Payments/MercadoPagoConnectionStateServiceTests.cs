@@ -40,9 +40,7 @@ public class MercadoPagoConnectionStateServiceTests
     [Fact]
     public void TryUnprotect_ValueProtectedUnderADifferentPurpose_ReturnsInvalid()
     {
-        // Proves the distinct purpose string actually matters: a value protected under
-        // "MercadoPagoConnection.Tokens" (the sibling repository's own purpose) must never be
-        // accepted here, even though both protectors share the same underlying key ring.
+
         var provider = new EphemeralDataProtectionProvider();
         var foreignProtector = provider.CreateProtector("MercadoPagoConnection.Tokens");
         var foreignValue = foreignProtector.Protect("some-unrelated-payload");

@@ -205,7 +205,6 @@ public class GetTripBoardingListQueryHandlerTests
         Assert.Equal(passenger.DocumentNumber, dto.PassengerDocumentNumber);
         Assert.Equal(BoardingStatus.Abordado, dto.Status);
 
-        // Deliberately excluded from the DTO shape — not just unset.
         Assert.DoesNotContain(
             typeof(BoardingPassengerDto).GetProperties(), p => p.Name is "PassengerEmail" or "PassengerPhone");
     }

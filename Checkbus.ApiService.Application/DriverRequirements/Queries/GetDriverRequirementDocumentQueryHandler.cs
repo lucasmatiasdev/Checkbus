@@ -22,7 +22,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Queries
 
         public async Task<DriverRequirementFileDto> Handle(GetDriverRequirementDocumentQuery request, CancellationToken cancellationToken)
         {
-            // Same self-or-admin-same-organization rule as GetDriverRequirementsQuery.
+
             await GetDriverRequirementsQueryHandler.AuthorizeSelfOrAdminAsync(
                 request.TargetUserId, _currentUser, _userRepository, cancellationToken);
 

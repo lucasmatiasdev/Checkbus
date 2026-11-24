@@ -276,16 +276,14 @@ public class VehicleDocumentRepositoryTests
         var threshold = today.AddDays(30);
 
         db.VehicleDocuments.AddRange(
-            // Org A, already expired -> counted.
+
             CreateDocument(vehicleA.Id, VehicleDocumentType.Seguro, expirationDate: today.AddDays(-5)),
-            // Org A, expires exactly at threshold -> counted.
+
             CreateDocument(vehicleA.Id, VehicleDocumentType.RTO_VTV, expirationDate: threshold),
-            // Org B, same expiring window -> excluded (different organization).
+
             CreateDocument(vehicleB.Id, VehicleDocumentType.Seguro, expirationDate: today.AddDays(-5)));
         await db.SaveChangesAsync(cancellationToken);
 
-        // Org A, additional vehicle to cover "no expiration date" and "beyond threshold"
-        // exclusions without colliding with the unique (VehicleId, Type) index above.
         var vehicleA2 = CreateVehicle(organizationA.Id, "AB333CD");
         db.Vehicles.Add(vehicleA2);
         db.VehicleDocuments.AddRange(

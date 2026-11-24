@@ -42,12 +42,12 @@
                     </TemplateColumn>
                     <TemplateColumn Title="Salida">
                         <CellTemplate>
-                            @context.Item.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                            @context.Item.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                         </CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Llegada">
                         <CellTemplate>
-                            @context.Item.ArrivalDate.ToString("dd/MM/yyyy HH:mm")
+                            @context.Item.ArrivalDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                         </CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Acciones" Sortable="false" Filterable="false">

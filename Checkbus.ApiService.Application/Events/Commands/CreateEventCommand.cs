@@ -10,9 +10,6 @@ namespace Checkbus.ApiService.Application.Events.Commands
         public required EventType Type { get; set; }
         public required DateTime Date { get; set; }
 
-        // Raw picked-location fields crossing the wire from Checkbus.Web's PickedLocation (see
-        // R3) — the API-side equivalent of its Nombre/Direccion/PlaceId/Latitud/Longitud. The
-        // handler resolves/dedupes the real Location row from these before creating the Event.
         public required string LocationName { get; set; }
         public required string Address { get; set; }
         public required string PlaceId { get; set; }

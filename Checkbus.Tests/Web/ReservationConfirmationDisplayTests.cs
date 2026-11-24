@@ -38,9 +38,7 @@ public class ReservationConfirmationDisplayTests
     [InlineData("Cancelada")]
     public void CanCancel_NonConfirmada_ReturnsFalse(string status)
     {
-        // PendientePago (Fase C's new hold state) must not offer cancellation here —
-        // cancelling an unpaid hold is a different, unscoped operation
-        // (CancelReservationCommandHandler only ever handles a Confirmada reservation).
+
         Assert.False(ReservationConfirmation.CanCancel(status));
     }
 }

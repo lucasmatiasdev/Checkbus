@@ -61,8 +61,7 @@ public sealed class PublicOrganizationsClient([FromKeyedServices("apiservice")] 
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new GetPublicOrganizationTripsOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

@@ -272,17 +272,11 @@
     private string? newDiagnosticNotes;
     private List<ComponentRowModel> componentRows = [new()];
 
-    // OnParametersSetAsync (not OnInitializedAsync) because Id is a routed parameter that can
-    // change via client-side routing (e.g. navigating from one maintenance record's detail page
-    // to another's without a full page reload) — same reasoning as VehicleDocuments.razor's
-    // VehicleId handling.
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
         errorMessage = null;
 
-        // The record and its diagnostics are independent reads against two different endpoints —
-        // fetched in parallel rather than sequentially awaited.
         var recordTask = LoadRecordAsync();
         var diagnosticsTask = LoadDiagnosticsAsync();
         await Task.WhenAll(recordTask, diagnosticsTask);
@@ -329,9 +323,7 @@
             case VehicleDiagnosticsListOutcome.Forbidden:
             case VehicleDiagnosticsListOutcome.NotFound:
             case VehicleDiagnosticsListOutcome.TransportError:
-                // LoadRecordAsync already surfaces the page-level error for a shared
-                // not-found/forbidden cause (both calls target the same record); degrade to an
-                // empty list here instead of a second competing error message.
+
                 diagnostics = [];
                 break;
         }
@@ -379,10 +371,7 @@
 
     private void RemoveComponentRow(int index)
     {
-        // Mirrors the server-side validator's "component list must have at least 1 entry" rule
-        // (M3) — the UI never lets the list shrink below 1 row in the first place (the delete
-        // button for the last remaining row is disabled in the markup above), so this guard is a
-        // defensive no-op rather than the only line of defense.
+
         if (componentRows.Count <= 1)
             return;
 

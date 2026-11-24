@@ -23,17 +23,12 @@ namespace Checkbus.ApiService.Application.Events.Queries
 
         public async Task<IReadOnlyList<EventDto>> Handle(GetEventsQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — the query has no
-            // OrganizationId field, so no request value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var events = await _eventRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
 
-            // ILocationRepository has no batch-by-ids lookup, so resolve each distinct
-            // Location at most once rather than once per Event — avoids N+1 when multiple
-            // events share the same venue, mirroring GetMaintenanceRecordsQueryHandler's
-            // single-join-table approach without inventing a new repository method for this.
             var locationsById = new Dictionary<Guid, Location>();
             foreach (var locationId in events.Select(e => e.LocationId).Distinct())
             {

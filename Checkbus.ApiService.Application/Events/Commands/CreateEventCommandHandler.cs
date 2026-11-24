@@ -24,15 +24,10 @@ namespace Checkbus.ApiService.Application.Events.Commands
 
         public async Task<EventDto> Handle(CreateEventCommand request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — the command has no
-            // OrganizationId field, so no request body value can ever influence it.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
-            // Dedupe by PlaceId first (shared Location catalog) — reuse the existing row when
-            // the same real-world place was already picked for a previous Event/Trip, otherwise
-            // create a new one. Event+Location is not an atomic aggregate (unlike Trip+Route+
-            // Stops), so two separate repository calls are fine here per the task's own guidance.
             var location = await _locationRepository.FindByPlaceIdAsync(request.PlaceId, cancellationToken);
             if (location is null)
             {
@@ -58,10 +53,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 Id = Guid.NewGuid(),
                 Name = request.Name,
                 Type = request.Type,
-                // Checkbus.Web's MudDatePicker produces a Kind=Unspecified DateTime (it survives
-                // the JSON round-trip as-is, with no offset); Npgsql's "timestamp with time zone"
-                // column only accepts Utc. The picked date has no real time-of-day/timezone
-                // meaning, so it's tagged Utc rather than converted.
+
                 Date = DateTime.SpecifyKind(request.Date, DateTimeKind.Utc),
                 LocationId = location.Id,
                 OrganizationId = organizationId,
@@ -77,7 +69,7 @@ namespace Checkbus.ApiService.Application.Events.Commands
                 Name = @event.Name,
                 Type = @event.Type,
                 Date = @event.Date,
-                HasImage = false, // a freshly created Event never has an image yet
+                HasImage = false,
                 Location = new EventDto.LocationDto
                 {
                     Name = location.Name,

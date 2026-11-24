@@ -67,8 +67,6 @@ public class MaintenanceRecordsClientTests
         Cost = null
     };
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccessWithDeserializedRecord()
     {
@@ -172,8 +170,6 @@ public class MaintenanceRecordsClientTests
         Assert.Contains("MaintenanceRecords", stub.CapturedRequest.RequestUri!.ToString());
     }
 
-    // ----- UpdateAsync -----
-
     [Fact]
     public async Task UpdateAsync_WhenNoContent_ReturnsSuccess()
     {
@@ -255,8 +251,6 @@ public class MaintenanceRecordsClientTests
         Assert.Equal(HttpMethod.Put, stub.CapturedRequest!.Method);
         Assert.Contains($"MaintenanceRecords/{RecordId}", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- GetListAsync -----
 
     [Fact]
     public async Task GetListAsync_WhenOk_ReturnsSuccessWithDeserializedList()
@@ -357,8 +351,6 @@ public class MaintenanceRecordsClientTests
         Assert.NotNull(stub.CapturedRequest);
         Assert.Equal(string.Empty, stub.CapturedRequest!.RequestUri!.Query);
     }
-
-    // ----- GetByIdAsync -----
 
     [Fact]
     public async Task GetByIdAsync_WhenOk_ReturnsSuccessWithDeserializedRecord()

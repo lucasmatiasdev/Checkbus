@@ -129,8 +129,7 @@ public class GetPublicOrganizationTripsQueryHandlerTests
     [Fact]
     public async Task Handle_UnknownOrganizationSlug_ReturnsEmptyListWithoutCallingTripRepository()
     {
-        // Same IDOR-safe posture as GetPublicTripSeatMapQueryHandler, expressed as an empty list
-        // rather than a 404 — see the handler's own doc comment.
+
         var organizationRepository = new FakeOrganizationRepository(null);
         var tripRepository = new FakeTripRepository([]);
         var handler = new GetPublicOrganizationTripsQueryHandler(

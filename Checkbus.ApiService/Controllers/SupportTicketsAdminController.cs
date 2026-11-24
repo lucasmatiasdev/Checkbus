@@ -8,9 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Contracts
 {
-    // Colocated here rather than its own Contracts file, same convention
-    // CreateSupportTicketRequest uses on SupportTicketsController.cs — this task's allowed edit
-    // surface only authorizes touching SupportTicketsAdminController.cs, not a new Contracts file.
+
     public sealed class UpdateSupportTicketStatusRequest
     {
         public required SupportTicketStatus NewStatus { get; set; }
@@ -19,12 +17,7 @@ namespace Checkbus.ApiService.Contracts
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Checkbus internal staff panel (odd/tasks/panel-soporte-checkbus.md) — cross-tenant ticket
-    // management, deliberately on its own route (api/support-tickets-admin) and controller,
-    // separate from SupportTicketsController (api/support-tickets, the client-organization
-    // audience). Every action requires the CheckbusSoporte role; the handlers additionally
-    // verify the caller resolves to the sentinel Checkbus Organization before returning or
-    // mutating anything cross-tenant — the Role claim alone is never trusted for that.
+
     [Route("api/support-tickets-admin")]
     [ApiController]
     public class SupportTicketsAdminController : ControllerBase

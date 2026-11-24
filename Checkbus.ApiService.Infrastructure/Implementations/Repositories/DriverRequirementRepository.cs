@@ -36,9 +36,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
         public async Task<int> GetExpiringOrExpiredCountByOrganizationAsync(
             Guid organizationId, DateOnly expiringThresholdDate, CancellationToken cancellationToken)
         {
-            // DriverRequirement has no navigation back to User (FK-only relationship by
-            // design), so the organization scope is applied via a subquery over Users
-            // rather than a join through a navigation property.
+
             var organizationUserIds = _context.Users
                 .Where(u => u.OrganizationId == organizationId)
                 .Select(u => u.Id);

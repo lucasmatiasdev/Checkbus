@@ -58,10 +58,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The one call this Fase's spec calls out by name: "If the Mercado Pago call
-                // itself fails, throw OrderCreationFailedException from CreateOrderAsync
-                // specifically — don't swallow it." Fase C3 catches this type to clean up the
-                // PendientePago batch an order-creation failure left behind.
+
                 throw new OrderCreationFailedException($"Mercado Pago order creation failed: {ex.Message}");
             }
         }
@@ -75,13 +72,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // No dedicated Domain exception exists for "order lookup failed" (Fase A only
-                // added OrderCreationFailedException for the create path, plus
-                // PaymentNotFoundException/PaymentNotRefundableException for local repository
-                // lookups/state checks) — adding a new one is outside this Fase's allowed edit
-                // surface (Domain layer). Same posture SmtpEmailService already uses for its own
-                // non-domain-exception-having failures: wrap in InvalidOperationException rather
-                // than let an SDK-specific exception type leak out of this adapter.
+
                 throw new InvalidOperationException($"Failed to fetch Mercado Pago order '{externalOrderId}'.", ex);
             }
         }
@@ -98,17 +89,11 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (Exception ex) when (ex is not OperationCanceledException and not InvalidOperationException)
             {
-                // Same wrapping posture as GetOrderAsync above — no dedicated Domain exception
-                // exists for a failed refund call either; Fase F2 is what decides how to react
-                // to this (log + surface for manual follow-up, the Reservation stays cancelled
-                // regardless).
+
                 throw new InvalidOperationException($"Failed to refund Mercado Pago order '{externalOrderId}'.", ex);
             }
         }
 
-        // A partial refund targets one specific payment attempt within the order (by its id),
-        // which the order itself must be fetched to discover — see
-        // MercadoPagoOrderMapper.BuildPartialRefundRequest's doc comment.
         private async Task<OrderRefundPaymentRequest> BuildPartialRefundRequestAsync(
             string externalOrderId, Money amount, string sellerAccessToken, CancellationToken cancellationToken)
         {
@@ -120,18 +105,9 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             return MercadoPagoOrderMapper.BuildPartialRefundRequest(paymentId, amount.Amount);
         }
 
-        // Fase I (Marketplace/Split Payments): the access token used per call is the specific
-        // Organization's own connected seller token passed in by the caller — there is no global
-        // fallback token (MercadoPagoOptions.AccessToken was removed as dead code once this
-        // became the only path). A blank sellerAccessToken (the three existing callers not yet
-        // wired to IMercadoPagoSellerTokenResolver, per I6) results in RequestOptions.AccessToken = ""
-        // exactly as before this Fase existed for those call sites — a real Mercado Pago call
-        // with a blank token fails at the gateway (401), not silently, which is the correct
-        // "not wired up yet" behavior until a later Fase does wire it in.
         private static RequestOptions BuildRequestOptions(string sellerAccessToken)
         {
-            // RequestOptions.CustomHeaders is a get-only dictionary on the installed SDK (2.12.1)
-            // — entries must be added into it, not replaced with a new Dictionary instance.
+
             var requestOptions = new RequestOptions { AccessToken = sellerAccessToken };
             requestOptions.CustomHeaders["X-Idempotency-Key"] = Guid.NewGuid().ToString();
             return requestOptions;

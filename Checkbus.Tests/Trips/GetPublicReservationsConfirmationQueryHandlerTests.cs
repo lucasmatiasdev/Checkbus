@@ -265,9 +265,7 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
     [Fact]
     public void ReservationConfirmationDto_HasNoEmailOrPhoneProperty()
     {
-        // Structural guarantee, not just "unset at runtime": the DTO's own shape must never
-        // carry Passenger.Email/Passenger.Phone, since this page is reachable by anyone
-        // holding a Reservation.Id.
+
         var properties = typeof(ReservationConfirmationDto).GetProperties().Select(p => p.Name);
 
         Assert.DoesNotContain("Email", properties);
@@ -343,8 +341,6 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
 
         Assert.Empty(result.Reservations);
     }
-
-    // --- CU-11 replacement ("Consultar estado y progreso del viaje", no GPS hardware). ---
 
     private static User CreateDriver(Guid organizationId) => new()
     {
@@ -444,9 +440,7 @@ public class GetPublicReservationsConfirmationQueryHandlerTests
     [Fact]
     public async Task Handle_DriverOrVehicleNotResolved_LeavesThoseFieldsNullWithoutError()
     {
-        // No drivers/vehicles/routes supplied to CreateHandler — neither the driver nor the
-        // vehicle FK resolves, same defensive posture as a missing Trip/Passenger elsewhere in
-        // this handler, but these fields are optional display data, not a reason to omit the row.
+
         var fixture = CreateFixture();
         var handler = CreateHandler(
             [fixture.Reservation], [fixture.Seat], [fixture.Passenger], [fixture.Trip], [fixture.Event]);

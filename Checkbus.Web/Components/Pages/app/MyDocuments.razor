@@ -93,15 +93,12 @@
 </MudContainer>
 
 @code {
-    // Maximum upload size accepted client-side: comfortably above Blazor's 500KB default
-    // OpenReadStream buffer and matching the backend's 5MB cap (T2 FluentValidation).
+
     private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
 
     private static readonly WebDriverRequirementType[] RequirementTypes =
         Enum.GetValues<WebDriverRequirementType>();
 
-    // Resolved via IServiceProvider.GetRequiredKeyedService, not IHttpClientFactory.CreateClient —
-    // same "apiservice" keyed-client pattern used by Dashboard.razor to reach auth/me.
     [Inject]
     private IServiceProvider ServiceProvider { get; set; } = default!;
 

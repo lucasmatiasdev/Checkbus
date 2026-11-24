@@ -54,9 +54,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             return FixedTimeEqualsHex(computedHex, v1);
         }
 
-        // x-signature's value is a comma-separated list of key=value pairs, e.g.
-        // "ts=1704908010,v1=7f8a9...". Order is not guaranteed by the format itself, so this
-        // parses by key rather than assuming position.
         private static bool TryParseSignatureHeader(string header, out string ts, out string v1)
         {
             ts = string.Empty;
@@ -95,9 +92,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
 
         private static bool FixedTimeEqualsHex(string computedHex, string providedHex)
         {
-            // Different lengths can only mean "not equal" (e.g. a malformed/truncated v1) —
-            // safe to short-circuit before the constant-time compare, which requires equal-
-            // length inputs anyway.
+
             if (computedHex.Length != providedHex.Length)
             {
                 return false;
@@ -112,7 +107,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Payments
             }
             catch (FormatException)
             {
-                // Not valid hex (e.g. a tampered/garbage v1 value) — definitely not equal.
+
                 return false;
             }
 

@@ -1,4 +1,4 @@
-﻿using Checkbus.ApiService.Domain.Authorization;
+using Checkbus.ApiService.Domain.Authorization;
 using Checkbus.ApiService.Domain.Entities.Tenancy;
 using Checkbus.ApiService.Domain.Interfaces;
 using System;
@@ -21,10 +21,7 @@ namespace Checkbus.ApiService.Domain.Entities.Authentication
         public Guid OrganizationId { get; set; }
         public Organization? Organization { get; set; }
         public bool IsActive { get; set; } = true;
-        // No initializer: relies on the CLR default `false` (and the resulting
-        // `boolean NOT NULL DEFAULT false` column), so every pre-existing or seeded
-        // user defaults to false with zero CheckbusDbSeeder edits. Only
-        // RegisterUserCommandHandler sets this true, explicitly.
+
         public bool MustChangePassword { get; set; }
         public DateTime? LastLoginAt { get; set; }
         public int FailedLoginAttempts { get; set; }

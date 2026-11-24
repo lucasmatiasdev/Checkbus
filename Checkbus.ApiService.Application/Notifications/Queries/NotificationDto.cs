@@ -11,9 +11,6 @@ namespace Checkbus.ApiService.Application.Notifications.Queries
         public required string Message { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        // Resolved display name for CreatedByUserId, same "resolve a Guid FK to a display name
-        // for the UI" pattern GetPublicReservationsConfirmationQueryHandler uses for a Trip's
-        // driver. Null when the creating User can no longer be resolved.
         public string? CreatedByName { get; set; }
     }
 }

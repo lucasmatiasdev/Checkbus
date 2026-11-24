@@ -10,11 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // CU-08: flips an EnProceso trip to Completado. Admin-initiated (Planificador/Administrador)
-    // OR the trip's own Chofer, same tenant-check/role-gate posture as StartTripCommandHandler
-    // (Chofer-only ownership check below — the role claim alone never proves it's THIS driver's
-    // trip). Also closes boarding (any still-Pendiente BoardingRecord becomes Ausente) as part
-    // of finishing, instead of requiring the driver to separately call CloseBoardingCommand.
+
     public class FinishTripCommandHandler : IRequestHandler<FinishTripCommand>
     {
         private readonly ITripRepository _tripRepository;
@@ -57,14 +53,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var trip = await _tripRepository.GetByIdAsync(request.Id, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
             if (_currentUser.Role == nameof(Role.Chofer) && trip.DriverId != _currentUser.UserId)
             {
-                // IDOR-safe: a chofer may only finish their OWN trip — existence of someone
-                // else's trip is never leaked, same as the cross-tenant case above.
+
                 throw new TripNotFoundException();
             }
 
@@ -74,9 +69,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     "El viaje no puede finalizarse: solo un viaje en estado En proceso puede finalizarse.");
             }
 
-            // Pendiente -> Ausente for every BoardingRecord on this trip, same mechanism
-            // CloseBoardingCommandHandler uses — folded into finishing instead of requiring the
-            // driver to call it as a separate step.
             await _boardingRecordRepository.CloseBoardingAsync(trip.Id, cancellationToken);
 
             trip.Status = TripStatus.Completado;
@@ -85,8 +77,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             trip.UpdatedAt = DateTime.UtcNow;
             await _tripRepository.UpdateAsync(trip, cancellationToken);
 
-            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
-            // finalización ya persistida sigue su curso normal.
             try
             {
                 await _auditLogRepository.AddAsync(new AuditLogEntry

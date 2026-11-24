@@ -95,8 +95,6 @@ public class SeatRepositoryTests
         var repository = new SeatRepository(db);
         await repository.EnsureSeatsForVehicleAsync(vehicle.Id, vehicle.Capacity, cancellationToken);
 
-        // Second call must be a pure no-op read — no duplicate inserts, no unique-index
-        // violation, still exactly Capacity seats.
         await repository.EnsureSeatsForVehicleAsync(vehicle.Id, vehicle.Capacity, cancellationToken);
 
         var seats = await db.Seats.Where(s => s.VehicleId == vehicle.Id).ToListAsync(cancellationToken);

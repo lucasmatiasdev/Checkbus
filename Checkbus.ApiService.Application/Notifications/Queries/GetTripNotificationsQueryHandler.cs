@@ -34,15 +34,13 @@ namespace Checkbus.ApiService.Application.Notifications.Queries
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new TripNotFoundException();
             }
 
             var notifications = await _notificationRepository.GetRelevantToTripAsync(
                 trip.Id, trip.EventId, cancellationToken);
 
-            // Small per-request cache, same convention as GetPublicReservationsConfirmationQuery
-            // Handler's driver lookup — a batch of notifications commonly shares the same author.
             var namesByUserId = new Dictionary<Guid, string?>();
             var dtos = new List<NotificationDto>(notifications.Count);
             foreach (var notification in notifications)

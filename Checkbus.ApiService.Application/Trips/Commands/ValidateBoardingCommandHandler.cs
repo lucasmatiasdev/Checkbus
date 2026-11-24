@@ -32,14 +32,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 ?? throw new BoardingRecordNotFoundException(
                     "The submitted code does not match any reservation for a trip you drive.");
 
-            // IDOR-safe ownership check, same rule GetTripBoardingListQueryHandler uses — a
-            // Reservation belonging to a Trip the caller doesn't drive must never be
-            // distinguishable from one that genuinely doesn't exist.
             await GetTripBoardingListQueryHandler.AuthorizeDriverOwnsTripAsync(
                 reservation.TripId, _tripRepository, _currentUser, cancellationToken);
 
-            // CU-12: the BoardingRecord alone doesn't know about cancellation — a Cancelada
-            // reservation (or one still PendientePago) must never be markable Abordado.
             if (reservation.Status != ReservationStatus.Confirmada)
             {
                 throw new ReservationNotEligibleForBoardingException();

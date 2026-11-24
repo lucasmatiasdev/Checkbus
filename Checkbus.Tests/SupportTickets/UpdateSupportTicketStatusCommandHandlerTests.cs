@@ -13,9 +13,7 @@ namespace Checkbus.Tests.SupportTickets;
 
 public class UpdateSupportTicketStatusCommandHandlerTests
 {
-    // Local fake, not the shared one in the other *CommandHandlerTests files — this one needs
-    // GetByIdAsync/UpdateAsync wired to real behavior and tracks whether UpdateAsync was reached,
-    // which the other handlers' fakes have no reason to do.
+
     private sealed class FakeSupportTicketRepository(SupportTicket? ticket) : ISupportTicketRepository
     {
         public SupportTicket? UpdatedTicket { get; private set; }
@@ -109,8 +107,7 @@ public class UpdateSupportTicketStatusCommandHandlerTests
     [Fact]
     public async Task Handle_CallerFromSentinelOrganization_UpdatesStatusAndUpdatedAt_RegardlessOfTicketOwner()
     {
-        // Cross-tenant on purpose: the ticket belongs to some client organization, not the
-        // caller's (sentinel) one — that is exactly the point of this panel.
+
         var ticket = CreateTicket(Guid.NewGuid());
         var ticketRepository = new FakeSupportTicketRepository(ticket);
         var handler = new UpdateSupportTicketStatusCommandHandler(
@@ -152,11 +149,7 @@ public class UpdateSupportTicketStatusCommandHandlerTests
     [Fact]
     public async Task Handle_TicketIdDoesNotExist_ThrowsSupportTicketNotFoundException()
     {
-        // Unlike GetSupportTicketAttachmentQueryHandler (which collapses "not found" and
-        // "belongs to another organization" into the same IDOR-safe null, because a regular
-        // caller must not learn whether a ticket exists in some other tenant), this is the
-        // Checkbus internal staff panel: the caller legitimately sees every organization's
-        // tickets, so a missing TicketId is a genuine 404 with nothing to hide.
+
         var ticketRepository = new FakeSupportTicketRepository(ticket: null);
         var handler = new UpdateSupportTicketStatusCommandHandler(
             ticketRepository,

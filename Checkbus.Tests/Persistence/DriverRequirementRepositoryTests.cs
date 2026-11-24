@@ -159,21 +159,19 @@ public class DriverRequirementRepositoryTests
         var threshold = today.AddDays(30);
 
         db.DriverRequirements.AddRange(
-            // Org A, already expired -> counted.
+
             CreateRequirement(userA.Id, DriverRequirementType.LicenciaConducir, expirationDate: today.AddDays(-5)),
-            // Org A, expires exactly at threshold -> counted.
+
             CreateRequirement(userA.Id, DriverRequirementType.CapacitacionProfesional, expirationDate: threshold),
-            // Org B, same expiring window -> excluded (different organization).
+
             CreateRequirement(userB.Id, DriverRequirementType.LicenciaConducir, expirationDate: today.AddDays(-5)));
         await db.SaveChangesAsync(cancellationToken);
 
-        // Org A, no expiration date at all -> excluded (added after save to avoid affecting
-        // the unique index on userA, since LicenciaConducir/CapacitacionProfesional are used above).
         var userA2 = CreateUser(organizationA.Id, "30111444", "pedro.lopez@org-a.com");
         db.Users.Add(userA2);
         db.DriverRequirements.AddRange(
             CreateRequirement(userA2.Id, DriverRequirementType.LicenciaConducir, expirationDate: null),
-            // Org A, expires well beyond the threshold -> excluded.
+
             CreateRequirement(userA2.Id, DriverRequirementType.CapacitacionProfesional, expirationDate: threshold.AddDays(1)));
         await db.SaveChangesAsync(cancellationToken);
 

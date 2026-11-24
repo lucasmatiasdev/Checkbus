@@ -40,10 +40,6 @@ public class PaymentPersistenceTests
         return new CheckbusDbContext(options);
     }
 
-    // Invoice/Refund carry real FKs to Trip/Passenger/Reservation (FK-only, no navigation
-    // properties — same posture as every other entity here), so persistence tests for them
-    // need a full, valid parent graph, not floating Guids. Mirrors the setup already used by
-    // ReservationPersistenceTests.
     private static async Task<(Trip Trip, Passenger Passenger, Reservation Reservation)> SeedReservationGraphAsync(
         CheckbusDbContext db, CancellationToken cancellationToken)
     {
@@ -266,9 +262,6 @@ public class PaymentPersistenceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync(cancellationToken);
 
-        // Refund references the specific Reservation it covers, not just the Payment — this is
-        // a deliberate design decision (see Refund's doc comment): a partial refund of 1-of-3
-        // seats must be traceable to which seat's price it refunded.
         var refund = new Refund
         {
             Id = Guid.NewGuid(),
@@ -292,8 +285,7 @@ public class PaymentPersistenceTests
     [Fact]
     public async Task Refund_ExternalRefundId_CanBeNull()
     {
-        // ExternalRefundId is nullable until the Mercado Pago refund call actually succeeds
-        // (Fase B/F) — mirrors Payment.ExternalOrderId's same nullable-until-confirmed shape.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

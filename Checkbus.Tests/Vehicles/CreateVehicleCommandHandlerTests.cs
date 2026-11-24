@@ -252,9 +252,7 @@ public class CreateVehicleCommandHandlerTests
     [Fact]
     public async Task Handle_OwnerTypeChofer_OwnerUserInDifferentOrganization_ThrowsVehicleOwnerNotFoundException()
     {
-        // IDOR-class check: an Administrador in org A must not be able to attach a Chofer
-        // from org B as a vehicle owner, even though the user genuinely exists and has the
-        // right role.
+
         var callerOrganizationId = Guid.NewGuid();
         var otherOrganizationChofer = CreateChoferUser(Guid.NewGuid());
         var userRepository = new FakeUserRepository { UserToReturn = otherOrganizationChofer };
@@ -284,9 +282,7 @@ public class CreateVehicleCommandHandlerTests
     [Fact]
     public async Task Handle_PatentExistsInCallerOrganization_PassesCallerOrganizationIdToPatentExistsAsync()
     {
-        // Patent uniqueness is scoped per organization (same patent reused by a different
-        // organization — e.g. a leased vehicle — must be allowed), so the handler has to pass
-        // the CALLER's own OrganizationId into PatentExistsAsync, never check it globally.
+
         var organizationId = Guid.NewGuid();
         var vehicleRepository = new FakeVehicleRepository();
         var handler = CreateHandler(vehicleRepository: vehicleRepository, hasOrganizationIdOverride: true, organizationIdOverride: organizationId);

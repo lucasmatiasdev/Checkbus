@@ -64,10 +64,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             }
             else
             {
-                // Overwrite in place — "at most one connection per Organization" (I1/I3's own
-                // doc comments). A fresh reconnect and a routine refresh both land here; both
-                // replace the old (now-invalid, per Mercado Pago's rotation rule) RefreshToken in
-                // full.
+
                 existing.SellerUserId = connection.SellerUserId;
                 existing.AccessToken = _protector.Protect(connection.AccessToken);
                 existing.RefreshToken = _protector.Protect(connection.RefreshToken);

@@ -33,8 +33,6 @@ public class VehicleDocumentsClientTests
             throw new HttpRequestException("Simulated network failure");
     }
 
-    // ----- GetDocumentsAsync -----
-
     [Fact]
     public async Task GetDocumentsAsync_WhenOk_ReturnsSuccessWithDeserializedList()
     {
@@ -131,8 +129,6 @@ public class VehicleDocumentsClientTests
         var transportError = Assert.IsType<VehicleDocumentsListOutcome.TransportError>(outcome);
         Assert.NotEmpty(transportError.Message);
     }
-
-    // ----- UploadDocumentAsync -----
 
     private static async Task<VehicleDocumentActionOutcome> UploadAsync(
         VehicleDocumentsClient client,
@@ -275,8 +271,6 @@ public class VehicleDocumentsClientTests
         Assert.DoesNotContain(parts, p => p.Headers.ContentDisposition?.Name?.Trim('"') == "IssueDate");
     }
 
-    // ----- ValidateAsync -----
-
     [Fact]
     public async Task ValidateAsync_WhenNoContent_ReturnsSuccess()
     {
@@ -316,8 +310,7 @@ public class VehicleDocumentsClientTests
     [Fact]
     public async Task ValidateAsync_WhenNotFound_ReturnsNotFound()
     {
-        // Covers both server-side 404 causes (vehicle not found/out-of-org, or this document
-        // type was never uploaded) — they are indistinguishable from the response alone.
+
         var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
         var client = CreateClient(stub);
 
@@ -354,8 +347,6 @@ public class VehicleDocumentsClientTests
         using var document = System.Text.Json.JsonDocument.Parse(body);
         Assert.True(document.RootElement.GetProperty("approved").GetBoolean());
     }
-
-    // ----- GetExpiringCountAsync -----
 
     [Fact]
     public async Task GetExpiringCountAsync_WhenOk_ReturnsSuccessWithDeserializedCount()

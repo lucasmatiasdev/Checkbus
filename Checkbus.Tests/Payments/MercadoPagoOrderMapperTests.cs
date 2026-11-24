@@ -29,11 +29,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void BuildCreateRequest_MapsTypeOnline_ProcessingModeManual_TotalAmount_AndExternalReference()
     {
-        // Corrected after a live sandbox 400 (see MercadoPagoOrderMapper.BuildCreateRequest's own
-        // doc comment): a Checkout Pro type: "online" order uses processing_mode: "manual" with
-        // NO transactions.payments entry at all — that shape belongs to a different (automatic)
-        // processing flow. This test was updated to match, replacing the old assertion that a
-        // Transactions/Payments entry existed.
+
         var request = new CreateOrderRequest(new Money(4500m, "ARS"), "payment-external-ref-123");
 
         var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
@@ -60,9 +56,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void BuildCreateRequest_WithAllThreeBackUrls_MapsThemUnderConfigOnline()
     {
-        // C5: back_urls for a type: "online" order live nested under config.online — confirmed
-        // against the installed mercadopago-sdk 2.12.1 assembly (MercadoPago.Client.Order.
-        // OrderOnlineConfigRequest: SuccessUrl/FailureUrl/PendingUrl are plain string props).
+
         var request = new CreateOrderRequest(
             new Money(1500m),
             "ref",
@@ -82,8 +76,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void BuildCreateRequest_WithNoBackUrls_LeavesConfigUnset()
     {
-        // Never send Mercado Pago an empty-string URL: when none of the three are populated,
-        // Config itself is left null rather than an empty Config.Online shell.
+
         var request = new CreateOrderRequest(new Money(1500m), "ref");
 
         var sdkRequest = MercadoPagoOrderMapper.BuildCreateRequest(request);
@@ -155,8 +148,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void ExtractCheckoutUrl_ReturnsNull_WhenNeitherSourceHasOne()
     {
-        // No ApiResponse at all (e.g. a hand-built Order, same shape a unit test constructs) —
-        // the JSON-parsing fallback must not throw on a null/empty raw body.
+
         var order = new Order { Id = "mp-order-3" };
 
         var checkoutUrl = MercadoPagoOrderMapper.ExtractCheckoutUrl(order);
@@ -218,8 +210,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void MapStatus_NoPaymentAttemptYet_FallsBackToOrderLevelStatus()
     {
-        // A freshly created order with no payment attempt yet — Order.Status ("created") is the
-        // only signal available, same convention already covered by the "Pending" theory above.
+
         var order = new Order { Id = "mp-order-4", Status = "created", Transactions = null };
 
         Assert.Equal(MercadoPagoOrderStatus.Pending, MercadoPagoOrderMapper.MapStatus(order));
@@ -239,7 +230,7 @@ public class MercadoPagoOrderMapperTests
     [Fact]
     public void BuildFullRefundRequest_HasNoTransactions()
     {
-        // Empty body = total refund, Mercado Pago's own convention.
+
         var request = MercadoPagoOrderMapper.BuildFullRefundRequest();
 
         Assert.Null(request.Transactions);

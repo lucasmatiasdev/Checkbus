@@ -159,7 +159,7 @@ public class ValidateVehicleDocumentCommandHandlerTests
     [Fact]
     public async Task Handle_CrossOrganizationVehicle_ThrowsVehicleNotFoundException()
     {
-        var vehicle = CreateVehicle(Guid.NewGuid()); // different organization than the caller
+        var vehicle = CreateVehicle(Guid.NewGuid());
         var repository = new FakeVehicleDocumentRepository();
         var handler = new ValidateVehicleDocumentCommandHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(Guid.NewGuid()),
@@ -186,12 +186,10 @@ public class ValidateVehicleDocumentCommandHandlerTests
     [Fact]
     public async Task Handle_ConditionalTypeNeverUploaded_ThrowsVehicleDocumentNotFoundException()
     {
-        // Unlike upload, validate must NOT auto-create: validating a conditional document
-        // type that was never submitted is a genuine error, distinct from the vehicle
-        // itself being missing/cross-tenant.
+
         var organizationId = Guid.NewGuid();
         var vehicle = CreateVehicle(organizationId);
-        var repository = new FakeVehicleDocumentRepository(); // no rows at all
+        var repository = new FakeVehicleDocumentRepository();
         var handler = new ValidateVehicleDocumentCommandHandler(
             new FakeVehicleRepository(vehicle), repository, new FakeCurrentUserService(organizationId),
             new FakeAuditLogRepository(), NullLogger<ValidateVehicleDocumentCommandHandler>.Instance);

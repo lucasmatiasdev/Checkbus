@@ -63,8 +63,7 @@ public class GetExpiringDriverRequirementsCountQueryHandlerTests
         await handler.Handle(new GetExpiringDriverRequirementsCountQuery(), TestContext.Current.CancellationToken);
 
         Assert.NotNull(repository.ReceivedThreshold);
-        // Tolerance of 1 day guards against a UTC-midnight rollover between the two
-        // DateTime.UtcNow reads (test and handler), without asserting exact clock timing.
+
         var diffDays = Math.Abs(repository.ReceivedThreshold!.Value.DayNumber - expectedThreshold.DayNumber);
         Assert.InRange(diffDays, 0, 1);
     }

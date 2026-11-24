@@ -50,8 +50,6 @@ public class NotificationsClientTests
         CreatedByName = "Juan Perez"
     };
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccess()
     {
@@ -138,8 +136,6 @@ public class NotificationsClientTests
         Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
         Assert.Equal("Notifications", stub.CapturedRequest.RequestUri!.AbsolutePath.TrimStart('/').Split('/').Last());
     }
-
-    // ----- GetTripHistoryAsync -----
 
     [Fact]
     public async Task GetTripHistoryAsync_WhenOk_ReturnsSuccessWithDeserializedList()

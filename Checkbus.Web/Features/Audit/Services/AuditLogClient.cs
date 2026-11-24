@@ -38,9 +38,7 @@ public sealed class AuditLogClient([FromKeyedServices("apiservice")] HttpClient 
         HttpResponseMessage response;
         try
         {
-            // The keyed "apiservice" HttpClient's BaseAddress already ends in "/api/" (see
-            // Program.cs), so this relative path resolves to "api/audit-log" — the controller's
-            // literal route.
+
             response = await _httpClient.GetAsync($"audit-log{query}", cancellationToken);
         }
         catch (Exception)
@@ -71,8 +69,7 @@ public sealed class AuditLogClient([FromKeyedServices("apiservice")] HttpClient 
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new AuditLogListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

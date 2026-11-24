@@ -6,9 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Every action here requires Mecanico OR Administrador, same posture as
-    // MaintenanceRecordsController — no Chofer/Planificador branch exists for this feature
-    // at all (odd/tasks/vehicle-maintenance.md Constraint 6).
+
     [Route("api/[controller]")]
     [ApiController]
     public class VehicleDiagnosticsController : ControllerBase

@@ -369,7 +369,7 @@ public class CancelTripCommandHandlerTests
     [Fact]
     public async Task Handle_ExactlyAtFiveDayWindow_IsCancellable()
     {
-        // >= 5 days must pass, not throw - only STRICTLY less than 5 days is blocked.
+
         var trip = CreateTrip(DateTime.UtcNow.AddDays(5).AddMinutes(1));
         var tripRepository = new FakeTripRepository(trip);
         var handler = CreateHandler(trip, tripRepository: tripRepository);
@@ -418,12 +418,10 @@ public class CancelTripCommandHandlerTests
 
         await handler.Handle(CreateCommand(trip.Id), TestContext.Current.CancellationToken);
 
-        // Exactly ONE RefundAsync call for the whole payment, not one per reservation.
         Assert.Single(paymentService.RefundCalls);
         Assert.Equal(payment.ExternalOrderId, paymentService.RefundCalls[0].ExternalOrderId);
-        Assert.Null(paymentService.RefundCalls[0].Amount); // null = full refund
+        Assert.Null(paymentService.RefundCalls[0].Amount);
 
-        // But one Refund record per cancelled Reservation, matching IRefundRepository's convention.
         Assert.Equal(3, refundRepository.AddedRefunds.Count);
         Assert.All(refundRepository.AddedRefunds, refund => Assert.Equal(payment.Id, refund.PaymentId));
 
@@ -505,8 +503,6 @@ public class CancelTripCommandHandlerTests
             trip, tripRepository: tripRepository, reservationRepository: reservationRepository,
             paymentRepository: paymentRepository, paymentService: paymentService);
 
-        // Must not throw - the already-persisted trip/reservation cancellation must never be
-        // undone by a downstream refund failure, same posture as CancelReservationCommandHandler.
         await handler.Handle(CreateCommand(trip.Id), TestContext.Current.CancellationToken);
 
         Assert.Equal(TripStatus.Cancelado, tripRepository.UpdatedTrip?.Status);

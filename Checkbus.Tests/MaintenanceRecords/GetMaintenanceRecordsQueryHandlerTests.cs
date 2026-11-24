@@ -106,8 +106,6 @@ public class GetMaintenanceRecordsQueryHandlerTests
             new FakeMaintenanceRecordRepository([record]),
             new FakeCurrentUserService(organizationId));
 
-        // A vehicleId from a different org must never surface records — proof this never
-        // special-cases into a VehicleNotFoundException leak, it just yields no matches.
         var otherOrgVehicleId = Guid.NewGuid();
         var result = await handler.Handle(
             new GetMaintenanceRecordsQuery { VehicleId = otherOrgVehicleId }, TestContext.Current.CancellationToken);

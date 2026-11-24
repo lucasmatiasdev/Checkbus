@@ -63,8 +63,7 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new SupportTicketsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -117,9 +116,6 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
             { new StringContent(description), "Description" }
         };
 
-        // The attachment is optional — only attach a file part when the caller actually picked
-        // one, same guard VehicleDocumentsClient doesn't need (its file is required) but
-        // CreateSupportTicketRequest.Attachment is nullable.
         if (attachmentStream is not null)
         {
             var fileContent = new StreamContent(attachmentStream);
@@ -172,8 +168,7 @@ public sealed class SupportTicketsClient([FromKeyedServices("apiservice")] HttpC
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new SupportTicketCreateOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

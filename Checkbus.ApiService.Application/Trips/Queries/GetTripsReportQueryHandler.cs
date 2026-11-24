@@ -31,14 +31,12 @@ namespace Checkbus.ApiService.Application.Trips.Queries
 
         public async Task<TripsReportDto> Handle(GetTripsReportQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — mirrors GetTripsQueryHandler.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var trips = await _tripRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
 
-            // Same in-memory filtering shape as GetMaintenanceRecordsQueryHandler — each
-            // filter is "absent or matches", chained over the org-scoped list.
             var filtered = trips
                 .Where(t => request.DateFrom is null || t.DepartureDate.Date >= request.DateFrom.Value.ToDateTime(TimeOnly.MinValue))
                 .Where(t => request.DateTo is null || t.DepartureDate.Date <= request.DateTo.Value.ToDateTime(TimeOnly.MinValue))
@@ -47,8 +45,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
                 .Where(t => request.VehicleId is null || t.VehicleId == request.VehicleId)
                 .ToList();
 
-            // Vehicles/drivers referenced by this org's trips are always themselves in
-            // this org (enforced at creation time) — mirrors GetTripsQueryHandler.
             var vehicles = await _vehicleRepository.GetAllByOrganizationAsync(organizationId, cancellationToken);
             var vehiclesById = vehicles.ToDictionary(v => v.Id);
 
@@ -82,9 +78,6 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             EstimatedRevenue = trips.Sum(t => t.Price * (t.Capacity - t.AvailableSeats))
         };
 
-        // Duplicated from GetTripsQueryHandler.MapToDto (private there, and that file is
-        // out of scope for this change) rather than introducing a shared mapper for one
-        // other caller.
         private static TripDto MapToDto(
             Trip trip,
             Dictionary<Guid, Vehicle> vehiclesById,

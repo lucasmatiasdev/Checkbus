@@ -32,34 +32,28 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Commands
 
         public async Task Handle(ValidateVehicleDocumentCommand request, CancellationToken cancellationToken)
         {
-            // Administrador-only is enforced at the controller; this handler only verifies
-            // tenant ownership of the target vehicle.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new VehicleNotFoundException();
             }
 
             var documents = await _vehicleDocumentRepository.GetByVehicleIdAsync(request.VehicleId, cancellationToken);
-            // Unlike upload, validate never auto-creates: an admin trying to validate a
-            // conditional document type that was never uploaded is a genuine error.
+
             var document = documents.FirstOrDefault(d => d.Type == request.Type)
                 ?? throw new VehicleDocumentNotFoundException();
 
-            // No requirement that DocumentPresent be true first — an admin can mark NoApto
-            // on an empty row too (mirrors ValidateDriverRequirementCommandHandler).
             document.Status = request.Approved ? VehicleDocumentStatus.Apto : VehicleDocumentStatus.NoApto;
             document.ValidatedBy = _currentUser.UserId;
             document.UpdatedAt = DateTime.UtcNow;
 
             await _vehicleDocumentRepository.UpdateAsync(document, cancellationToken);
 
-            // CU-16 (odd/tasks/auditoria-sistema.md S5): no bloqueante — si falla, se loguea y la
-            // validación ya persistida sigue su curso normal.
             try
             {
                 await _auditLogRepository.AddAsync(new AuditLogEntry

@@ -21,8 +21,7 @@ namespace Checkbus.ApiService.Application.VehicleDocuments.Queries
 
         public async Task<int> Handle(GetExpiringVehicleDocumentsCountQuery request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — same anti-IDOR rationale
-            // as GetExpiringDriverRequirementsCountQueryHandler.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

@@ -307,8 +307,6 @@ public class CreateTripCommandHandlerTests
             new FakeCurrentUserService(OrganizationId));
     }
 
-    // ---- Vehicle habilitación ----
-
     [Fact]
     public async Task Handle_InactiveVehicle_ThrowsTripNotEligible()
     {
@@ -380,8 +378,6 @@ public class CreateTripCommandHandlerTests
             harness.BuildHandler().Handle(CreateCommand(vehicle.Id, driver.Id, Guid.NewGuid()), TestContext.Current.CancellationToken));
     }
 
-    // ---- Driver eligibility ----
-
     [Fact]
     public async Task Handle_InactiveDriverAccount_ThrowsTripNotEligible()
     {
@@ -451,8 +447,6 @@ public class CreateTripCommandHandlerTests
             harness.BuildHandler().Handle(CreateCommand(vehicle.Id, administrador.Id, Guid.NewGuid()), TestContext.Current.CancellationToken));
     }
 
-    // ---- Existence / IDOR ----
-
     [Fact]
     public async Task Handle_VehicleNotFound_ThrowsVehicleNotFound()
     {
@@ -507,8 +501,6 @@ public class CreateTripCommandHandlerTests
             harness.BuildHandler().Handle(CreateCommand(vehicle.Id, driver.Id, otherOrgEvent.Id), TestContext.Current.CancellationToken));
     }
 
-    // ---- Happy path ----
-
     [Fact]
     public async Task Handle_AllChecksPass_PersistsAggregateAndCallsDirectionsWithOrderedPoints()
     {
@@ -525,13 +517,11 @@ public class CreateTripCommandHandlerTests
 
         var result = await harness.BuildHandler().Handle(command, TestContext.Current.CancellationToken);
 
-        // Directions called with the ordered points, origin first, destination last.
         Assert.NotNull(harness.DirectionsService.CalledWithPoints);
         Assert.Equal(2, harness.DirectionsService.CalledWithPoints!.Count);
         Assert.Equal((command.Stops[0].Latitude, command.Stops[0].Longitude), harness.DirectionsService.CalledWithPoints[0]);
         Assert.Equal((command.Stops[1].Latitude, command.Stops[1].Longitude), harness.DirectionsService.CalledWithPoints[1]);
 
-        // Aggregate persisted atomically via one AddAsync call.
         Assert.NotNull(harness.TripRepository.AddedTrip);
         Assert.NotNull(harness.TripRepository.AddedRoute);
         Assert.Equal(2, harness.TripRepository.AddedStops.Count);
@@ -641,7 +631,6 @@ public class CreateTripCommandHandlerTests
             ]
         };
 
-        // Two legs: 0->1 takes 2 hours, 1->2 takes 3 hours.
         var legDurations = new List<TimeSpan> { TimeSpan.FromHours(2), TimeSpan.FromHours(3) };
         var harness = new Harness
         {

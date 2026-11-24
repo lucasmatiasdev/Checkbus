@@ -54,10 +54,6 @@
     [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
 
-    // I7's OAuth callback redirects here with these two query params — see
-    // MercadoPagoOAuthCallbackController/HandleMercadoPagoOAuthCallbackCommandHandler for the
-    // exact values. Read as plain strings (not bool?) to avoid any query-binding edge case —
-    // parsed manually below.
     [SupplyParameterFromQuery(Name = "connected")]
     public string? ConnectedQueryParam { get; set; }
 
@@ -125,9 +121,7 @@
             switch (outcome)
             {
                 case StartMercadoPagoConnectionOutcome.Success success:
-                    // Full external navigation to Mercado Pago's own hosted authorization page —
-                    // same forceLoad:true precedent TripReservation.razor already established
-                    // for its own checkout redirect.
+
                     NavigationManager.NavigateTo(success.AuthorizationUrl, forceLoad: true);
                     break;
 
@@ -145,10 +139,6 @@
         }
     }
 
-    // Public static deliberately — this codebase has no bUnit
-    // (see RegisterUserPageAuthorizationTests' own doc comment), so the page's markup itself
-    // cannot be rendered in a test; this pure mapping is made directly testable without one,
-    // same precedent ReservationConfirmation.GetStatusLabel already established.
     public static string GetReasonLabel(string? reason) => reason switch
     {
         "invalid_state" => "el enlace de conexión expiró o no es válido, probá de nuevo",

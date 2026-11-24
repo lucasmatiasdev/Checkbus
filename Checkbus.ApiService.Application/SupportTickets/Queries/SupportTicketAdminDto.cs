@@ -2,9 +2,7 @@ using Checkbus.ApiService.Domain.Enums;
 
 namespace Checkbus.ApiService.Application.SupportTickets.Queries
 {
-    // Same shape as SupportTicketDto (the "my tickets" DTO for a single organization), plus
-    // OrganizationId/OrganizationName - the Checkbus internal staff panel lists tickets across
-    // every organization, so the caller needs to know which organization each ticket belongs to.
+
     public class SupportTicketAdminDto
     {
         public required Guid Id { get; set; }

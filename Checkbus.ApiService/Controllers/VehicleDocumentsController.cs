@@ -10,17 +10,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Contracts
 {
-    // Colocated here rather than its own Contracts file: this task's allowed edit surface
-    // only authorizes a new UploadVehicleDocumentRequest.cs file alongside
-    // VehicleDocumentsController.cs. Same shape as ValidateDriverRequirementRequest.
+
     public sealed record ValidateVehicleDocumentRequest(bool Approved);
 }
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Every action here is Administrador-only — unlike DriverRequirementsController, there
-    // is no Chofer self-service branch at all for vehicle documents (odd/tasks/vehiculos.md
-    // Constraint 4).
+
     [Route("api/[controller]")]
     [ApiController]
     public class VehicleDocumentsController : ControllerBase

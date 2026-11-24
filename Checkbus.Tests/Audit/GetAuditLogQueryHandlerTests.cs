@@ -11,9 +11,7 @@ namespace Checkbus.Tests.Audit;
 
 public class GetAuditLogQueryHandlerTests
 {
-    // Local fake routing to the right repository method depending on the scope the handler
-    // chose, same split-by-method idea as FakeSupportTicketRepository in
-    // GetAllSupportTicketsQueryHandlerTests.
+
     private sealed class FakeAuditLogRepository(IReadOnlyList<AuditLogEntry> allEntries) : IAuditLogRepository
     {
         public Task AddAsync(AuditLogEntry entry, CancellationToken cancellationToken)
@@ -90,8 +88,6 @@ public class GetAuditLogQueryHandlerTests
             new FakeOrganizationRepository(null, new Dictionary<Guid, string?>()),
             new FakeCurrentUserService(callerOrganizationId, nameof(Role.Administrador)));
 
-        // Even trying to peek into another organization via the filter stays scoped to the
-        // Administrador's own organization (CU-16 main flow).
         var result = await handler.Handle(
             new GetAuditLogQuery { OrganizationId = otherOrganizationId },
             TestContext.Current.CancellationToken);
@@ -152,8 +148,7 @@ public class GetAuditLogQueryHandlerTests
     [Fact]
     public async Task Handle_CheckbusSoporteCallerOrganizationIsNotSentinel_ThrowsAuditLogAccessDeniedException()
     {
-        // Defense in depth: having the CheckbusSoporte Role claim is not enough - the caller's
-        // own OrganizationId must resolve to CheckbusInternalOrganization.Slug.
+
         var callerOrganizationId = Guid.NewGuid();
         var handler = new GetAuditLogQueryHandler(
             new FakeAuditLogRepository([CreateEntry(Guid.NewGuid())]),
@@ -197,16 +192,15 @@ public class GetAuditLogQueryHandlerTests
         var otherActorUserId = Guid.NewGuid();
         var baseDate = new DateTime(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc);
 
-        // Matches every filter.
         var matching = CreateEntry(
             callerOrganizationId, AuditAction.ViajeCancelado, actorUserId, baseDate);
-        // Wrong action.
+
         var wrongAction = CreateEntry(
             callerOrganizationId, AuditAction.ViajeIniciado, actorUserId, baseDate);
-        // Wrong actor.
+
         var wrongActor = CreateEntry(
             callerOrganizationId, AuditAction.ViajeCancelado, otherActorUserId, baseDate);
-        // Outside the date range.
+
         var tooEarly = CreateEntry(
             callerOrganizationId, AuditAction.ViajeCancelado, actorUserId, baseDate.AddDays(-10));
         var tooLate = CreateEntry(

@@ -26,9 +26,6 @@ namespace Checkbus.ApiService.Controllers
             return StatusCode(StatusCodes.Status201Created, result);
         }
 
-        // Planificador needs this for the rutas-publicacion module's "new Trip" form chofer
-        // picker (same class of fix as VehiclesController.GetVehicles widening for Mecanico).
-        // Register stays Administrador-only.
         [Authorize(Roles = "Administrador,Planificador")]
         [HttpGet]
         public async Task<IActionResult> GetUsers(CancellationToken cancellationToken)
@@ -37,11 +34,6 @@ namespace Checkbus.ApiService.Controllers
             return Ok(result);
         }
 
-        // CU-16 (odd/tasks/auditoria-sistema.md T4) — [Usuario] dropdown for the audit screen
-        // after a CheckbusSoporte caller picks an Organization. Deliberately a separate action/
-        // query from GetUsers above (anti-IDOR): the organizationId here is the TARGET being
-        // browsed, not the caller's own, so it is CheckbusSoporte-only with its own
-        // defense-in-depth re-check in the handler.
         [Authorize(Roles = "CheckbusSoporte")]
         [HttpGet("by-organization/{organizationId:guid}")]
         public async Task<IActionResult> GetUsersByOrganization(Guid organizationId, CancellationToken cancellationToken)

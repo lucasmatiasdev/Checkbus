@@ -91,8 +91,6 @@ public class TripsClientTests
         ]
     };
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccessWithDeserializedTrip()
     {
@@ -196,8 +194,6 @@ public class TripsClientTests
         Assert.Contains("Trips", stub.CapturedRequest.RequestUri!.ToString());
     }
 
-    // ----- PublishAsync -----
-
     [Fact]
     public async Task PublishAsync_WhenNoContent_ReturnsSuccess()
     {
@@ -292,8 +288,6 @@ public class TripsClientTests
         Assert.Contains($"Trips/{TripId}/publish", stub.CapturedRequest.RequestUri!.ToString());
     }
 
-    // ----- GetListAsync -----
-
     [Fact]
     public async Task GetListAsync_WhenOk_ReturnsSuccessWithDeserializedList()
     {
@@ -348,8 +342,6 @@ public class TripsClientTests
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains("Trips", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- GetByIdAsync -----
 
     [Fact]
     public async Task GetByIdAsync_WhenOk_ReturnsSuccessWithDeserializedDetail()
@@ -417,8 +409,6 @@ public class TripsClientTests
         Assert.Equal(HttpMethod.Get, stub.CapturedRequest!.Method);
         Assert.Contains($"Trips/{TripId}", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- UpdateStopTimesAsync (Fase D3) -----
 
     private static UpdateStopTimesRequest MakeStopTimesRequest() => new()
     {
@@ -507,8 +497,6 @@ public class TripsClientTests
         Assert.Equal(HttpMethod.Put, stub.CapturedRequest!.Method);
         Assert.Contains($"Trips/{TripId}/stops/times", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- GetSeatMapAsync (Fase E1) -----
 
     private static TripSeatMapResponse MakeSeatMap() => new()
     {

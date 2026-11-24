@@ -5,10 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.ExceptionHandling
 {
-    // Maps the boarding/abordaje surface's own domain exceptions (odd/tasks/reservas-publicas.md
-    // Fase 3). Trip ownership failures on this same surface (GetTripBoardingListQuery,
-    // ValidateBoardingCommand, CloseBoardingCommand) reuse TripNotFoundException and are already
-    // handled by TripExceptionHandler — not duplicated here.
+
     public sealed class BoardingExceptionHandler : IExceptionHandler
     {
         public async ValueTask<bool> TryHandleAsync(

@@ -36,8 +36,6 @@ public class SupportTicketsControllerAuthorizationTests : IClassFixture<Checkbus
         return client;
     }
 
-    // ---- Create (POST) ----
-
     [Fact]
     public async Task Create_MissingToken_Returns401()
     {
@@ -62,8 +60,6 @@ public class SupportTicketsControllerAuthorizationTests : IClassFixture<Checkbus
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ---- GetAll (GET) ----
-
     [Fact]
     public async Task GetAll_MissingToken_Returns401()
     {
@@ -85,8 +81,6 @@ public class SupportTicketsControllerAuthorizationTests : IClassFixture<Checkbus
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-
-    // ---- GetAttachment (GET {id}/attachment) ----
 
     [Fact]
     public async Task GetAttachment_MissingToken_Returns401()

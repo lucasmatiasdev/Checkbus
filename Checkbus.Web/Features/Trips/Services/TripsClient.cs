@@ -66,8 +66,7 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new TripActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -120,8 +119,7 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new TripPublishOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -367,8 +365,7 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new TripsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -415,15 +412,12 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new TripOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
         }
     }
-
-    // ---- Fase D3 (odd/tasks/mejoras-detalle-viaje.md) ----
 
     public async Task<TripStopTimesUpdateOutcome> UpdateStopTimesAsync(
         Guid tripId,
@@ -477,8 +471,6 @@ public sealed class TripsClient([FromKeyedServices("apiservice")] HttpClient htt
             }
         }
     }
-
-    // ---- Fase E1 (odd/tasks/mejoras-detalle-viaje.md) ----
 
     public async Task<TripSeatMapOutcome> GetSeatMapAsync(
         Guid tripId,

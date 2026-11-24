@@ -69,8 +69,6 @@ public class VehicleDiagnosticsClientTests
         ]
     };
 
-    // ----- CreateAsync -----
-
     [Fact]
     public async Task CreateAsync_WhenCreated_ReturnsSuccessWithDeserializedDiagnostic()
     {
@@ -137,7 +135,7 @@ public class VehicleDiagnosticsClientTests
     [Fact]
     public async Task CreateAsync_WhenNotFound_ReturnsNotFound()
     {
-        // The parent MaintenanceRecord doesn't exist or is out-of-org.
+
         var stub = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
         var client = CreateClient(stub);
 
@@ -173,8 +171,6 @@ public class VehicleDiagnosticsClientTests
         Assert.Equal(HttpMethod.Post, stub.CapturedRequest!.Method);
         Assert.Contains("VehicleDiagnostics", stub.CapturedRequest.RequestUri!.ToString());
     }
-
-    // ----- GetListAsync -----
 
     [Fact]
     public async Task GetListAsync_WhenOk_ReturnsSuccessWithDeserializedList()

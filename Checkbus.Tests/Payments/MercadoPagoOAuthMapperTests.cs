@@ -29,8 +29,7 @@ public class MercadoPagoOAuthMapperTests
         Assert.Contains("response_type=code", url);
         Assert.Contains("platform_id=mp", url);
         Assert.Contains("redirect_uri=https%3A%2F%2Fcheckbus.test%2Fmp%2Fcallback", url);
-        // organizationId and the caller's own CSRF token are combined into one opaque,
-        // URL-encoded state value so the (not-yet-built) I7 callback can recover both.
+
         Assert.Contains(Uri.EscapeDataString($"{organizationId}|random-csrf-token"), url);
     }
 
@@ -42,7 +41,6 @@ public class MercadoPagoOAuthMapperTests
         var url = MercadoPagoOAuthMapper.BuildAuthorizationUrl(
             "APP-123", "https://checkbus.test/mp/callback?x=1&y=2", organizationId, "token with spaces & stuff");
 
-        // A raw '&' from the redirect_uri/state must never leak in as a literal query separator.
         Assert.DoesNotContain("x=1&y=2", url);
         Assert.Contains(Uri.EscapeDataString("https://checkbus.test/mp/callback?x=1&y=2"), url);
     }
@@ -55,7 +53,7 @@ public class MercadoPagoOAuthMapperTests
             AccessToken = "APP_USR-access-token",
             RefreshToken = "TG-refresh-token",
             UserId = 987654321,
-            ExpiresIn = 15552000 // 180 days, Mercado Pago's documented value
+            ExpiresIn = 15552000
         };
 
         var before = DateTime.UtcNow;
@@ -65,8 +63,7 @@ public class MercadoPagoOAuthMapperTests
         Assert.Equal("APP_USR-access-token", result.AccessToken);
         Assert.Equal("TG-refresh-token", result.RefreshToken);
         Assert.Equal("987654321", result.SellerUserId);
-        // ExpiresAt = now + expires_in seconds, computed at mapping time — bounded by the two
-        // "now" snapshots taken immediately around the call, plus the full 180-day offset.
+
         Assert.InRange(result.ExpiresAt, before.AddSeconds(15552000), after.AddSeconds(15552000));
     }
 

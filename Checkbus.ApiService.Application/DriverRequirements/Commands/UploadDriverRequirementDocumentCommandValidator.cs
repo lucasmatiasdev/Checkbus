@@ -5,7 +5,7 @@ namespace Checkbus.ApiService.Application.DriverRequirements.Commands
     public sealed class UploadDriverRequirementDocumentCommandValidator : AbstractValidator<UploadDriverRequirementDocumentCommand>
     {
         private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "application/pdf"];
-        private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+        private const long MaxFileSizeBytes = 5 * 1024 * 1024;
 
         public UploadDriverRequirementDocumentCommandValidator()
         {

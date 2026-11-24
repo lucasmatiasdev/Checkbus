@@ -144,12 +144,12 @@
                     </TemplateColumn>
                     <TemplateColumn Title="Salida">
                         <CellTemplate>
-                            @context.Item.DepartureDate.ToString("dd/MM/yyyy HH:mm")
+                            @context.Item.DepartureDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                         </CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Llegada">
                         <CellTemplate>
-                            @context.Item.ArrivalDate.ToString("dd/MM/yyyy HH:mm")
+                            @context.Item.ArrivalDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                         </CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Estado">
@@ -217,9 +217,6 @@
         }
     }
 
-    // The driver dropdown reuses the organization's full user list — there is no dedicated
-    // "list drivers" endpoint — filtered to Role.Chofer here rather than touching the shared
-    // GetUsersQuery/UsersClient for a single consumer's filter.
     private async Task LoadDriversAsync()
     {
         var outcome = await UsersClient.GetUsersAsync();
@@ -266,9 +263,6 @@
         await LoadReportAsync();
     }
 
-    // Reuses the exact same filter-to-query-string logic as TripsReportClient.GetReportAsync so
-    // the exported file always matches what's currently on screen, then appends the format the
-    // /trips/report/export proxy (Checkbus.Web/Program.cs) expects.
     private string BuildExportHref(string format)
     {
         var query = TripsReportClient.BuildReportQuery(

@@ -92,8 +92,6 @@ public class HandlePaymentWebhookCommandHandlerTests
         }
     }
 
-    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — same fake-repository style as every other
-    // fake in this file; only GetByIdAsync is ever exercised by this handler.
     private sealed class FakeTripRepository(Trip? trip) : ITripRepository
     {
         public Task AddAsync(Trip trip, Route route, IEnumerable<Stop> stops, CancellationToken cancellationToken)
@@ -269,8 +267,6 @@ public class HandlePaymentWebhookCommandHandlerTests
         CreatedAt = DateTime.UtcNow
     };
 
-    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — minimal valid Trip for a given id, used
-    // only so FakeTripRepository can resolve the Organization behind a test's Reservation(s).
     private static Trip CreateTrip(Guid id) => new()
     {
         Id = id,
@@ -308,7 +304,6 @@ public class HandlePaymentWebhookCommandHandlerTests
             new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
             TestContext.Current.CancellationToken);
 
-        // Nothing past the dedupe check ran: GetOrderAsync/UpdateAsync never touched, nothing published.
         Assert.Equal(0, paymentRepository.UpdateCallCount);
         Assert.Empty(publisher.Published);
     }
@@ -326,9 +321,7 @@ public class HandlePaymentWebhookCommandHandlerTests
         var invoiceRepository = new FakeInvoiceRepository();
         var publisher = new FakePublisher();
         var paymentRepository = new FakePaymentRepository(payment);
-        // Fase I: only reservations[0] (reservation1)'s TripId is ever looked up to resolve the
-        // Organization behind this Payment — same "any one Reservation" posture the handler's
-        // own doc comment describes.
+
         var tripRepository = new FakeTripRepository(CreateTrip(reservation1.TripId));
 
         var handler = CreateHandler(
@@ -385,8 +378,7 @@ public class HandlePaymentWebhookCommandHandlerTests
     [Fact]
     public async Task Handle_OrphanedApproval_TriggersFullRefund_AndSendsExplanatoryEmail_NotReconfirmation()
     {
-        // The hold was already released (e.g. Cancelada by some other path) before this
-        // approval notification arrived — must refund, never confirm/invoice.
+
         var passenger = CreatePassenger();
         var reservation = CreateReservation(passenger.Id, status: ReservationStatus.Cancelada);
         var payment = CreatePayment();
@@ -409,10 +401,9 @@ public class HandlePaymentWebhookCommandHandlerTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(1, paymentService.RefundCallCount);
-        Assert.Null(paymentService.LastRefundAmount); // null = full refund, per IPaymentService's own convention
+        Assert.Null(paymentService.LastRefundAmount);
         Assert.Equal(PaymentStatus.Reembolsado, payment.Status);
 
-        // Never reconfirmed, never invoiced, nothing published.
         Assert.Equal(ReservationStatus.Cancelada, reservation.Status);
         Assert.Empty(reservationRepository.ConfirmedIds);
         Assert.Empty(invoiceRepository.AddedInvoices);
@@ -441,8 +432,6 @@ public class HandlePaymentWebhookCommandHandlerTests
         Assert.Empty(publisher.Published);
         Assert.Equal(1, processedEvents.RecordCallCount);
     }
-
-    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
 
     [Fact]
     public async Task Handle_Approved_ResolvesSellerToken_AndPassesItThroughToGetOrderAsync()
@@ -519,7 +508,6 @@ public class HandlePaymentWebhookCommandHandlerTests
                 new HandlePaymentWebhookCommand { ExternalEventId = ExternalEventId, ExternalOrderId = ExternalOrderId },
                 TestContext.Current.CancellationToken));
 
-        // GetOrderAsync/UpdateAsync never ran — the exception propagated before either.
         Assert.Equal(0, paymentRepository.UpdateCallCount);
     }
 

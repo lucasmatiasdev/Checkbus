@@ -122,8 +122,6 @@
                     };
                     await DialogService.ShowAsync<UserCreatedDialog>("Usuario creado", dialogParameters);
 
-                    // Only reset on success — the 4 failure branches below must preserve the
-                    // admin's typed data so they can fix and resubmit without retyping everything.
                     model = new RegisterUserFormModel();
                     break;
 

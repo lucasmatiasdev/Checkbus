@@ -73,8 +73,7 @@ public sealed class MaintenanceRecordsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new MaintenanceRecordActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -128,8 +127,7 @@ public sealed class MaintenanceRecordsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new MaintenanceRecordUpdateOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -177,8 +175,7 @@ public sealed class MaintenanceRecordsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new MaintenanceRecordsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -225,8 +222,7 @@ public sealed class MaintenanceRecordsClient([FromKeyedServices("apiservice")] H
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new MaintenanceRecordOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

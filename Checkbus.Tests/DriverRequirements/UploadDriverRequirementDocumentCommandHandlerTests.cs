@@ -120,8 +120,7 @@ public class UploadDriverRequirementDocumentCommandHandlerTests
         var requirement = CreateRequirement(targetUserId, DriverRequirementType.LicenciaConducir, DriverRequirementStatus.Pendiente);
         var repository = new FakeDriverRequirementRepository { Requirements = [requirement] };
         var fileStorage = new FakeFileStorageService();
-        // Even an Administrador calling with the chofer's own id as TargetUserId must be
-        // denied: uploading is chofer-self-only by role, not just by id match.
+
         var handler = new UploadDriverRequirementDocumentCommandHandler(
             repository, fileStorage, new FakeCurrentUserService(targetUserId, "Administrador"));
 
@@ -169,7 +168,7 @@ public class UploadDriverRequirementDocumentCommandHandlerTests
     public async Task Handle_MissingRequirementRow_ThrowsInvalidOperationException()
     {
         var targetUserId = Guid.NewGuid();
-        var repository = new FakeDriverRequirementRepository(); // no rows at all - data invariant violation
+        var repository = new FakeDriverRequirementRepository();
         var fileStorage = new FakeFileStorageService();
         var handler = new UploadDriverRequirementDocumentCommandHandler(
             repository, fileStorage, new FakeCurrentUserService(targetUserId, "Chofer"));

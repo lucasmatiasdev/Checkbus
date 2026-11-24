@@ -6,9 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // CU-04: standalone notification module. Every action requires Planificador OR
-    // Administrador, same raw comma-separated [Authorize(Roles = "...")] convention as
-    // TripsController/EventsController — not a side effect of any other controller's action.
+
     [Route("api/[controller]")]
     [ApiController]
     public class NotificationsController : ControllerBase

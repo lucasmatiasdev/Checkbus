@@ -4,9 +4,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Payments.Commands
 {
-    // odd/tasks/pagos-mercadopago.md Fase I, I7 — builds the Mercado Pago authorization URL for
-    // the caller's own Organization. No DB write happens here at all: that only happens once the
-    // callback (HandleMercadoPagoOAuthCallbackCommandHandler) actually receives a code back.
+
     public class StartMercadoPagoConnectionCommandHandler
         : IRequestHandler<StartMercadoPagoConnectionCommand, StartMercadoPagoConnectionResultDto>
     {
@@ -27,8 +25,7 @@ namespace Checkbus.ApiService.Application.Payments.Commands
         public Task<StartMercadoPagoConnectionResultDto> Handle(
             StartMercadoPagoConnectionCommand request, CancellationToken cancellationToken)
         {
-            // Tenant comes exclusively from the validated claim — same convention as
-            // GetVehiclesQueryHandler/RegisterUserCommandHandler.
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 

@@ -7,7 +7,7 @@ namespace Checkbus.Tests.Common;
 
 public class ValidationBehaviorTests
 {
-    // Deliberately NOT LoginCommand — proves the behavior is generic.
+
     public sealed class DummyRequest : IRequest<string>
     {
         public required string Value { get; set; }

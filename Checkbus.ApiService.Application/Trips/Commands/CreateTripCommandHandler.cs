@@ -51,23 +51,17 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
         public async Task<TripDto> Handle(CreateTripCommand request, CancellationToken cancellationToken)
         {
-            // Role gate (Planificador/Administrador) is enforced at the controller; this handler
-            // only needs to verify tenant ownership of the referenced vehicle/driver, mirroring
-            // CreateMaintenanceRecordCommandHandler.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
-            // Checkbus.Web's MudDatePicker produces Kind=Unspecified DateTimes; Npgsql's "timestamp
-            // with time zone" columns (and any comparison against them, including the overlap
-            // queries below) only accept Utc. Normalized once here and reused for the rest of the
-            // handler instead of re-converting at every use site.
             var departureDate = DateTime.SpecifyKind(request.DepartureDate, DateTimeKind.Utc);
             var arrivalDate = DateTime.SpecifyKind(request.ArrivalDate, DateTimeKind.Utc);
 
             var vehicle = await _vehicleRepository.GetByIdAsync(request.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new VehicleNotFoundException();
             }
 
@@ -77,8 +71,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var driver = await _userRepository.FindByIdAsync(request.DriverId, cancellationToken);
             if (driver is null || driver.OrganizationId != callerOrganizationId || driver.Role != Role.Chofer)
             {
-                // IDOR-safe: cross-tenant existence (and a non-Chofer role) is never leaked —
-                // someone cannot probe whether a given id belongs to an Administrador this way.
+
                 throw new DriverNotFoundException();
             }
 
@@ -88,7 +81,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var @event = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken);
             if (@event is null || @event.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence is never leaked to the caller.
+
                 throw new EventNotFoundException();
             }
 
@@ -153,13 +146,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 UpdatedAt = createdAt
             };
 
-            // Placeholder per-stop DepartureTime (odd/tasks/mejoras-detalle-viaje.md Fase D):
-            // origin = departureDate, then cumulative sum of leg durations from
-            // directionsResult.LegDurations — every Stop gets a value (origin and destino
-            // included, no special-casing), editable later via UpdateStopTimesCommandHandler.
-            // The destino's placeholder is NOT forced equal to arrivalDate — that field is
-            // independently user-entered and may not exactly match Directions' own total,
-            // which is expected and fine for a placeholder.
             var stops = new List<Stop>(resolvedLocations.Count);
             var cumulativeDepartureTime = departureDate;
             for (var i = 0; i < resolvedLocations.Count; i++)
@@ -215,7 +201,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
         private async Task EnsureVehicleEligibleAsync(Vehicle vehicle, DateTime arrivalDate, CancellationToken cancellationToken)
         {
-            // EnMantenimiento deliberately does NOT block — only Inactivo does.
+
             if (vehicle.Status == VehicleStatus.Inactivo)
             {
                 throw new TripNotEligibleException("El vehículo no está habilitado: está inactivo.");
@@ -231,7 +217,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     throw new TripNotEligibleException("El vehículo no está habilitado: tiene documentación no apta.");
                 }
 
-                // A document with no expiration date set just needs to be Apto — no date check.
                 if (document.ExpirationDate is { } expirationDate && expirationDate < arrivalDateOnly)
                 {
                     throw new TripNotEligibleException("El vehículo no está habilitado: tiene documentación vencida.");
@@ -266,7 +251,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     throw new TripNotEligibleException("El chofer no está habilitado: tiene documentación no apta.");
                 }
 
-                // A requirement with no expiration date set just needs to be Apto — no date check.
                 if (requirement.ExpirationDate is { } expirationDate && expirationDate < arrivalDateOnly)
                 {
                     throw new TripNotEligibleException("El chofer no está habilitado: tiene documentación vencida.");
@@ -274,10 +258,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             }
         }
 
-        // Human-readable public identifier: "<event-name>-<yyyyMMdd>", lowercased, accents and
-        // punctuation stripped (reuses UserEmailGenerator.SanitizeSlug, same normalization
-        // already used for Organization slugs). Disambiguated with a numeric suffix within the
-        // organization on collision (e.g. two trips to the same event on the same date).
         private async Task<string> GenerateUniqueSlugAsync(
             string eventName, DateTime departureDate, Guid organizationId, CancellationToken cancellationToken)
         {

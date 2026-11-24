@@ -8,9 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // Every action requires Planificador OR Administrador (odd/tasks/rutas-publicacion.md
-    // Constraint 6) — raw comma-separated [Authorize(Roles = "...")], matching every other
-    // controller's convention, same as EventsController.
+
     [Route("api/[controller]")]
     [ApiController]
     public class TripsController : ControllerBase
@@ -38,8 +36,6 @@ namespace Checkbus.ApiService.Controllers
             return Ok(result);
         }
 
-        // Report for CU-07 (notes/casos-de-uso-adaptacion.md) — separate query/endpoint
-        // from GetAll so the existing trips-listing screen stays untouched.
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpGet("report")]
         public async Task<IActionResult> GetReport(
@@ -63,8 +59,6 @@ namespace Checkbus.ApiService.Controllers
             return Ok(result);
         }
 
-        // Export for CU-07 — same filters as GetReport plus an output format, delegates the
-        // actual filtering/joins to GetTripsReportQuery via mediator inside the handler.
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpGet("report/export")]
         public async Task<IActionResult> ExportReport(
@@ -111,9 +105,6 @@ namespace Checkbus.ApiService.Controllers
             return Ok(result);
         }
 
-        // Not a full resource replace (PUT) — a narrow explicit status transition, same REST
-        // shape idea as MaintenanceRecordsController.Update but POST-with-204 since this isn't
-        // replacing the Trip's fields, only flipping its lifecycle status.
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpPost("{id:guid}/publish")]
         public async Task<IActionResult> Publish(Guid id, CancellationToken cancellationToken)
@@ -122,8 +113,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // Same narrow-status-transition shape as Publish above, with an extra body carrying the
-        // cancellation reason/description (CU-05).
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(
@@ -135,9 +124,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // CU-08: admin-initiated OR the trip's own Chofer, same narrow-status-transition shape
-        // as Publish above. A Chofer caller is further restricted to their own trip inside the
-        // handler (IDOR-safe) — the role claim alone never proves ownership.
         [Authorize(Roles = "Planificador,Administrador,Chofer")]
         [HttpPost("{id:guid}/start")]
         public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
@@ -146,8 +132,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // CU-08: admin-initiated OR the trip's own Chofer, same narrow-status-transition shape
-        // as Start above, but with a small body carrying the real arrival time/observations.
         [Authorize(Roles = "Planificador,Administrador,Chofer")]
         [HttpPost("{id:guid}/finish")]
         public async Task<IActionResult> Finish(
@@ -164,10 +148,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // Narrow update of the Route's Stops, not the whole Trip resource — same PUT-with-204
-        // shape idea the project doesn't have a prior precedent for on this controller, but
-        // matches a plain partial-update convention. TripId comes exclusively from the route
-        // ({id}), never trusted from the body (odd/tasks/mejoras-detalle-viaje.md Fase D3).
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpPut("{id:guid}/stops/times")]
         public async Task<IActionResult> UpdateStopTimes(
@@ -185,8 +165,6 @@ namespace Checkbus.ApiService.Controllers
             return NoContent();
         }
 
-        // CU-05: Payments whose refund never reached the gateway after a trip cancellation, for
-        // Checkbus staff to follow up on manually.
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpGet("{id:guid}/pending-refunds")]
         public async Task<IActionResult> GetPendingRefunds(Guid id, CancellationToken cancellationToken)
@@ -195,9 +173,6 @@ namespace Checkbus.ApiService.Controllers
             return Ok(result);
         }
 
-        // New authenticated, org-scoped seat-map surface for the Planificador
-        // (odd/tasks/mejoras-detalle-viaje.md Fase E1) — same occupancy computation as the
-        // public GetPublicTripSeatMapQuery, no Trip.Status == Publicado gate.
         [Authorize(Roles = "Planificador,Administrador")]
         [HttpGet("{id:guid}/seats")]
         public async Task<IActionResult> GetSeatMap(Guid id, CancellationToken cancellationToken)

@@ -14,8 +14,7 @@ namespace Checkbus.Web.Features.PublicReservations.Services;
 /// </summary>
 public static class ReservationTicketQrCode
 {
-    // 10 px per module keeps the resulting PNG a modest few KB while staying comfortably
-    // scannable at the ~160-200px <img> size this is rendered at in ReservationConfirmation.
+
     private const int PixelsPerModule = 10;
 
     public static string GeneratePngDataUrl(Guid reservationId)

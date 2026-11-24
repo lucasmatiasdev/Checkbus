@@ -28,10 +28,7 @@ namespace Checkbus.ApiService.Application.VehicleDiagnostics.Commands
 
         public async Task<VehicleDiagnosticDto> Handle(CreateVehicleDiagnosticCommand request, CancellationToken cancellationToken)
         {
-            // Role gate (Mecanico/Administrador) is enforced at the controller; this handler
-            // verifies tenant ownership by resolving the parent MaintenanceRecord's vehicle
-            // (odd/tasks/vehicle-maintenance.md Constraint 1) — same org-scope shape as M2's
-            // CreateMaintenanceRecordCommandHandler, one level deeper.
+
             var callerOrganizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -44,8 +41,7 @@ namespace Checkbus.ApiService.Application.VehicleDiagnostics.Commands
             var vehicle = await _vehicleRepository.GetByIdAsync(record.VehicleId, cancellationToken);
             if (vehicle is null || vehicle.OrganizationId != callerOrganizationId)
             {
-                // IDOR-safe: cross-tenant existence of the maintenance record is never leaked —
-                // reported as the same not-found outcome as a genuinely missing record.
+
                 throw new MaintenanceRecordNotFoundException();
             }
 
@@ -74,8 +70,6 @@ namespace Checkbus.ApiService.Application.VehicleDiagnostics.Commands
                 })
                 .ToList();
 
-            // Diagnostic and its components are persisted atomically in one aggregate save —
-            // see IVehicleDiagnosticRepository.AddAsync.
             await _vehicleDiagnosticRepository.AddAsync(diagnostic, components, cancellationToken);
 
             return new VehicleDiagnosticDto

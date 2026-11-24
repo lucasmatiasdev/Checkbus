@@ -6,13 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Checkbus.ApiService.Controllers
 {
-    // odd/tasks/pagos-mercadopago.md Fase I, I7 — authenticated surface for an Organization to
-    // connect/inspect its own Mercado Pago seller account. Role gate matches
-    // VehiclesController's own convention for a comma-separated multi-role string: this is the
-    // same "org-management action" posture as creating a Vehicle, just for payments instead.
-    // The anonymous OAuth callback deliberately lives on a SEPARATE controller
-    // (MercadoPagoOAuthCallbackController, under Controllers/Public) rather than here — see that
-    // controller's own doc comment for why.
+
     [Route("api/mercadopago-connections")]
     [ApiController]
     public class MercadoPagoConnectionsController : ControllerBase

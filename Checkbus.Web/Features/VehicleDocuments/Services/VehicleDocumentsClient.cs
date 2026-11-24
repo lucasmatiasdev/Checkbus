@@ -69,8 +69,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new VehicleDocumentsListOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -142,8 +141,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new VehicleDocumentActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -206,8 +204,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new VehicleDocumentActionOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }
@@ -249,8 +246,7 @@ public sealed class VehicleDocumentsClient([FromKeyedServices("apiservice")] Htt
             }
             catch (Exception)
             {
-                // A malformed or unparsable response body (e.g. not valid JSON) must not bubble
-                // up as an unhandled exception — the caller only ever expects a typed outcome.
+
                 return new VehicleDocumentCountOutcome.TransportError(
                     "An unexpected error occurred. Please try again.");
             }

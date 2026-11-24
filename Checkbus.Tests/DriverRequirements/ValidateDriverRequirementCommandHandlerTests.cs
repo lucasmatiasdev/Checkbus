@@ -143,8 +143,7 @@ public class ValidateDriverRequirementCommandHandlerTests
     {
         var targetUserId = Guid.NewGuid();
         var repository = new FakeDriverRequirementRepository { Requirements = [CreateRequirement(targetUserId)] };
-        // Not even the owning Chofer may self-approve: the caller's id matches
-        // targetUserId here, proving the check is role-only, not a self-service fallback.
+
         var handler = new ValidateDriverRequirementCommandHandler(
             repository,
             new FakeUserRepository(target: null),

@@ -115,8 +115,6 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = default!;
 
-    // Comfortably above Blazor's 500KB default OpenReadStream buffer and matching the backend's
-    // 5MB cap, same convention as VehicleDocuments.razor/MyDocuments.razor.
     private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
 
     private EventFormModel model = new();
@@ -152,11 +150,6 @@
                 case EventActionOutcome.Success success:
                     errorMessage = null;
 
-                    // The image upload is a second, separate request after the Event already
-                    // exists (same two-step shape as a Vehicle's documents) — a failure here does
-                    // NOT roll back the just-created Event, since there is no transactional link
-                    // between the two calls. Surface it clearly instead of silently swallowing it,
-                    // so the planificador knows to retry just the image from a future edit screen.
                     if (selectedImage is not null)
                     {
                         await using var stream = selectedImage.OpenReadStream(maxAllowedSize: MaxUploadSizeBytes);

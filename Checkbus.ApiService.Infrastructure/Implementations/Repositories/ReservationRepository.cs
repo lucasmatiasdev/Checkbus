@@ -18,7 +18,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             _context = context;
         }
 
-        // Excludes Cancelada rows — see IReservationRepository's doc comment.
         public async Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
         {
             return await _context.Reservations
@@ -31,12 +30,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             return await _context.Reservations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         }
 
-        // Payment + Passenger + Reservation rows for the whole batch are added to the same
-        // ChangeTracker and saved in one SaveChangesAsync call, so they are persisted
-        // atomically as a single aggregate — same convention as TripRepository.AddAsync.
-        // Deliberately does NOT catch DbUpdateException here: that translation into a
-        // domain-level failure belongs to the handler, keeping this repository a thin
-        // persistence layer.
         public async Task CreateBatchAsync(
             Payment payment,
             IReadOnlyCollection<Passenger> passengers,
@@ -50,10 +43,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // Thin persistence only, no business-rule checks — see IReservationRepository's doc
-        // comment. CancelReservationCommandHandler already resolved and checked this
-        // Reservation once before calling here; the not-found throw below is purely
-        // defensive.
         public async Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
         {
             var reservation = await _context.Reservations
@@ -65,9 +54,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // Fase D7: resolves every Reservation belonging to this Payment directly via its own
-        // PaymentId FK (supersedes the Fase D PaymentReservationLink join table), regardless of
-        // Status.
         public async Task<IReadOnlyList<Reservation>> GetByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken)
         {
             return await _context.Reservations
@@ -75,7 +61,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        // Fase D's approved-webhook path — mirror image of CancelAsync above.
         public async Task ConfirmAsync(Guid reservationId, CancellationToken cancellationToken)
         {
             var reservation = await _context.Reservations
@@ -87,9 +72,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // Fase E: lazy, idempotent release of unpaid holds — see IReservationRepository's doc
-        // comment. Same "check first, only write if something actually needs it" shape as
-        // SeatRepository.EnsureSeatsForVehicleAsync/BoardingRecordRepository.EnsureForTripAsync.
         public async Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
         {
             var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
@@ -100,7 +82,7 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
 
             if (expiredHolds.Count == 0)
             {
-                // Idempotent no-op read — nothing has expired for this Trip.
+
                 return;
             }
 
@@ -112,8 +94,6 @@ namespace Checkbus.ApiService.Infrastructure.Implementations.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // CU-05's pending-refunds report — see IReservationRepository's doc comment for why this
-        // does NOT exclude Cancelada (unlike GetByTripIdAsync).
         public async Task<IReadOnlyList<Reservation>> GetAllByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
         {
             return await _context.Reservations

@@ -33,10 +33,7 @@ public class SmtpEmailServiceTests
     [Fact]
     public async Task SendAsync_WithInlineImages_BlankHost_ThrowsInvalidOperationException()
     {
-        // Same blank-host fast-fail as above, but with an EmailMessage.InlineImages entry
-        // present — proves the LinkedResources embedding this adds runs to completion (any bug
-        // in it would surface here as some other exception type) before the connect attempt is
-        // what actually fails, same as the no-attachment case.
+
         var options = new EmailOptions
         {
             Host = string.Empty,

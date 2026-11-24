@@ -140,9 +140,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Same "auth/me" lookup Dashboard.razor already uses to branch UI by role — CU-16 step 8
-        // only shows [Organización] (and only lets [Usuario] list a chosen organization's users)
-        // when the authenticated caller's role is CheckbusSoporte.
+
         var httpClient = ServiceProvider.GetRequiredKeyedService<HttpClient>("apiservice");
         CurrentUserResponse? currentUser = null;
         try
@@ -151,9 +149,7 @@
         }
         catch (Exception)
         {
-            // Swallowed: a failure here still surfaces to the user below, because the audit log
-            // load that follows unconditionally needs the same "apiservice" connectivity and will
-            // fail the same way, triggering FA1's fixed error message.
+
         }
 
         isCheckbusSoporte = currentUser?.Role == "CheckbusSoporte";
@@ -164,9 +160,7 @@
             organizations = organizationsOutcome is OrganizationsListOutcome.Success success
                 ? success.Organizations
                 : [];
-            // [Usuario] has no "every organization's users" endpoint to back it (CU-16 doesn't
-            // ask for one), so it starts disabled/empty until a specific organization is chosen —
-            // see HandleOrganizationChangedAsync.
+
         }
         else
         {
@@ -191,8 +185,6 @@
         var outcome = await UsersByOrganizationClient.GetUsersByOrganizationAsync(newOrganizationId.Value);
         availableUsers = outcome is UsersListOutcome.Success success ? success.Users : [];
 
-        // CU-16 step 10: if the previously selected [Usuario] doesn't belong to the newly chosen
-        // organization, reset it back to "Todos los usuarios".
         if (filterActorUserId is not null && !availableUsers.Any(u => u.Id == filterActorUserId))
         {
             filterActorUserId = null;
@@ -204,10 +196,7 @@
         isLoading = true;
         try
         {
-            // "Hasta" compares directly against AuditLogEntry.CreatedAt (a precise timestamp) on
-            // the API side, not a date-only column, so the date the user picked must be pushed to
-            // the end of that day — otherwise anything after midnight on the selected "Hasta" day
-            // would be silently excluded.
+
             var dateToInclusive = filterDateTo?.Date.AddDays(1).AddTicks(-1);
 
             var outcome = await AuditLogClient.GetAuditLogAsync(
@@ -220,15 +209,14 @@
             switch (outcome)
             {
                 case AuditLogListOutcome.Success success:
-                    // FA2: an empty result is rendered as-is, no extra message — MudDataGrid
-                    // already renders an empty body for an empty Items list.
+
                     entries = success.Entries;
                     errorMessage = null;
                     break;
 
                 case AuditLogListOutcome.Forbidden:
                 case AuditLogListOutcome.TransportError:
-                    // FA1: fixed message, regardless of which of the two caused it.
+
                     errorMessage = "No pudimos cargar la auditoría.";
                     break;
             }
@@ -241,8 +229,7 @@
 
     private async Task ClearFiltersAsync()
     {
-        // FA3: empties every filter and reloads the full scope table determined by the caller's
-        // role, same as the initial OnInitializedAsync load.
+
         filterDateFrom = null;
         filterDateTo = null;
         filterAction = null;

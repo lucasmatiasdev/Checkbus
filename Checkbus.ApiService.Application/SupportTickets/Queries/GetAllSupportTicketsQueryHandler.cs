@@ -25,10 +25,7 @@ namespace Checkbus.ApiService.Application.SupportTickets.Queries
 
         public async Task<IReadOnlyList<SupportTicketAdminDto>> Handle(GetAllSupportTicketsQuery request, CancellationToken cancellationToken)
         {
-            // Role gate (CheckbusSoporte) is enforced at the controller; this handler additionally
-            // verifies the caller's own OrganizationId resolves to the sentinel Checkbus
-            // Organization - defense in depth, never trust the Role claim alone for this
-            // cross-tenant visibility (see CheckbusInternalOrganization's doc comment).
+
             var organizationId = _currentUser.OrganizationId
                 ?? throw new InvalidOperationException("Authenticated caller has no OrganizationId claim.");
 
@@ -40,8 +37,6 @@ namespace Checkbus.ApiService.Application.SupportTickets.Queries
 
             var tickets = await _ticketRepository.GetAllAsync(cancellationToken);
 
-            // Resolve each distinct OrganizationId's display Name once, instead of calling the
-            // repository once per ticket when several tickets share the same organization.
             var organizationNames = new Dictionary<Guid, string>();
             foreach (var distinctOrganizationId in tickets.Select(t => t.OrganizationId).Distinct())
             {

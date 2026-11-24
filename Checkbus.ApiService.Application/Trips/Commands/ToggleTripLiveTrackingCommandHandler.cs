@@ -20,7 +20,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
         public async Task Handle(ToggleTripLiveTrackingCommand request, CancellationToken cancellationToken)
         {
-            // Same IDOR-safe ownership rule as the rest of the boarding surface.
+
             var trip = await GetTripBoardingListQueryHandler.AuthorizeDriverOwnsTripAsync(
                 request.TripId, _tripRepository, _currentUser, cancellationToken);
 
@@ -33,9 +33,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             trip.LiveTrackingEnabled = request.Enabled;
             if (!request.Enabled)
             {
-                // Clear the stale point rather than leaving a frozen pin on the map once
-                // sharing stops — the viewer's screen hides the map when this is false anyway,
-                // but this keeps the data itself from implying a position that may be minutes old.
+
                 trip.CurrentLatitude = null;
                 trip.CurrentLongitude = null;
                 trip.LocationUpdatedAt = null;

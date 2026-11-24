@@ -60,8 +60,7 @@ public class ProcessedWebhookEventRepositoryTests
     [Fact]
     public async Task RecordAsync_SameEventIdTwice_ViolatesUniqueIndex()
     {
-        // The whole point of the table (Fase D3's dedupe guarantee): the DB itself, not just
-        // the handler's own check, must reject a second row for the same notification id.
+
         var cancellationToken = TestContext.Current.CancellationToken;
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);

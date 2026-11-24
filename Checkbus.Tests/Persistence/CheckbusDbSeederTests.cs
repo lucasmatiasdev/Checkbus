@@ -52,9 +52,7 @@ public class CheckbusDbSeederTests
         var adminUser = db.Users.Single(u => u.Email == SeededAdminEmail);
         Assert.Equal(Role.Administrador, adminUser.Role);
         Assert.Equal(organization.Id, adminUser.OrganizationId);
-        // Regression guard for the CLR default: MustChangePassword must be false
-        // for any user not created through the registration flow, including the
-        // seeded admin — no initializer on User.MustChangePassword relies on this.
+
         Assert.False(adminUser.MustChangePassword);
     }
 
@@ -131,13 +129,7 @@ public class CheckbusDbSeederTests
     [Fact]
     public void Seed_AdminUserReassignedToRealRole_DoesNotRevertReassignment()
     {
-        // Anti-regression for a corrected security finding: seeding must never
-        // silently undo a deliberate operator action (e.g. demoting this
-        // well-known seeded account) just because it no longer matches
-        // Administrador. There is no repair branch at all any more — an enum
-        // cannot hold an "empty"/invalid value through normal construction, so
-        // this is now true by construction, but the regression test stays to
-        // guard against a future re-introduction of repair logic.
+
         using var connection = CreateOpenConnection();
         using var db = CreateContext(connection);
         db.Database.EnsureCreated();

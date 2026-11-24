@@ -125,10 +125,6 @@ public sealed class BoardingClient([FromKeyedServices("apiservice")] HttpClient 
         return await ReadActionOutcomeAsync(response, cancellationToken);
     }
 
-    // DEMO-ONLY (odd/tasks/seguimiento-tiempo-real-demo.md) — the driver's own device toggles and
-    // posts its Geolocation position while the trip is in progress. Both reuse the same closed
-    // outcome as the rest of the boarding actions above: 204 success, 400 when the trip isn't
-    // eligible (not EnProceso, or the toggle isn't on yet), 404 IDOR-safe not-mine/doesn't-exist.
     public async Task<BoardingActionOutcome> ToggleLiveTrackingAsync(
         Guid tripId, bool enabled, CancellationToken cancellationToken = default)
     {

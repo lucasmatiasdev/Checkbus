@@ -14,13 +14,10 @@ namespace Checkbus.ApiService.Application.Vehicles.Commands
         public required VehicleStatus Status { get; set; }
         public required VehicleOwnerType OwnerType { get; set; }
 
-        // Conditional on OwnerType — see CreateVehicleCommandValidator.
         public Guid? OwnerUserId { get; set; }
         public string? OwnerName { get; set; }
         public string? OwnerDocumentNumber { get; set; }
 
-        // Deliberately ABSENT: OrganizationId (from the validated token — a body-supplied
-        // value would be a cross-tenant IDOR), same pattern as RegisterUserCommand.
     }
 
     public class CreateVehicleCommandResult

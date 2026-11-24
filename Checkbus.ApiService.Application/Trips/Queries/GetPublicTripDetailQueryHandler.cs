@@ -5,12 +5,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Trips.Queries
 {
-    // Deliberately takes NO ICurrentUserService — same public, unauthenticated posture as
-    // GetPublicTripSeatMapQueryHandler (odd/tasks/reservas-publicas.md R3). The ONLY visibility
-    // gate is Trip.Status == Publicado — a Trip that doesn't exist and a real Trip in any other
-    // status both throw the same TripNotFoundException (404), so a stranger probing random GUIDs
-    // can never distinguish "wrong id" from "exists but not published" (odd/tasks/
-    // detalle-reserva-publica.md T2 reuses this exact rationale, not a new one).
+
     public class GetPublicTripDetailQueryHandler : IRequestHandler<GetPublicTripDetailQuery, PublicTripDetailDto>
     {
         private readonly ITripRepository _tripRepository;
@@ -41,17 +36,13 @@ namespace Checkbus.ApiService.Application.Trips.Queries
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.Status != TripStatus.Publicado)
             {
-                // Same exception, same message, for both "truly doesn't exist" and "exists but
-                // not published" — see class doc comment above.
+
                 throw new TripNotFoundException();
             }
 
             var vehicle = await _vehicleRepository.GetByIdAsync(trip.VehicleId, cancellationToken);
             var capacity = vehicle?.Capacity ?? trip.Capacity;
 
-            // Only the COUNT of existing reservations is needed here — unlike
-            // GetPublicTripSeatMapQueryHandler, this endpoint never resolves/seeds individual
-            // Seat rows, it has no per-seat UI to drive.
             var reservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);
             var availableSeats = capacity - reservations.Count;
 

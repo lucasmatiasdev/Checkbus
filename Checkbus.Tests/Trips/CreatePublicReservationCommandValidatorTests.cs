@@ -64,8 +64,7 @@ public class CreatePublicReservationCommandValidatorTests
     [Fact]
     public void DocumentNumber_PasaporteWithFewerThanEightDigits_IsAccepted()
     {
-        // The exact-8-digit rule only applies to DocumentType.DNI (CU-06/CU-14) — Pasaporte
-        // only gets the NotEmpty check.
+
         var passenger = ValidPassenger();
         passenger.DocumentType = DocumentType.Pasaporte;
         passenger.DocumentNumber = "AB12345";

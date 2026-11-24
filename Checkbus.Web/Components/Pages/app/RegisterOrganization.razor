@@ -127,8 +127,6 @@
                     };
                     await DialogService.ShowAsync<OrganizationRegisteredDialog>("Organización creada", dialogParameters);
 
-                    // Only reset on success — the 4 failure branches below must preserve the
-                    // operator's typed data so they can fix and resubmit without retyping everything.
                     model = new RegisterOrganizationFormModel();
                     break;
 

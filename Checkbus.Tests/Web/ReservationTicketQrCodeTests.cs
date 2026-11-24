@@ -31,9 +31,7 @@ public class ReservationTicketQrCodeTests
         var base64Payload = dataUrl["data:image/png;base64,".Length..];
 
         Assert.NotEmpty(base64Payload);
-        // Convert.FromBase64String throws FormatException on malformed input — this is the
-        // "decodable" half of the assertion, since this repo has no QR-decoding library to
-        // verify the payload actually encodes the reservation id.
+
         var bytes = Convert.FromBase64String(base64Payload);
         Assert.NotEmpty(bytes);
     }

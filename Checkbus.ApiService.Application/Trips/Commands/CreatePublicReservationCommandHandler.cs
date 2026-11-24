@@ -17,80 +17,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Checkbus.ApiService.Application.Trips.Commands
 {
-    // All-or-nothing batch reservation create (odd/tasks/reservas-publicas.md R4), reworked in
-    // odd/tasks/pagos-mercadopago.md Fase C into a payment-gated seat hold: the batch is now
-    // persisted as PendientePago (not Confirmada), covered by one Mercado Pago order (one
-    // Payment row), and the caller is redirected to that order's checkout_url instead of
-    // getting an immediate "reserva confirmada" response. Same posture as
-    // GetPublicTripSeatMapQueryHandler: NO ICurrentUserService, no org scoping — there is no
-    // authenticated caller on this public surface, the only gate is Trip.Status == Publicado.
-    //
-    // Double-booking is prevented on two layers, deliberately:
-    //   1. A fast pre-check against existing Reservations for the requested SeatIds — gives the
-    //      common (non-racing) case a clear, cheap rejection without touching the DB's
-    //      constraint machinery.
-    //   2. The REAL guarantee: a unique index on Reservation(TripId, SeatId)
-    //      (CheckbusDbContext.OnModelCreating), which already excludes only Cancelada rows —
-    //      a PendientePago row blocks the seat for everyone else exactly like Confirmada did,
-    //      confirmed in Fase A. If another visitor's submit wins the race between this
-    //      handler's pre-check and its SaveChangesAsync, the insert throws DbUpdateException,
-    //      caught here and translated into the same domain-level failure.
-    //      IReservationRepository.CreateBatchAsync persists the whole Payment+Passenger+
-    //      Reservation batch in ONE SaveChangesAsync call, so a failed save rolls back
-    //      everything — nothing partial, matching this feature's explicit all-or-nothing
-    //      design.
-    //
-    // Ordering that avoids needing a rollback (Fase C design decision): Payment.Id is
-    // generated client-side, and IPaymentService.CreateOrderAsync is called BEFORE anything is
-    // persisted. Only once that gateway call succeeds does the handler write the Payment +
-    // Passengers + PendientePago Reservations in the single batch above. If CreateOrderAsync
-    // throws OrderCreationFailedException, nothing has been persisted yet, so there is nothing
-    // to roll back — the exception simply propagates to the controller like any other failure.
-    // The inverse (rare) failure — the gateway call succeeds but the subsequent DB write then
-    // fails for an unrelated reason — leaves a real Mercado Pago order with no matching local
-    // Payment/Reservation state; this is the exact "orphaned payment" case Fase D's webhook
-    // handler is designed to auto-refund once a notification eventually arrives for it, so no
-    // extra handling is added here for that rare path.
-    //
-    // Sending the "reserva confirmada" ticket email moved out of this handler entirely: a
-    // PendientePago hold has not been paid for yet, so confirming it by email here would be
-    // actively wrong. Fase D's PaymentApprovedEvent handler now owns building and sending that
-    // email once Mercado Pago's webhook actually confirms payment — this handler no longer
-    // depends on IEventRepository/IEmailService at all.
-    //
-    // CU-14 gap closure: the transport organization was never told a new public reservation
-    // came in. User-confirmed decision — notify every User with Role.Administrador in
-    // trip.OrganizationId, by email, one message per recipient. Zero Administradores means
-    // nothing is sent (not an error, not logged). Same defensive posture as
-    // CloseBoardingCommandHandler.NotifyAbsentPassengersAsync: runs AFTER CreateBatchAsync has
-    // durably persisted the batch, each recipient's send is try/caught independently so one
-    // bad address never blocks another recipient or the caller's response, and nothing here
-    // ever propagates — a flaky SMTP relay must not turn an already-successful reservation
-    // into a failed response. No IEventRepository/IOrganizationRepository added only to
-    // enrich the email body — the event/organization display name is intentionally omitted;
-    // the trip/date/seat-count data already in scope at this point is enough to be useful.
-    //
-    // C5: PublicWebOptions IS still a dependency again, but only to build Mercado Pago's
-    // success/failure/pending back-URLs (config.online in the order-create request) — NOT to
-    // send an email. All three outcomes point at the same /reservas/confirmacion/{ids} route
-    // ReservationConfirmation.razor already renders sensibly for every ReservationStatus
-    // (including PendientePago), same route/format TripReservation.razor:268 already uses on
-    // its own synchronous-path redirect. Same defensive posture as every other permissive
-    // options class in this codebase (PublicWebOptions.BaseUrl is blank-by-default, never
-    // throw-if-missing): a blank BaseUrl means skip the back-URLs entirely rather than send
-    // Mercado Pago a broken relative URL.
+
     public class CreatePublicReservationCommandHandler
         : IRequestHandler<CreatePublicReservationCommand, CreatePublicReservationResultDto>
     {
-        // Hardcoded, not external config — same reasoning
-        // CancelReservationCommandHandler.CancellationWindowHours already uses (Fase 1 R6's
-        // 20/min rate-limit number): no measured traffic/business data yet to justify making
-        // this configurable. 15 minutes is the de-facto industry default for "time to
-        // complete an external checkout redirect" (odd/tasks/pagos-mercadopago.md Fase E,
-        // user-confirmed no stronger preference). Lives here (not a new shared file) for the
-        // same reason CancellationWindowHours lives on the handler that most directly owns the
-        // policy — GetPublicTripSeatMapQueryHandler/GetTripSeatMapQueryHandler reference this
-        // same constant by name rather than duplicating the number.
+
         public const int HoldExpirationMinutes = 15;
 
         private readonly ITripRepository _tripRepository;
@@ -131,20 +62,13 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
             if (trip is null || trip.Status != TripStatus.Publicado)
             {
-                // Same reasoning as GetPublicTripSeatMapQueryHandler: IDOR-safe, "doesn't exist"
-                // and "exists but not published" are indistinguishable to the caller.
+
                 throw new TripNotFoundException();
             }
 
-            // The seat map page must have been viewed first for Seat rows to exist (lazily
-            // backfilled by ISeatRepository.EnsureSeatsForVehicleAsync in R3) — no need to
-            // re-ensure them here, only look them up so every requested SeatId can be
-            // validated against THIS trip's vehicle.
             var seats = await _seatRepository.GetByVehicleIdAsync(trip.VehicleId, cancellationToken);
             var seatsById = seats.ToDictionary(s => s.Id);
 
-            // A malicious client could submit a SeatId belonging to an entirely different
-            // vehicle/trip — reject the whole batch rather than silently accepting it.
             foreach (var entry in request.Passengers)
             {
                 if (!seatsById.ContainsKey(entry.SeatId))
@@ -154,15 +78,8 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 }
             }
 
-            // Fase E: lazily release any PendientePago hold on this Trip that is older than
-            // HoldExpirationMinutes, before the pre-check below reads current reservations —
-            // same "clean up state the next time something reads it" convention as
-            // ISeatRepository.EnsureSeatsForVehicleAsync, applied so an abandoned checkout
-            // doesn't block a brand-new booking attempt on the same seat.
             await _reservationRepository.ReleaseExpiredHoldsAsync(trip.Id, HoldExpirationMinutes, cancellationToken);
 
-            // Fast pre-check (not the real guarantee, see class doc comment): reject early if
-            // any requested seat already has a Reservation for this Trip.
             var existingReservations = await _reservationRepository.GetByTripIdAsync(trip.Id, cancellationToken);
             var alreadyReservedSeatIds = existingReservations.Select(r => r.SeatId).ToHashSet();
             if (request.Passengers.Any(entry => alreadyReservedSeatIds.Contains(entry.SeatId)))
@@ -170,10 +87,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 throw new SeatsNoLongerAvailableException();
             }
 
-            // Payment.Id is generated client-side, BEFORE any gateway or DB call, so it can be
-            // handed to Mercado Pago as external_reference up front (Fase C design decision —
-            // see class doc comment) and stamped onto each Reservation below (Fase D7). Fase D's
-            // webhook resolves a notification back to this Payment via that same value.
             var paymentId = Guid.NewGuid();
 
             var passengers = new List<Passenger>(request.Passengers.Count);
@@ -182,8 +95,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             foreach (var entry in request.Passengers)
             {
-                // Always a brand-new row, never looked up/deduped by DocumentNumber — explicit
-                // design decision from R1 (Passenger is not a reusable catalog).
+
                 var passenger = new Passenger
                 {
                     Id = Guid.NewGuid(),
@@ -202,10 +114,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                     SeatId = entry.SeatId,
                     PassengerId = passenger.Id,
                     Price = trip.Price,
-                    // Fase C: a seat hold, not an immediate confirmation — flips to Confirmada
-                    // only once Fase D's webhook sees the Mercado Pago order approved.
+
                     Status = ReservationStatus.PendientePago,
-                    // Fase D7: links this Reservation back to the Payment covering it.
+
                     PaymentId = paymentId
                 };
 
@@ -223,11 +134,6 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             var totalAmount = new Money(reservations.Sum(r => r.Price));
 
-            // C5: all three outcomes (success/failure/pending) redirect the buyer back to the
-            // same confirmation page, keyed by this batch's reservation ids — same
-            // route/format TripReservation.razor:268 already uses. If BaseUrl is blank
-            // (not provisioned for this environment yet), skip the back-URLs entirely rather
-            // than build a broken relative URL.
             string? successUrl = null;
             string? failureUrl = null;
             string? pendingUrl = null;
@@ -240,19 +146,9 @@ namespace Checkbus.ApiService.Application.Trips.Commands
                 pendingUrl = confirmationUrl;
             }
 
-            // Fase I (Marketplace/Split Payments): real money must land in THIS trip's own
-            // Organization's Mercado Pago account, not Checkbus's. No global fallback token
-            // exists any more — an Organization that never connected its own seller account
-            // throws OrganizationNotConnectedToMercadoPagoException here, propagated unhandled
-            // exactly like OrderCreationFailedException below (nothing persisted yet at this
-            // point in the handler, so there is nothing to roll back).
             var sellerAccessToken = await _sellerTokenResolver.ResolveAccessTokenAsync(
                 trip.OrganizationId, cancellationToken);
 
-            // The whole point of this ordering: nothing is written to our DB until Mercado
-            // Pago confirms it opened the order. A failed gateway call
-            // (OrderCreationFailedException) propagates untouched — there is nothing to roll
-            // back, so it must not be caught/swallowed here.
             var orderResult = await _paymentService.CreateOrderAsync(
                 new CreateOrderRequest(
                     totalAmount,
@@ -265,13 +161,7 @@ namespace Checkbus.ApiService.Application.Trips.Commands
 
             if (orderResult.CheckoutUrl is null)
             {
-                // Documented-rare case (odd/tasks/pagos-mercadopago.md Fase B/C): Mercado
-                // Pago's own docs say a type: "online" order's response always carries a
-                // top-level checkout_url, so a null value here means this particular response
-                // diverged from that contract. Log it and still proceed — the order and the
-                // hold it is meant to cover are both real either way, and blocking the whole
-                // flow over a missing redirect URL would strand a paid-for order with no seat
-                // hold to show for it.
+
                 _logger.LogWarning(
                     "Mercado Pago order {ExternalOrderId} for Payment {PaymentId} returned a null CheckoutUrl.",
                     orderResult.OrderId, paymentId);
@@ -292,19 +182,10 @@ namespace Checkbus.ApiService.Application.Trips.Commands
             }
             catch (DbUpdateException)
             {
-                // The race path: another visitor's submit took one of these seats between our
-                // pre-check above and this SaveChangesAsync, caught here as a unique-constraint
-                // violation on Reservation(TripId, SeatId). The failed SaveChangesAsync already
-                // guarantees nothing from this batch was persisted locally — the Mercado Pago
-                // order itself was already created at this point and is left exactly as the
-                // class doc comment describes: an orphaned payment for Fase D's webhook to
-                // discover and auto-refund once its notification arrives.
+
                 throw new SeatsNoLongerAvailableException();
             }
 
-            // CU-14: the batch is now real — notify the organization's admins. See class doc
-            // comment for the full defensive-posture rationale; failures here must never
-            // affect the response already earned above.
             await NotifyOrganizationAdminsAsync(trip, reservations.Count, cancellationToken);
 
             return new CreatePublicReservationResultDto

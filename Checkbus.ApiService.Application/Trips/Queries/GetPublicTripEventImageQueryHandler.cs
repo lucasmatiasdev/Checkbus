@@ -6,9 +6,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Trips.Queries
 {
-    // No ICurrentUserService — same public, unauthenticated posture as every other handler on
-    // this surface. Same TripNotFoundException for "doesn't exist" and "exists but not
-    // Publicado" as GetPublicTripDetailQueryHandler/GetPublicTripSeatMapQueryHandler.
+
     public class GetPublicTripEventImageQueryHandler : IRequestHandler<GetPublicTripEventImageQuery, EventImageFileDto>
     {
         private readonly ITripRepository _tripRepository;

@@ -4,11 +4,7 @@ using MediatR;
 
 namespace Checkbus.ApiService.Application.Trips.Queries
 {
-    // DEMO-ONLY. Deliberately NEVER throws for "trip doesn't exist" or "not tracking right now" —
-    // both collapse into the exact same { LiveTrackingEnabled: false, ... } shape, so an anonymous
-    // poller can never distinguish "wrong id" from "right id but nothing to show yet", same
-    // posture as GetPublicTripDetailQueryHandler's shared TripNotFoundException, just expressed as
-    // a 200 instead of a 404 because this is polled continuously and a 404 storm would be noisy.
+
     public class GetTripLocationQueryHandler : IRequestHandler<GetTripLocationQuery, TripLocationDto>
     {
         private static readonly TripLocationDto NotTracking = new() { LiveTrackingEnabled = false };

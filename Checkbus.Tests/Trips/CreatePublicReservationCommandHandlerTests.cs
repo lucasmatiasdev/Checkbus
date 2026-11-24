@@ -95,9 +95,7 @@ public class CreatePublicReservationCommandHandlerTests
         public List<Reservation>? SavedReservations { get; private set; }
 
         public Task<IReadOnlyList<Reservation>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken)
-            // Excludes Cancelada, matching ReservationRepository's real contract — needed so a
-            // hold just released by ReleaseExpiredHoldsAsync below correctly stops blocking the
-            // pre-check in the same Handle() call.
+
             => Task.FromResult<IReadOnlyList<Reservation>>(
                 existingReservations.Where(r => r.TripId == tripId && r.Status != ReservationStatus.Cancelada).ToList());
 
@@ -109,11 +107,7 @@ public class CreatePublicReservationCommandHandlerTests
         {
             if (throwOnSave)
             {
-                // Simulates the real DB unique-constraint violation on
-                // Reservation(TripId, SeatId) surfacing from SaveChangesAsync when a
-                // concurrent submit wins the race between the handler's pre-check and this
-                // call. By this point (Fase C ordering), the Mercado Pago order already
-                // "succeeded" from the handler's point of view — only the local write fails.
+
                 throw new DbUpdateException("Simulated unique-constraint violation.");
             }
 
@@ -129,11 +123,6 @@ public class CreatePublicReservationCommandHandlerTests
         public Task CancelAsync(Guid reservationId, CancellationToken cancellationToken)
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
 
-        // Fase E: mirrors ReservationRepository.ReleaseExpiredHoldsAsync's real behavior
-        // in-memory against existingReservations — see
-        // GetPublicTripSeatMapQueryHandlerTests' identical fake for rationale. Lets this
-        // handler's own tests prove an expired hold is released before the
-        // "already reserved" pre-check runs, freeing the seat for a new attempt.
         public Task ReleaseExpiredHoldsAsync(Guid tripId, int holdExpirationMinutes, CancellationToken cancellationToken)
         {
             var cutoff = DateTime.UtcNow.AddMinutes(-holdExpirationMinutes);
@@ -147,11 +136,6 @@ public class CreatePublicReservationCommandHandlerTests
         }
     }
 
-    // Fake IPaymentService — same public-list-for-assertions, NotSupportedException-for-unused
-    // style as every other fake in this codebase (e.g. FakeEmailService below). Defaults to a
-    // successful order creation so every test that doesn't care about the payment gateway
-    // itself (seat-validation failures, the DbUpdateException race path) doesn't need to wire
-    // one up explicitly.
     private sealed class FakePaymentService(
         CreateOrderResult? createOrderResult = null,
         Exception? createOrderException = null) : IPaymentService
@@ -180,10 +164,6 @@ public class CreatePublicReservationCommandHandlerTests
             => throw new NotSupportedException("Not needed by CreatePublicReservationCommandHandler.");
     }
 
-    // Fase I (odd/tasks/pagos-mercadopago.md, I9) — fake IMercadoPagoSellerTokenResolver, same
-    // NotSupportedException-for-unused/public-list-for-assertions style as every other fake in
-    // this file. Defaults to a successful resolution so every pre-existing test that doesn't
-    // care about the resolver at all keeps working unchanged.
     private sealed class FakeMercadoPagoSellerTokenResolver(
         string token = "seller-access-token", Exception? exception = null) : IMercadoPagoSellerTokenResolver
     {
@@ -202,9 +182,6 @@ public class CreatePublicReservationCommandHandlerTests
         }
     }
 
-    // CU-14: fake IUserRepository, same NotSupportedException-for-unused style as every other
-    // fake in this file — only GetAllByOrganizationAsync is exercised by the handler's
-    // post-persistence admin-notification step.
     private sealed class FakeUserRepository(IReadOnlyList<User> users) : IUserRepository
     {
         public Guid? ReceivedOrganizationId { get; private set; }
@@ -237,10 +214,6 @@ public class CreatePublicReservationCommandHandlerTests
         }
     }
 
-    // CU-14: fake IEmailService — same SentMessages-list style as
-    // CloseBoardingCommandHandlerTests/CreateSupportTicketCommandHandlerTests. ThrowFor lets a
-    // single test target exactly one recipient's send without aborting the others, proving the
-    // handler's per-recipient try/catch.
     private sealed class FakeEmailService(IReadOnlyCollection<string>? throwFor = null) : IEmailService
     {
         public List<EmailMessage> SentMessages { get; } = [];
@@ -293,15 +266,10 @@ public class CreatePublicReservationCommandHandlerTests
             reservationRepository,
             paymentService ?? new FakePaymentService(),
             sellerTokenResolver ?? new FakeMercadoPagoSellerTokenResolver(),
-            // No Administrador users by default — every pre-existing test in this file that
-            // doesn't care about CU-14's notification step keeps working unchanged (empty
-            // org user list means NotifyOrganizationAdminsAsync sends nothing).
+
             userRepository ?? new FakeUserRepository([]),
             emailService ?? new FakeEmailService(),
-            // Blank BaseUrl by default — matches PublicWebOptions' own permissive/blank-until-
-            // provisioned default, and every pre-existing test in this file that doesn't care
-            // about back-URLs keeps working unchanged (CreatePublicReservationCommandHandler
-            // skips setting them entirely when BaseUrl is blank).
+
             publicWebOptions ?? new PublicWebOptions(),
             NullLogger<CreatePublicReservationCommandHandler>.Instance);
 
@@ -352,9 +320,9 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.NotNull(reservationRepository.SavedPassengers);
         Assert.Single(reservationRepository.SavedPassengers!);
         Assert.Single(reservationRepository.SavedReservations!);
-        // The core Fase C behavior change: a hold, not an immediate confirmation.
+
         Assert.Equal(ReservationStatus.PendientePago, reservationRepository.SavedReservations![0].Status);
-        // D7: each persisted Reservation carries the batch's own Payment.Id.
+
         Assert.NotNull(reservationRepository.SavedPayment);
         Assert.Equal(reservationRepository.SavedPayment!.Id, reservationRepository.SavedReservations![0].PaymentId);
     }
@@ -394,7 +362,7 @@ public class CreatePublicReservationCommandHandlerTests
         {
             Assert.Equal(trip.Price, r.Price);
             Assert.Equal(ReservationStatus.PendientePago, r.Status);
-            // D7: each persisted Reservation carries the batch's own Payment.Id.
+
             Assert.Equal(reservationRepository.SavedPayment!.Id, r.PaymentId);
         });
     }
@@ -434,8 +402,7 @@ public class CreatePublicReservationCommandHandlerTests
     {
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
-        // A SeatId that exists but belongs to a completely different vehicle — must not be
-        // silently accepted.
+
         var foreignSeat = new Seat { Id = Guid.NewGuid(), VehicleId = Guid.NewGuid(), Number = 1 };
 
         var handler = CreateHandler(trip, [foreignSeat], new FakeReservationRepository([]));
@@ -449,11 +416,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_DuplicateSeatInSameRequest_ThrowsSeatsNoLongerAvailable()
     {
-        // Defense-in-depth: CreatePublicReservationCommandValidator already rejects this at
-        // the FluentValidation layer, but the handler must not silently misbehave (e.g.
-        // double-counting) if that rule were ever bypassed — a duplicate SeatId collides with
-        // the existing-reservation pre-check logic and is rejected the same way an
-        // already-taken seat would be.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -464,10 +427,6 @@ public class CreatePublicReservationCommandHandlerTests
             Passengers = [CreateEntry(seat.Id, "1"), CreateEntry(seat.Id, "2")]
         };
 
-        // Not already reserved, and both entries resolve to the same real seat — the handler
-        // builds two Reservation rows for the same (TripId, SeatId) pair, which the batch save
-        // would reject via the unique index; here that is simulated by throwOnSave. The order
-        // call still happens (and succeeds) before this — the real failure is the local save.
         var reservationRepository = new FakeReservationRepository([], throwOnSave: true);
         var handlerWithThrow = CreateHandler(trip, [seat], reservationRepository);
 
@@ -498,9 +457,6 @@ public class CreatePublicReservationCommandHandlerTests
                 TestContext.Current.CancellationToken));
     }
 
-    // Fase E (odd/tasks/pagos-mercadopago.md): an expired PendientePago hold on the requested
-    // seat must be released BEFORE the "already reserved" pre-check runs, so the new attempt
-    // succeeds instead of being wrongly rejected.
     [Fact]
     public async Task Handle_ExistingHoldExpired_ReleasesItAndSucceedsOnSameSeat()
     {
@@ -531,9 +487,6 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Equal(ReservationStatus.PendientePago, reservationRepository.SavedReservations![0].Status);
     }
 
-    // The mirror case: a hold still inside the window must keep blocking the seat, same as
-    // Handle_SeatAlreadyReserved_PreCheckThrowsSeatsNoLongerAvailable above but explicit about
-    // the age boundary.
     [Fact]
     public async Task Handle_ExistingHoldNotExpired_StillBlocksSeat()
     {
@@ -563,12 +516,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_SaveThrowsDbUpdateException_RethrowsAsSeatsNoLongerAvailable()
     {
-        // Proves the race path: the pre-check passes (nothing reserved yet from this
-        // handler's point of view), the Mercado Pago order call succeeds, but the single
-        // CreateBatchAsync save throws DbUpdateException (simulating another visitor's
-        // concurrent submit winning the race via the real unique index on
-        // Reservation(TripId, SeatId)) — the handler must translate that into the same
-        // domain-level failure, not let it bubble up as a raw DbUpdateException / 500.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -638,11 +586,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_CallsCreateOrderAsync_WithPaymentIdAsExternalReference()
     {
-        // The whole point of generating Payment.Id client-side before the gateway call
-        // (Fase C design decision): it becomes external_reference up front, so Fase D's
-        // webhook can resolve a Mercado Pago notification back to this exact Payment row.
-        // Round-trip proof: the value passed as ExternalReference must equal the Id on the
-        // Payment row that actually got persisted.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -682,9 +626,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_OrderResultWithNullCheckoutUrl_StillPersistsAndReturnsNullCheckoutUrl()
     {
-        // Documented-rare case (CreateOrderResult.CheckoutUrl's own doc comment) — must not
-        // block the whole flow, just surface null rather than throwing or silently fabricating
-        // a URL.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -705,9 +647,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_OrderCreationFails_PropagatesAndPersistsNothing()
     {
-        // The Fase C ordering's whole purpose: Payment.Id is generated and CreateOrderAsync is
-        // called BEFORE any DB write, so a gateway failure has nothing to roll back — the
-        // exception propagates untouched and CreateBatchAsync must never have been called.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -729,10 +669,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_NonBlankBaseUrl_BuildsAllThreeBackUrlsFromBaseUrlAndReservationIds()
     {
-        // C5: all three back-URLs point at the exact same confirmation route/format
-        // TripReservation.razor:268 already uses, keyed by THIS batch's reservation ids (not
-        // known until the handler generates them) — the real assertion is a round-trip against
-        // whatever ids actually got persisted.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seats = new List<Seat>
@@ -766,8 +703,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_BlankBaseUrl_SkipsBackUrlsEntirely()
     {
-        // Defensive posture explicitly required by C5: a blank BaseUrl (not provisioned for
-        // this environment yet) must never produce a broken relative URL sent to Mercado Pago.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -786,8 +722,6 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Null(paymentService.ReceivedRequest!.FailureUrl);
         Assert.Null(paymentService.ReceivedRequest!.PendingUrl);
     }
-
-    // --- Fase I (odd/tasks/pagos-mercadopago.md, I9): seller token resolution. ---
 
     [Fact]
     public async Task Handle_ResolvesSellerToken_AndPassesItThroughToCreateOrderAsync()
@@ -813,9 +747,7 @@ public class CreatePublicReservationCommandHandlerTests
     [Fact]
     public async Task Handle_OrganizationNotConnected_PropagatesWithoutPersistingAnything()
     {
-        // No global fallback token exists any more (Fase I's whole point) — an unconnected
-        // Organization's attempt to charge a seat hold must fail loudly, same "propagate
-        // unhandled, nothing to roll back" posture as OrderCreationFailedException above.
+
         var vehicleId = Guid.NewGuid();
         var trip = CreateTrip(vehicleId);
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
@@ -835,8 +767,6 @@ public class CreatePublicReservationCommandHandlerTests
         Assert.Null(reservationRepository.SavedPassengers);
         Assert.Null(reservationRepository.SavedReservations);
     }
-
-    // --- CU-14: notify the organization's Administrador users on a new public reservation. ---
 
     [Fact]
     public async Task Handle_OneAdministradorInOrganization_SendsOneEmailToThatAdmin()
@@ -869,7 +799,7 @@ public class CreatePublicReservationCommandHandlerTests
         var seat = new Seat { Id = Guid.NewGuid(), VehicleId = vehicleId, Number = 1 };
         var admin1 = CreateAdmin(trip.OrganizationId, "admin1@checkbus.test");
         var admin2 = CreateAdmin(trip.OrganizationId, "admin2@checkbus.test");
-        // A Chofer in the same org must never receive this notification.
+
         var chofer = new User
         {
             Id = Guid.NewGuid(),
@@ -936,7 +866,6 @@ public class CreatePublicReservationCommandHandlerTests
             new CreatePublicReservationCommand { TripId = trip.Id, Passengers = [CreateEntry(seat.Id)] },
             TestContext.Current.CancellationToken);
 
-        // The failure for one recipient must not abort the loop nor the caller's response.
         Assert.Single(result.Reservations);
         Assert.Single(emailService.SentMessages);
         Assert.Equal("healthy@checkbus.test", emailService.SentMessages[0].To);
